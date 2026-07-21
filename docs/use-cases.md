@@ -1386,21 +1386,17 @@ _Use cases for the web application interface._
 
 **UI Components:**
 
-1. **Competition Card Grid**
-   - Display competitions in a responsive grid layout
+1. **Country Groups**
+   - Competitions grouped by country
+   - Countries sorted alphabetically (A-Z)
+   - Country header with flag icon (if available)
+
+2. **Competition Card**
    - Each card shows:
      - League badge/logo (if available)
      - League name
-     - Country flag or name
-     - Fixture count badge (visual indicator)
+     - Fixture count icon with number (e.g., 📅 10)
    - Cards are clickable, navigating to the league detail page
-
-2. **Fixture Count Badge**
-   - Visual indicator styles based on count:
-     - **Hot** (red/orange): 5+ fixtures upcoming
-     - **Active** (green): 2-4 fixtures upcoming
-     - **Low** (grey): 0-1 fixtures upcoming
-   - Displays the numeric count
 
 3. **Empty State**
    - Message when no competitions are available
@@ -1414,14 +1410,30 @@ GET /api/leagues/overview
 **Response Structure:**
 ```json
 {
-  "competitions": [
+  "countries": [
     {
-      "leagueId": 1,
-      "name": "Premier League",
       "country": "England",
-      "logoUrl": "...",
-      "fixtureCount": 10,
-      "nextFixtureDate": "2026-07-22T15:00:00Z"
+      "countryCode": "GB-ENG",
+      "competitions": [
+        {
+          "leagueId": 1,
+          "name": "Premier League",
+          "logoUrl": "...",
+          "fixtureCount": 10
+        }
+      ]
+    },
+    {
+      "country": "Germany",
+      "countryCode": "DE",
+      "competitions": [
+        {
+          "leagueId": 2,
+          "name": "Bundesliga",
+          "logoUrl": "...",
+          "fixtureCount": 9
+        }
+      ]
     }
   ],
   "totalFixtures": 45,
@@ -1431,8 +1443,9 @@ GET /api/leagues/overview
 
 **Acceptance Criteria:**
 - [ ] Homepage displays all supported competitions
-- [ ] Each competition shows an accurate fixture count
-- [ ] Visual badge colour reflects fixture availability
+- [ ] Competitions are grouped by country
+- [ ] Countries are sorted alphabetically (A-Z)
+- [ ] Each competition shows fixture count with icon
 - [ ] Clicking a competition navigates to its detail page
 - [ ] Page loads within 500ms (cached data)
 - [ ] Responsive layout works on mobile and desktop
