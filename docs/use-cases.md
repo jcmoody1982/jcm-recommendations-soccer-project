@@ -19,7 +19,7 @@ When adding a new use case, copy this template:
 
 **API Source(s):** [Where does the data come from?]
 
-**Status:** Draft | Defined | In Progress | Done
+**Status:** Draft | Reviewed | In Progress | Done
 ```
 
 ---
@@ -63,12 +63,13 @@ When adding a new use case, copy this template:
 - Refresh data on a **daily schedule**
 - Store fixtures locally so the app can serve them without hitting the API on every request
 
-**Status:** Defined
+**Status:** Reviewed
 
 **Next Steps:**
-- [ ] Explore the fixtures endpoint to understand its structure
-- [ ] Define domain entities (League, Season, Fixture, Team)
+- [ ] Define domain entities (League, Fixture, Team)
 - [ ] Implement persistence layer
+- [ ] Build API client to fetch data
+- [ ] Implement daily refresh scheduler
 
 ---
 
