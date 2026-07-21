@@ -152,6 +152,45 @@ When adding a new use case, copy this template:
 
 ---
 
+### UC-004: Team Recent Form Stats (Last 5 Matches)
+
+**Goal:** Track recent form statistics for teams to supplement season-level data with current momentum.
+
+**User Story:** As a user, I want to see a team's recent form (last 5 matches) so that I can understand their current momentum and make better predictions.
+
+**Data Required:**
+- **Team (identity)**: id, name, competition_id
+- **Results & Points**: seasonWinsNum, seasonDrawsNum, seasonLossesNum, seasonPPG, table_position, performance_rank (all with overall/home/away splits)
+- **Goals**: seasonGoals, seasonConceded, seasonGoalsTotal, seasonGoalDifference, scoredAVG, concededAVG (all with overall/home/away splits)
+- **BTTS**: seasonBTTS, seasonBTTSPercentage, seasonBTTSHT, seasonBTTSPercentageHT (all with overall/home/away splits)
+- **Over/Under Goals**: seasonOver05Num to seasonOver55Num, seasonOver05Percentage to seasonOver55Percentage, seasonUnder05Num to seasonUnder55Num (all with overall/home/away splits)
+- **Corners**: cornersTotal, cornersTotalAVG, cornersAgainst, cornersAgainstAVG, cornersHighest, cornersLowest (all with overall/home/away splits)
+- **Cards**: cardsTotal, cardsAVG, cards_for, cards_against, cards_for_avg, cards_against_avg, fh_cards_total, 2h_cards_total (all with overall/home/away splits)
+- **Other**: foulsTotal, foulsAVG, cleanSheets, failedToScore (all with overall/home/away splits)
+
+**API Source:**
+- `/lastx?team_id=XXX` — returns last 5, 6, and 10 match stats in one call (focus on last 5)
+
+**Behavior:**
+- For teams appearing in upcoming fixtures (UC-001), fetch their recent form
+- Store last 5 match statistics
+- Link to team entity via team ID
+- Refresh alongside fixtures (daily schedule)
+- Use to enhance fixture predictions alongside season stats (UC-002)
+
+**Dependencies:** 
+- UC-001 (identifies teams in upcoming fixtures)
+- UC-002 (team IDs for lookup)
+
+**API Call Strategy:**
+- Fetch on-demand for teams in upcoming fixtures only
+- ~40 teams per day (avg 2 teams × ~20 fixtures across leagues with games that day)
+- Avoids 840+ calls for all teams
+
+**Status:** Draft
+
+---
+
 ## Data Model Summary
 
 _As use cases are defined, summarize the domain entities needed here._
@@ -166,6 +205,7 @@ _As use cases are defined, summarize the domain entities needed here._
 | FixturePotentials | fixtureId, btts_potential, o15/o25/o35/o45_potential, corners_potential, cards_potential, avg_potential, etc. | API `/league-matches` | UC-001 |
 | Referee | id, full_name, first_name, last_name, known_as, seasonId | API `/league-referees` | UC-003 |
 | RefereeStats | refereeId, seasonId, appearances, outcomes, goals, btts, penalties, cards (all fields) | API `/league-referees` | UC-003 |
+| TeamRecentForm | teamId, results, goals, btts, over/under, corners, cards, fouls, cleanSheets (last 5 matches) | API `/lastx` | UC-004 |
 
 ---
 
@@ -185,6 +225,7 @@ _Document the external APIs being used._
 | `/league-matches` | Get all matches for a season | `?key=XXX&season_id=17146` |
 | `/league-teams` | Get teams with season stats | `?key=XXX&season_id=17146&include=stats` |
 | `/league-referees` | Get referees with stats | `?key=XXX&season_id=17146` |
+| `/lastx` | Get team last 5/6/10 form stats | `?key=XXX&team_id=93` |
 
 ### `/league-matches` Response Fields
 
