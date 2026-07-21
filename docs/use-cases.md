@@ -79,8 +79,8 @@ _As use cases are defined, summarize the domain entities needed here._
 | Entity | Key Fields | Source | Used By |
 |--------|------------|--------|---------|
 | League | name, image, country, currentSeasonId | API `/league-list` (last entry in `season` array) | UC-001 |
-| Team | id, name | API (fixtures response) | UC-001 |
-| Fixture | id, seasonId, homeTeam, awayTeam, matchDateTime, venue, status | API (TBD endpoint) | UC-001 |
+| Team | id, name | API `/league-matches` (`homeID`/`awayID`, `home_name`/`away_name`) | UC-001 |
+| Fixture | id, seasonId, homeTeam, awayTeam, dateUnix, stadium, status, gameWeek | API `/league-matches` | UC-001 |
 
 ---
 
@@ -97,4 +97,25 @@ _Document the external APIs being used._
 | Endpoint | Purpose | Example |
 |----------|---------|---------|
 | `/league-list` | Get supported leagues | `?key=XXX&chosen_leagues_only=true` |
-| `/league-matches` | Get fixtures for a season | TBD - need to explore |
+| `/league-matches` | Get all matches for a season | `?key=XXX&season_id=17146` |
+
+### `/league-matches` Response Fields
+
+Key fields from match objects:
+
+| Field | Description |
+|-------|-------------|
+| `id` | Match ID |
+| `homeID` / `awayID` | Team IDs |
+| `home_name` / `away_name` | Team names |
+| `date_unix` | Match date/time (Unix timestamp) |
+| `status` | `complete`, `incomplete`, `suspended`, `canceled` |
+| `game_week` | Matchday/game week number |
+| `homeGoalCount` / `awayGoalCount` | Goals scored |
+| `stadium_name` | Venue |
+| `competition_id` | League/competition ID |
+
+Query parameters:
+- `season_id` (required): The season ID from league-list
+- `page`: Pagination (default ~300-500 matches per page)
+- `max_per_page`: Up to 1000 matches per page
