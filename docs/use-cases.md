@@ -1391,12 +1391,17 @@ _Use cases for the web application interface._
    - Countries sorted alphabetically (A-Z)
    - Country header with flag icon (if available)
 
-2. **Competition Card**
+2. **Competition Card (Expandable)**
    - Each card shows:
      - League badge/logo (if available)
      - League name
      - Fixture count icon with number (e.g., 📅 10)
-   - Cards are clickable, navigating to the league detail page
+     - Expand/collapse indicator (chevron)
+   - Clicking a card expands to reveal fixtures below
+   - Expanded section shows:
+     - List of upcoming fixtures for that competition
+     - Each fixture displays: home team vs away team, date/time
+     - Clicking again collapses the section
 
 3. **Empty State**
    - Message when no competitions are available
@@ -1419,7 +1424,21 @@ GET /api/leagues/overview
           "leagueId": 1,
           "name": "Premier League",
           "logoUrl": "...",
-          "fixtureCount": 10
+          "fixtureCount": 2,
+          "fixtures": [
+            {
+              "fixtureId": 101,
+              "homeTeam": "Arsenal",
+              "awayTeam": "Chelsea",
+              "matchDate": "2026-07-22T15:00:00Z"
+            },
+            {
+              "fixtureId": 102,
+              "homeTeam": "Liverpool",
+              "awayTeam": "Man United",
+              "matchDate": "2026-07-22T17:30:00Z"
+            }
+          ]
         }
       ]
     },
@@ -1431,12 +1450,20 @@ GET /api/leagues/overview
           "leagueId": 2,
           "name": "Bundesliga",
           "logoUrl": "...",
-          "fixtureCount": 9
+          "fixtureCount": 1,
+          "fixtures": [
+            {
+              "fixtureId": 201,
+              "homeTeam": "Bayern Munich",
+              "awayTeam": "Dortmund",
+              "matchDate": "2026-07-23T14:30:00Z"
+            }
+          ]
         }
       ]
     }
   ],
-  "totalFixtures": 45,
+  "totalFixtures": 3,
   "lastUpdated": "2026-07-21T03:00:00Z"
 }
 ```
@@ -1446,7 +1473,9 @@ GET /api/leagues/overview
 - [ ] Competitions are grouped by country
 - [ ] Countries are sorted alphabetically (A-Z)
 - [ ] Each competition shows fixture count with icon
-- [ ] Clicking a competition navigates to its detail page
+- [ ] Clicking a competition expands to show fixtures
+- [ ] Clicking again collapses the fixture list
+- [ ] Expanded fixtures show home vs away and date/time
 - [ ] Page loads within 500ms (cached data)
 - [ ] Responsive layout works on mobile and desktop
 
