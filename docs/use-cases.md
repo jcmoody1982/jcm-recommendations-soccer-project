@@ -73,31 +73,48 @@ When adding a new use case, copy this template:
 
 ---
 
-### UC-002: Maintain Distinct Team List from Fixtures
+### UC-002: Maintain Enriched Team List
 
-**Goal:** Build and maintain a distinct list of team domain objects extracted from fixture data.
+**Goal:** Build and maintain a distinct list of team domain objects with full season statistics.
 
-**User Story:** As the system, I want to maintain a canonical list of teams so that team data is normalized and reusable across features.
+**User Story:** As the system, I want to maintain a canonical list of teams with their stats so that team data is normalized and reusable across features.
 
 **Data Required:**
-- **Team**: id, name (extracted from fixture `homeID`/`awayID` and `home_name`/`away_name`)
+- **Team (basic)**: id, name, country, stadium_name, leagueId/seasonId
+- **Team (season stats)**: All stats from `/league-teams?include=stats`
 
-**API Source:** Derived from `/league-matches` responses (no separate API call needed)
+**API Source:** 
+- `/league-teams?season_id=XXX&include=stats` — full team data with season statistics
+
+**Key Team Fields:**
+| Field | Description |
+|-------|-------------|
+| `id` | Team ID |
+| `name` / `cleanName` | Team name |
+| `country` | Country |
+| `image` | Team logo URL |
+| `stadium_name` | Home stadium |
+| `matchesPlayed` | Games played |
+| `points` | League points |
+| `position` | League position |
+| `seasonWins_home/away` | Wins (home/away split) |
+| `seasonDraws_home/away` | Draws (home/away split) |
+| `seasonLosses_home/away` | Losses (home/away split) |
+| `seasonGoals` / `seasonGoals_home/away` | Goals scored |
+| `seasonConceded_home/away` | Goals conceded |
+| `seasonGoalDifference` | Goal difference |
+| Plus all other season stats | PPG, BTTS%, Over/Under, form, etc. |
 
 **Behavior:**
-- When fixtures are fetched (UC-001), extract team data from each match
-- For each fixture, capture both home and away team (id + name)
-- Deduplicate by team ID to maintain a distinct list
-- Update team records if name changes (upsert logic)
-- Teams are linked to fixtures via foreign key relationship
+- For each league's current season, call `/league-teams?season_id=XXX&include=stats`
+- Store team basic info + all season statistics
+- Link teams to their league/season
+- Upsert by team ID (update stats on each refresh)
+- Refresh alongside fixtures (daily schedule)
 
-**Dependencies:** UC-001 (fixtures must be fetched first)
+**Dependencies:** UC-001 (need season IDs from league list)
 
 **Status:** Draft
-
-**Open Questions:**
-- Should we store which league(s) a team belongs to?
-- Do we need additional team data beyond id/name (e.g., logo, country)?
 
 ---
 
@@ -108,7 +125,8 @@ _As use cases are defined, summarize the domain entities needed here._
 | Entity | Key Fields | Source | Used By |
 |--------|------------|--------|---------|
 | League | name, image, country, currentSeasonId | API `/league-list` (last entry in `season` array) | UC-001 |
-| Team | id, name | Extracted from `/league-matches` fixtures | UC-001, UC-002 |
+| Team | id, name, cleanName, country, image, stadium_name, seasonId | API `/league-teams` | UC-002 |
+| TeamSeasonStats | teamId, seasonId, matchesPlayed, points, position, wins, draws, losses, goals, conceded, goalDifference, + all stats | API `/league-teams?include=stats` | UC-002 |
 | Fixture | id, seasonId, homeTeam, awayTeam, dateUnix, stadium, status, gameWeek | API `/league-matches` | UC-001 |
 
 ---
@@ -127,6 +145,7 @@ _Document the external APIs being used._
 |----------|---------|---------|
 | `/league-list` | Get supported leagues | `?key=XXX&chosen_leagues_only=true` |
 | `/league-matches` | Get all matches for a season | `?key=XXX&season_id=17146` |
+| `/league-teams` | Get teams with season stats | `?key=XXX&season_id=17146&include=stats` |
 
 ### `/league-matches` Response Fields
 
