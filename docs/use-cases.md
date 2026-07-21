@@ -35,7 +35,10 @@ When adding a new use case, copy this template:
 **Data Required:**
 - **League**: name, country, image
 - **Season**: id, year, country (use only the **latest/current season** per league)
-- **Fixture**: id, league/season, home team, away team, match date/time, venue, status
+- **Fixture (basic)**: id, league/season, home team, away team, match date/time, venue, status, gameWeek
+- **Fixture (referee)**: refereeID, referee
+- **Fixture (pre-match potentials)**: btts_potential, o15_potential, o25_potential, o35_potential, o45_potential, o05HT_potential, o15HT_potential, u15_potential, avg_potential, corners_potential, corners_o85_potential, corners_o95_potential, corners_o105_potential, cards_potential, offsides_potential
+- **Fixture (betting odds)**: odds_ft_1, odds_ft_x, odds_ft_2, odds_ft_over05 to odds_ft_over45, odds_ft_under05 to odds_ft_under45, odds_btts_yes, odds_btts_no
 - **Team**: id, name
 
 **API Source:** football-data-api.com
@@ -127,7 +130,9 @@ _As use cases are defined, summarize the domain entities needed here._
 | League | name, image, country, currentSeasonId | API `/league-list` (last entry in `season` array) | UC-001 |
 | Team | id, name, cleanName, country, image, stadium_name, seasonId | API `/league-teams` | UC-002 |
 | TeamSeasonStats | teamId, seasonId, matchesPlayed, points, position, wins, draws, losses, goals, conceded, goalDifference, + all stats | API `/league-teams?include=stats` | UC-002 |
-| Fixture | id, seasonId, homeTeam, awayTeam, dateUnix, stadium, status, gameWeek | API `/league-matches` | UC-001 |
+| Fixture | id, seasonId, homeTeam, awayTeam, dateUnix, stadium, status, gameWeek, refereeID, referee | API `/league-matches` | UC-001 |
+| FixtureOdds | fixtureId, odds_ft_1/x/2, odds_ft_over/under (0.5-4.5), odds_btts_yes/no | API `/league-matches` | UC-001 |
+| FixturePotentials | fixtureId, btts_potential, o15/o25/o35/o45_potential, corners_potential, cards_potential, avg_potential, etc. | API `/league-matches` | UC-001 |
 
 ---
 
@@ -149,7 +154,7 @@ _Document the external APIs being used._
 
 ### `/league-matches` Response Fields
 
-Key fields from match objects:
+**Basic match info:**
 
 | Field | Description |
 |-------|-------------|
@@ -162,8 +167,32 @@ Key fields from match objects:
 | `homeGoalCount` / `awayGoalCount` | Goals scored |
 | `stadium_name` | Venue |
 | `competition_id` | League/competition ID |
+| `refereeID` / `referee` | Match official ID and name |
 
-Query parameters:
+**Pre-match potentials:**
+
+| Field | Description |
+|-------|-------------|
+| `btts_potential` | Both teams to score likelihood |
+| `o15_potential`, `o25_potential`, `o35_potential`, `o45_potential` | Over X.5 goals potential |
+| `o05HT_potential`, `o15HT_potential` | Over X.5 half-time goals potential |
+| `u15_potential` | Under 1.5 goals potential |
+| `avg_potential` | Average total goals per match |
+| `corners_potential` | Expected corners |
+| `corners_o85_potential`, `corners_o95_potential`, `corners_o105_potential` | Over X.5 corners potential |
+| `cards_potential` | Expected cards |
+| `offsides_potential` | Expected offsides |
+
+**Betting odds:**
+
+| Field | Description |
+|-------|-------------|
+| `odds_ft_1`, `odds_ft_x`, `odds_ft_2` | 1X2 full-time odds |
+| `odds_ft_over05` to `odds_ft_over45` | Over X.5 goals odds |
+| `odds_ft_under05` to `odds_ft_under45` | Under X.5 goals odds |
+| `odds_btts_yes`, `odds_btts_no` | Both teams to score odds |
+
+**Query parameters:**
 - `season_id` (required): The season ID from league-list
 - `page`: Pagination (default ~300-500 matches per page)
 - `max_per_page`: Up to 1000 matches per page
