@@ -33,14 +33,14 @@ When adding a new use case, copy this template:
 **User Story:** As a user, I want to see the next upcoming fixtures for leagues I care about so that I can plan what matches to watch.
 
 **Data Required:**
-- **League**: id, name, country, image
-- **Season**: id, year, country (links league to current season for API queries)
+- **League**: name, country, image
+- **Season**: id, year, country (use only the **latest/current season** per league)
 - **Fixture**: id, league/season, home team, away team, match date/time, venue, status
 - **Team**: id, name
 
 **API Source:** football-data-api.com
 
-**Leagues:** 42 leagues returned from `/league-list?chosen_leagues_only=true`, including:
+**Leagues:** 42 leagues returned from `/league-list?chosen_leagues_only=true`. Use only the **last season entry** from each league's `season` array (the current season). Example leagues:
 - England: Premier League, Championship, EFL League One, EFL League Two
 - Spain: La Liga, Segunda División
 - Germany: Bundesliga, 2. Bundesliga
@@ -58,8 +58,8 @@ When adding a new use case, copy this template:
 
 **Behavior:**
 - Fetch league list from API (or use cached version)
-- For each league, get the current season ID
-- Pull upcoming fixtures for the next **7 days**
+- For each league, extract the **last entry** from the `season` array (= current season ID)
+- Pull upcoming fixtures for the next **7 days** using the current season ID
 - Refresh data on a **daily schedule**
 - Store fixtures locally so the app can serve them without hitting the API on every request
 
@@ -78,8 +78,7 @@ _As use cases are defined, summarize the domain entities needed here._
 
 | Entity | Key Fields | Source | Used By |
 |--------|------------|--------|---------|
-| League | name, image, country | API `/league-list` | UC-001 |
-| Season | id, year, country, leagueName | API `/league-list` | UC-001 |
+| League | name, image, country, currentSeasonId | API `/league-list` (last entry in `season` array) | UC-001 |
 | Team | id, name | API (fixtures response) | UC-001 |
 | Fixture | id, seasonId, homeTeam, awayTeam, matchDateTime, venue, status | API (TBD endpoint) | UC-001 |
 
