@@ -76,7 +76,7 @@ When adding a new use case, copy this template:
 
 ---
 
-### UC-002: Maintain Enriched Team List
+### UC-002: Maintain Enriched Team List with Statistics
 
 **Goal:** Build and maintain a distinct list of team domain objects with full season statistics.
 
