@@ -26,7 +26,13 @@ When adding a new use case, copy this template:
 
 ## Use Cases
 
-### UC-001: Upcoming Fixtures for Supported Leagues
+### Feed Handling / Data Gathering
+
+_Use cases related to ingesting, storing, and maintaining data from external APIs._
+
+---
+
+#### UC-001: Upcoming Fixtures for Supported Leagues
 
 **Goal:** Display a list of upcoming fixtures for all supported leagues, refreshed daily.
 
@@ -76,7 +82,7 @@ When adding a new use case, copy this template:
 
 ---
 
-### UC-002: Maintain Enriched Team List with Statistics
+#### UC-002: Maintain Enriched Team List with Statistics
 
 **Goal:** Build and maintain a distinct list of team domain objects with full season statistics.
 
@@ -121,7 +127,7 @@ When adding a new use case, copy this template:
 
 ---
 
-### UC-003: Maintain Referee List with Statistics
+#### UC-003: Maintain Referee List with Statistics
 
 **Goal:** Build and maintain a list of referees with their officiating statistics for each league/season.
 
@@ -152,7 +158,7 @@ When adding a new use case, copy this template:
 
 ---
 
-### UC-004: Team Recent Form Stats (Last 5 Matches)
+#### UC-004: Team Recent Form Stats (Last 5 Matches)
 
 **Goal:** Track recent form statistics for teams to supplement season-level data with current momentum.
 
