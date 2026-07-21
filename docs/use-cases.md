@@ -216,9 +216,31 @@ _Use cases for generating insights, recommendations, and predictions based on co
 - BTTS potential from API
 
 **Logic:**
-- TBD
+```
+BTTS Score = weighted average of:
+  - Home team BTTS % (season)           × 0.15
+  - Away team BTTS % (season)           × 0.15
+  - Home team BTTS % (last 5)           × 0.20
+  - Away team BTTS % (last 5)           × 0.20
+  - Home team "failed to score" inverse × 0.10
+  - Away team "failed to score" inverse × 0.10
+  - API btts_potential                  × 0.10
+```
 
-**Status:** Draft
+**Thresholds:**
+- **Strong:** BTTS Score ≥ 80%
+- **Moderate:** BTTS Score 65-79%
+- **Weak:** BTTS Score < 65%
+
+**Additional Filters:**
+- Both teams must have scored in 50%+ of their matches
+- Neither team's "failed to score" rate > 40%
+
+**Output:**
+- Ranked list of fixtures by BTTS score
+- Include: fixture details, both team stats, confidence level
+
+**Status:** Reviewed
 
 ---
 
@@ -234,9 +256,37 @@ _Use cases for generating insights, recommendations, and predictions based on co
 - o25_potential, o35_potential from API
 
 **Logic:**
-- TBD
+```
+Over Goals Score = weighted average of:
+  - Home team goals scored avg (season)      × 0.10
+  - Away team goals scored avg (season)      × 0.10
+  - Home team goals conceded avg (season)    × 0.10
+  - Away team goals conceded avg (season)    × 0.10
+  - Home team goals scored avg (last 5)      × 0.15
+  - Away team goals scored avg (last 5)      × 0.15
+  - Home team Over 2.5 % (season)            × 0.10
+  - Away team Over 2.5 % (season)            × 0.10
+  - API o25_potential                        × 0.10
+```
 
-**Status:** Draft
+**Calculation:**
+- Convert to expected goals: (Home scored + Away scored + Home conceded + Away conceded) / 2
+- Normalize to percentage based on historical O2.5 rates
+
+**Thresholds:**
+- **Strong:** Score ≥ 80%
+- **Moderate:** Score 65-79%
+- **Weak:** Score < 65%
+
+**Additional Filters:**
+- Combined goals average ≥ 2.5 per match
+- At least one team with Over 2.5 rate > 50%
+
+**Output:**
+- Ranked list of fixtures by over goals score
+- Include: expected goals, team averages, confidence level
+
+**Status:** Reviewed
 
 ---
 
@@ -253,9 +303,37 @@ _Use cases for generating insights, recommendations, and predictions based on co
 - Defensive strength metrics
 
 **Logic:**
-- TBD
+```
+Under Goals Score = weighted average of:
+  - Home team goals scored avg (season) inverse      × 0.10
+  - Away team goals scored avg (season) inverse      × 0.10
+  - Home team goals conceded avg (season) inverse    × 0.10
+  - Away team goals conceded avg (season) inverse    × 0.10
+  - Home team goals scored avg (last 5) inverse      × 0.15
+  - Away team goals scored avg (last 5) inverse      × 0.15
+  - Home team clean sheet % (season)                 × 0.10
+  - Away team clean sheet % (season)                 × 0.10
+  - API u15_potential                                × 0.10
+```
 
-**Status:** Draft
+**Calculation:**
+- Inverse = lower goals = higher score
+- Factor in clean sheet rates and failed to score rates
+
+**Thresholds:**
+- **Strong:** Score ≥ 80%
+- **Moderate:** Score 65-79%
+- **Weak:** Score < 65%
+
+**Additional Filters:**
+- Combined goals average ≤ 2.5 per match
+- At least one team with Under 2.5 rate > 50%
+
+**Output:**
+- Ranked list of fixtures by under goals score
+- Include: expected goals, defensive stats, confidence level
+
+**Status:** Reviewed
 
 ---
 
@@ -271,9 +349,36 @@ _Use cases for generating insights, recommendations, and predictions based on co
 - Referee yellow/red card tendencies
 
 **Logic:**
-- TBD
+```
+Expected Booking Points = sum of:
+  - Home team cards avg per match (home) × 10      × 0.20
+  - Away team cards avg per match (away) × 10     × 0.20
+  - Referee cards per match avg × 10              × 0.25
+  - Home team red card rate × 25                  × 0.05
+  - Away team red card rate × 25                  × 0.05
+  - Referee reliability factor                    × 0.10
+    (appearances ≥ 10 = 1.0, 5-9 = 0.8, <5 = 0.5)
+  - Match intensity factor                        × 0.15
+    (derby/rivalry = 1.5, same league position ±3 = 1.2, normal = 1.0)
+```
 
-**Status:** Draft
+**Calculation:**
+- Base expected points from team card averages
+- Adjust heavily based on referee tendencies
+- Scale by referee data reliability
+- Boost for high-intensity matchups (derbies, close standings)
+
+**Thresholds (for Over/Under 40 booking points):**
+- **Strong Over:** Expected ≥ 50 points
+- **Moderate Over:** Expected 40-49 points
+- **Moderate Under:** Expected 30-39 points
+- **Strong Under:** Expected < 30 points
+
+**Output:**
+- Ranked list by expected booking points
+- Include: team card stats, referee stats, intensity flag, confidence level
+
+**Status:** Reviewed
 
 ---
 
@@ -289,9 +394,39 @@ _Use cases for generating insights, recommendations, and predictions based on co
 - Implied probability from odds
 
 **Logic:**
-- TBD
+```
+For each market (BTTS, Over 2.5, Match Result, etc.):
 
-**Status:** Draft
+1. Calculate implied probability from bookmaker odds:
+   Implied % = 1 / decimal_odds × 100
+
+2. Get our calculated probability from relevant use case:
+   - BTTS: UC-005 score
+   - Over Goals: UC-006 score
+   - Under Goals: UC-007 score
+   - Match Result: UC-017 score
+
+3. Calculate value:
+   Value % = Our Probability - Implied Probability
+
+4. Calculate expected value (EV):
+   EV = (Our Probability × (odds - 1)) - (1 - Our Probability)
+```
+
+**Thresholds:**
+- **Strong Value:** Value % ≥ 15% AND EV ≥ 0.10
+- **Moderate Value:** Value % ≥ 10% AND EV ≥ 0.05
+- **No Value:** Value % < 10% OR EV < 0.05
+
+**Additional Factors:**
+- Confidence weight from source use case (Strong/Moderate/Weak)
+- Minimum odds threshold (e.g., odds ≥ 1.50) to avoid tiny margins
+
+**Output:**
+- Ranked list by EV or Value %
+- Include: market, our probability, implied probability, odds, EV, confidence
+
+**Status:** Reviewed
 
 ---
 
@@ -302,12 +437,46 @@ _Use cases for generating insights, recommendations, and predictions based on co
 **User Story:** As a user, I want to spot teams on hot streaks that may be undervalued by the market.
 
 **Data Required:**
-- Season PPG, goals, wins
-- Recent form (last 5) PPG, goals, wins
-- Comparison delta
+- Season PPG, goals scored avg, win percentage, clean sheet %
+- Recent form (last 5) PPG, goals scored avg, win percentage, clean sheet %
+- Home/away splits for both season and recent form
+- Upcoming fixture location (home/away)
 
 **Logic:**
-- TBD
+```
+Winning Mismatch Score = weighted average of deltas:
+  - PPG delta: (Last 5 PPG - Season PPG) / Season PPG           × 0.30
+  - Goals delta: (Last 5 goals avg - Season goals avg)          × 0.25
+  - Wins delta: (Last 5 win % - Season win %)                   × 0.25
+  - Clean sheets delta: (Last 5 CS % - Season CS %)             × 0.20
+```
+
+**Calculation:**
+- Positive delta = team performing BETTER recently
+- Normalize each delta to comparable scale (percentage improvement)
+- For upcoming home fixture: weight home splits at 1.25×
+- For upcoming away fixture: weight away splits at 1.25×
+
+**Thresholds:**
+- **Strong Mismatch:** Score ≥ 25% improvement
+- **Moderate Mismatch:** Score 15-24% improvement
+- **No Mismatch:** Score < 15% improvement
+
+**Additional Factors:**
+1. **Minimum Sample Size:** At least 5 matches in recent form window
+2. **Home/Away Context:** Apply location-based weighting for upcoming fixture
+3. **Streak Bonus:** Add +5% if team has won 3+ consecutive matches
+4. **Quality Opposition Indicator:** Flag if recent opponents were bottom-half teams (potential false signal)
+5. **Scoring Trend:** Note if goals per game increasing over last 5 (momentum indicator)
+6. **Defensive Trend:** Note if goals conceded decreasing over last 5 (solidity indicator)
+7. **Goals vs Performance:** Flag if actual goals significantly > expected from shots (regression risk)
+8. **Fixture Difficulty:** Compare average league position of recent opponents vs season average
+
+**Output:**
+- Ranked list of teams by mismatch score
+- Include: season stats, recent form stats, delta percentages
+- Include: win streak status, opponent quality flag
+- Flag: "Hot streak - potentially undervalued"
 
 **Status:** Draft
 
@@ -320,12 +489,47 @@ _Use cases for generating insights, recommendations, and predictions based on co
 **User Story:** As a user, I want to spot teams on cold streaks that may be overvalued by the market.
 
 **Data Required:**
-- Season PPG, goals, wins
-- Recent form (last 5) PPG, goals, wins
-- Comparison delta
+- Season PPG, goals scored avg, win percentage, clean sheet %
+- Recent form (last 5) PPG, goals scored avg, win percentage, clean sheet %
+- Home/away splits for both season and recent form
+- Upcoming fixture location (home/away)
 
 **Logic:**
-- TBD
+```
+Losing Mismatch Score = weighted average of negative deltas:
+  - PPG delta: (Season PPG - Last 5 PPG) / Season PPG           × 0.30
+  - Goals delta: (Season goals avg - Last 5 goals avg)          × 0.25
+  - Wins delta: (Season win % - Last 5 win %)                   × 0.25
+  - Clean sheets delta: (Season CS % - Last 5 CS %)             × 0.20
+```
+
+**Calculation:**
+- Positive delta = team performing WORSE recently
+- Normalize each delta to comparable scale (percentage decline)
+- For upcoming home fixture: weight home splits at 1.25×
+- For upcoming away fixture: weight away splits at 1.25×
+
+**Thresholds:**
+- **Strong Mismatch:** Score ≥ 25% decline
+- **Moderate Mismatch:** Score 15-24% decline
+- **No Mismatch:** Score < 15% decline
+
+**Additional Factors:**
+1. **Minimum Sample Size:** At least 5 matches in recent form window
+2. **Home/Away Context:** Apply location-based weighting for upcoming fixture
+3. **Losing Streak Indicator:** Add +5% if team has lost 3+ consecutive matches
+4. **Quality Opposition Indicator:** Flag if recent opponents were top-half teams (not necessarily a crisis)
+5. **Scoring Drought:** Note if goals per game decreasing over last 5 (attacking confidence issue)
+6. **Defensive Collapse:** Note if goals conceded increasing over last 5 (structural problem)
+7. **Key Metrics Divergence:** Flag if multiple metrics declining simultaneously (systemic issue)
+8. **Fixture Difficulty:** Compare average league position of recent opponents vs season average
+9. **Injury/Suspension Context:** Note if decline coincides with missing key players (temporary vs permanent)
+
+**Output:**
+- Ranked list of teams by mismatch score
+- Include: season stats, recent form stats, delta percentages
+- Include: losing streak status, opponent quality flag
+- Flag: "Cold streak - potentially overvalued"
 
 **Status:** Draft
 
