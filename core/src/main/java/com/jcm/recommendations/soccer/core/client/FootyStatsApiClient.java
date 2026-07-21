@@ -10,8 +10,9 @@ import com.jcm.recommendations.soccer.core.client.dto.TeamDto;
 import com.jcm.recommendations.soccer.core.config.FootyStatsApiConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Collections;
 import java.util.List;
@@ -21,28 +22,25 @@ import java.util.List;
 public class FootyStatsApiClient {
 
     private final FootyStatsApiConfig config;
-    private final RestClient restClient;
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
     public FootyStatsApiClient(FootyStatsApiConfig config, ObjectMapper objectMapper) {
         this.config = config;
         this.objectMapper = objectMapper;
-        this.restClient = RestClient.builder()
-                .baseUrl(config.getBaseUrl())
-                .build();
+        this.restTemplate = new RestTemplate();
     }
 
     public List<LeagueDto> fetchLeagues() {
         log.info("Fetching league list from API");
         try {
-            String response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/league-list")
-                            .queryParam("key", config.getKey())
-                            .queryParam("chosen_leagues_only", "true")
-                            .build())
-                    .retrieve()
-                    .body(String.class);
+            String url = UriComponentsBuilder.fromUriString(config.getBaseUrl())
+                    .path("/league-list")
+                    .queryParam("key", config.getKey())
+                    .queryParam("chosen_leagues_only", "true")
+                    .toUriString();
+
+            String response = restTemplate.getForObject(url, String.class);
 
             ApiResponse<LeagueDto> apiResponse = objectMapper.readValue(
                     response, new TypeReference<ApiResponse<LeagueDto>>() {});
@@ -67,14 +65,13 @@ public class FootyStatsApiClient {
     public List<MatchDto> fetchMatches(Long seasonId) {
         log.info("Fetching matches for season: seasonId={}", seasonId);
         try {
-            String response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/league-matches")
-                            .queryParam("key", config.getKey())
-                            .queryParam("season_id", seasonId)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
+            String url = UriComponentsBuilder.fromUriString(config.getBaseUrl())
+                    .path("/league-matches")
+                    .queryParam("key", config.getKey())
+                    .queryParam("season_id", seasonId)
+                    .toUriString();
+
+            String response = restTemplate.getForObject(url, String.class);
 
             ApiResponse<MatchDto> apiResponse = objectMapper.readValue(
                     response, new TypeReference<ApiResponse<MatchDto>>() {});
@@ -99,15 +96,14 @@ public class FootyStatsApiClient {
     public List<TeamDto> fetchTeams(Long seasonId) {
         log.info("Fetching teams for season: seasonId={}", seasonId);
         try {
-            String response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/league-teams")
-                            .queryParam("key", config.getKey())
-                            .queryParam("season_id", seasonId)
-                            .queryParam("include", "stats")
-                            .build())
-                    .retrieve()
-                    .body(String.class);
+            String url = UriComponentsBuilder.fromUriString(config.getBaseUrl())
+                    .path("/league-teams")
+                    .queryParam("key", config.getKey())
+                    .queryParam("season_id", seasonId)
+                    .queryParam("include", "stats")
+                    .toUriString();
+
+            String response = restTemplate.getForObject(url, String.class);
 
             ApiResponse<TeamDto> apiResponse = objectMapper.readValue(
                     response, new TypeReference<ApiResponse<TeamDto>>() {});
@@ -132,14 +128,13 @@ public class FootyStatsApiClient {
     public List<RefereeDto> fetchReferees(Long seasonId) {
         log.info("Fetching referees for season: seasonId={}", seasonId);
         try {
-            String response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/league-referees")
-                            .queryParam("key", config.getKey())
-                            .queryParam("season_id", seasonId)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
+            String url = UriComponentsBuilder.fromUriString(config.getBaseUrl())
+                    .path("/league-referees")
+                    .queryParam("key", config.getKey())
+                    .queryParam("season_id", seasonId)
+                    .toUriString();
+
+            String response = restTemplate.getForObject(url, String.class);
 
             ApiResponse<RefereeDto> apiResponse = objectMapper.readValue(
                     response, new TypeReference<ApiResponse<RefereeDto>>() {});
@@ -164,14 +159,13 @@ public class FootyStatsApiClient {
     public TeamDto fetchTeamForm(Long teamId) {
         log.info("Fetching recent form for team: teamId={}", teamId);
         try {
-            String response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/lastx")
-                            .queryParam("key", config.getKey())
-                            .queryParam("team_id", teamId)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
+            String url = UriComponentsBuilder.fromUriString(config.getBaseUrl())
+                    .path("/lastx")
+                    .queryParam("key", config.getKey())
+                    .queryParam("team_id", teamId)
+                    .toUriString();
+
+            String response = restTemplate.getForObject(url, String.class);
 
             ApiResponse<TeamDto> apiResponse = objectMapper.readValue(
                     response, new TypeReference<ApiResponse<TeamDto>>() {});
