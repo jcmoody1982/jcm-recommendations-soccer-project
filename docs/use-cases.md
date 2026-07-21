@@ -1373,17 +1373,69 @@ _Use cases for the web application interface._
 
 ---
 
-#### UC-020: [Website Use Case Name]
+#### UC-020: Homepage - Competition Overview
 
-**Goal:** [What does this feature provide?]
+**Goal:** Provide an at-a-glance view of all supported competitions with upcoming fixture counts, allowing users to quickly navigate to areas of interest.
 
-**User Story:** As a user, I want to [action] so that [benefit].
+**User Story:** As a user, I want to land on the homepage and see a list of competitions with visual indicators showing how many fixtures are available, so that I can quickly identify which leagues have upcoming matches and navigate to them.
 
 **Data Required:**
-- TBD
+- League list (from `LeagueRepository`)
+- Fixture counts per league (from `FixtureRepository` - upcoming fixtures grouped by league)
+- League metadata: name, country, logo/badge
 
-**Screens/Components:**
-- TBD
+**UI Components:**
+
+1. **Competition Card Grid**
+   - Display competitions in a responsive grid layout
+   - Each card shows:
+     - League badge/logo (if available)
+     - League name
+     - Country flag or name
+     - Fixture count badge (visual indicator)
+   - Cards are clickable, navigating to the league detail page
+
+2. **Fixture Count Badge**
+   - Visual indicator styles based on count:
+     - **Hot** (red/orange): 5+ fixtures upcoming
+     - **Active** (green): 2-4 fixtures upcoming
+     - **Low** (grey): 0-1 fixtures upcoming
+   - Displays the numeric count
+
+3. **Empty State**
+   - Message when no competitions are available
+   - "No competitions configured" or similar
+
+**API Endpoint:**
+```
+GET /api/leagues/overview
+```
+
+**Response Structure:**
+```json
+{
+  "competitions": [
+    {
+      "leagueId": 1,
+      "name": "Premier League",
+      "country": "England",
+      "logoUrl": "...",
+      "fixtureCount": 10,
+      "nextFixtureDate": "2026-07-22T15:00:00Z"
+    }
+  ],
+  "totalFixtures": 45,
+  "lastUpdated": "2026-07-21T03:00:00Z"
+}
+```
+
+**Acceptance Criteria:**
+- [ ] Homepage displays all supported competitions
+- [ ] Each competition shows an accurate fixture count
+- [ ] Visual badge colour reflects fixture availability
+- [ ] Clicking a competition navigates to its detail page
+- [ ] Page loads within 500ms (cached data)
+- [ ] Responsive layout works on mobile and desktop
 
 **Status:** Draft
 
