@@ -187,7 +187,7 @@ When adding a new use case, copy this template:
 - ~40 teams per day (avg 2 teams × ~20 fixtures across leagues with games that day)
 - Avoids 840+ calls for all teams
 
-**Status:** Draft
+**Status:** Reviewed
 
 ---
 
