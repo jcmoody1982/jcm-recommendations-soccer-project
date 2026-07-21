@@ -1,0 +1,59 @@
+.card {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background: #1a1a2e;
+  padding: 1rem 1.5rem;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.card:hover {
+  background: #252542;
+}
+
+.time {
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+  min-width: 50px;
+}
+
+.teams {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.team {
+  color: #fff;
+  font-weight: 500;
+}
+
+.vs {
+  color: #666;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.meta {
+  display: flex;
+  gap: 1rem;
+  color: #666;
+  font-size: 0.75rem;
+}
+
+.stadium {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gameweek {
+  background: #252542;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}

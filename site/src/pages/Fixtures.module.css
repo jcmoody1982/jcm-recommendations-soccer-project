@@ -1,0 +1,49 @@
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.title {
+  color: #fff;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+
+.loading,
+.error {
+  color: #fff;
+  text-align: center;
+  padding: 4rem;
+  font-size: 1.25rem;
+}
+
+.error {
+  color: #ef4444;
+}
+
+.dateSection {
+  margin-bottom: 2rem;
+}
+
+.dateTitle {
+  color: #888;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.fixtureList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.empty {
+  color: #666;
+  text-align: center;
+  padding: 3rem;
+  background: #1a1a2e;
+  border-radius: 12px;
+}

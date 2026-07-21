@@ -1,0 +1,130 @@
+.card {
+  background: #1a1a2e;
+  border-radius: 12px;
+  padding: 1.25rem;
+  border-left: 4px solid #666;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.card.strong {
+  border-left-color: #22c55e;
+}
+
+.card.moderate {
+  border-left-color: #f59e0b;
+}
+
+.card.weak {
+  border-left-color: #666;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.type {
+  background: #252542;
+  color: #a0a0ff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.confidence {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.strong .confidence {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.moderate .confidence {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.weak .confidence {
+  background: rgba(107, 114, 128, 0.2);
+  color: #6b7280;
+}
+
+.match {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.team {
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.vs {
+  color: #666;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.market {
+  text-align: center;
+  color: #a0a0a0;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.scoreBar {
+  flex: 1;
+  height: 8px;
+  background: #252542;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.scoreFill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.scoreValue {
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.875rem;
+  min-width: 50px;
+  text-align: right;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  color: #666;
+  font-size: 0.75rem;
+}

@@ -1,0 +1,50 @@
+.dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.title {
+  color: #fff;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+
+.loading {
+  color: #fff;
+  text-align: center;
+  padding: 4rem;
+  font-size: 1.25rem;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.section {
+  margin-bottom: 3rem;
+}
+
+.sectionTitle {
+  color: #fff;
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #333;
+}
+
+.recommendationGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+.empty {
+  color: #666;
+  text-align: center;
+  padding: 2rem;
+  background: #1a1a2e;
+  border-radius: 12px;
+}
