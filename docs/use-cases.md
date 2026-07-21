@@ -197,6 +197,282 @@ _Use cases related to ingesting, storing, and maintaining data from external API
 
 ---
 
+### Recommendations & Predictions
+
+_Use cases for generating insights, recommendations, and predictions based on collected data._
+
+---
+
+#### UC-005: BTTS Recommendations
+
+**Goal:** Identify fixtures with high likelihood of both teams scoring.
+
+**User Story:** As a user, I want to see which upcoming matches are most likely to have both teams score so I can make informed BTTS bets.
+
+**Data Required:**
+- Team BTTS percentage (season + recent form)
+- Goals scored/conceded averages
+- Failed to score percentage
+- BTTS potential from API
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-006: Over Goals Recommendations
+
+**Goal:** Identify fixtures likely to be high-scoring (Over 2.5, Over 3.5).
+
+**User Story:** As a user, I want to see which matches are likely to have many goals so I can bet on over goals markets.
+
+**Data Required:**
+- Goals scored/conceded averages (season + form)
+- Over 2.5/3.5 percentages
+- o25_potential, o35_potential from API
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-007: Under Goals Recommendations
+
+**Goal:** Identify fixtures likely to be low-scoring (Under 2.5, Under 1.5).
+
+**User Story:** As a user, I want to see which matches are likely to have few goals so I can bet on under goals markets.
+
+**Data Required:**
+- Goals scored/conceded averages
+- Under 2.5/1.5 percentages
+- Clean sheet percentages
+- Defensive strength metrics
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-008: Booking Points Recommendations
+
+**Goal:** Predict total booking points for a fixture (Yellow=10, Red=25).
+
+**User Story:** As a user, I want to see expected booking points for matches so I can bet on cards markets.
+
+**Data Required:**
+- Team cards averages (home/away)
+- Referee cards per match stats
+- Referee yellow/red card tendencies
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-009: Value Bet Recommendations
+
+**Goal:** Flag fixtures where calculated probability differs significantly from bookmaker odds.
+
+**User Story:** As a user, I want to find bets where the odds offer value compared to statistical probability.
+
+**Data Required:**
+- Calculated probabilities from other use cases
+- Bookmaker odds from API
+- Implied probability from odds
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-010: Winning Form Mismatch Recommendations
+
+**Goal:** Identify teams whose recent form is significantly better than their season average suggests.
+
+**User Story:** As a user, I want to spot teams on hot streaks that may be undervalued by the market.
+
+**Data Required:**
+- Season PPG, goals, wins
+- Recent form (last 5) PPG, goals, wins
+- Comparison delta
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-011: Losing Form Mismatch Recommendations
+
+**Goal:** Identify teams whose recent form is significantly worse than their season average suggests.
+
+**User Story:** As a user, I want to spot teams on cold streaks that may be overvalued by the market.
+
+**Data Required:**
+- Season PPG, goals, wins
+- Recent form (last 5) PPG, goals, wins
+- Comparison delta
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-012: Over Corners Recommendations
+
+**Goal:** Identify fixtures likely to have high corner counts.
+
+**User Story:** As a user, I want to see which matches are likely to have many corners for over corners bets.
+
+**Data Required:**
+- Team corners averages (for/against, home/away)
+- corners_potential from API
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-013: Under Corners Recommendations
+
+**Goal:** Identify fixtures likely to have low corner counts.
+
+**User Story:** As a user, I want to see which matches are likely to have few corners for under corners bets.
+
+**Data Required:**
+- Team corners averages (for/against, home/away)
+- corners_potential from API
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-014: Clean Sheet Recommendations
+
+**Goal:** Identify teams likely to keep a clean sheet in upcoming fixtures.
+
+**User Story:** As a user, I want to see which teams are likely to keep clean sheets for defensive betting markets.
+
+**Data Required:**
+- Clean sheet percentages (home/away)
+- Goals conceded averages
+- Opponent failed to score percentage
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-015: First Half Goals Recommendations
+
+**Goal:** Predict likelihood of goals in the first half (Over 0.5 HT, Over 1.5 HT).
+
+**User Story:** As a user, I want to see which matches are likely to have first half goals.
+
+**Data Required:**
+- o05HT_potential, o15HT_potential from API
+- First half goals stats if available
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-016: Second Half Goals Recommendations
+
+**Goal:** Predict likelihood of goals in the second half.
+
+**User Story:** As a user, I want to see which matches are likely to have second half goals.
+
+**Data Required:**
+- Second half goals stats
+- Teams that score/concede late
+- 2h_cards_total as proxy for late game intensity
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-017: Match Result Recommendations
+
+**Goal:** Predict 1X2 match outcomes (Home Win, Draw, Away Win).
+
+**User Story:** As a user, I want to see predicted match results for upcoming fixtures.
+
+**Data Required:**
+- Team PPG (home/away)
+- Recent form results
+- Head-to-head (if available)
+- odds_ft_1, odds_ft_x, odds_ft_2
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-018: Home/Away Recommendations
+
+**Goal:** Identify teams with significant performance gaps between home and away matches.
+
+**User Story:** As a user, I want to spot teams that are much stronger at home or away to inform my bets.
+
+**Data Required:**
+- Home vs away PPG comparison
+- Home vs away goals scored/conceded
+- Home vs away win percentages
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
+#### UC-019: Draw Recommendations
+
+**Goal:** Identify fixtures likely to end in a draw.
+
+**User Story:** As a user, I want to find matches with high draw probability for draw betting.
+
+**Data Required:**
+- Team draw percentages
+- Evenly matched stats comparison
+- odds_ft_x from API
+
+**Logic:**
+- TBD
+
+**Status:** Draft
+
+---
+
 ## Data Model Summary
 
 _As use cases are defined, summarize the domain entities needed here._
