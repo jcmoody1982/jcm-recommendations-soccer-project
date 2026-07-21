@@ -73,6 +73,34 @@ When adding a new use case, copy this template:
 
 ---
 
+### UC-002: Maintain Distinct Team List from Fixtures
+
+**Goal:** Build and maintain a distinct list of team domain objects extracted from fixture data.
+
+**User Story:** As the system, I want to maintain a canonical list of teams so that team data is normalized and reusable across features.
+
+**Data Required:**
+- **Team**: id, name (extracted from fixture `homeID`/`awayID` and `home_name`/`away_name`)
+
+**API Source:** Derived from `/league-matches` responses (no separate API call needed)
+
+**Behavior:**
+- When fixtures are fetched (UC-001), extract team data from each match
+- For each fixture, capture both home and away team (id + name)
+- Deduplicate by team ID to maintain a distinct list
+- Update team records if name changes (upsert logic)
+- Teams are linked to fixtures via foreign key relationship
+
+**Dependencies:** UC-001 (fixtures must be fetched first)
+
+**Status:** Draft
+
+**Open Questions:**
+- Should we store which league(s) a team belongs to?
+- Do we need additional team data beyond id/name (e.g., logo, country)?
+
+---
+
 ## Data Model Summary
 
 _As use cases are defined, summarize the domain entities needed here._
@@ -80,7 +108,7 @@ _As use cases are defined, summarize the domain entities needed here._
 | Entity | Key Fields | Source | Used By |
 |--------|------------|--------|---------|
 | League | name, image, country, currentSeasonId | API `/league-list` (last entry in `season` array) | UC-001 |
-| Team | id, name | API `/league-matches` (`homeID`/`awayID`, `home_name`/`away_name`) | UC-001 |
+| Team | id, name | Extracted from `/league-matches` fixtures | UC-001, UC-002 |
 | Fixture | id, seasonId, homeTeam, awayTeam, dateUnix, stadium, status, gameWeek | API `/league-matches` | UC-001 |
 
 ---
