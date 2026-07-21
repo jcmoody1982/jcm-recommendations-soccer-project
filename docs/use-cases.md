@@ -1367,6 +1367,50 @@ Fixture Timing:
 
 ---
 
+### Website
+
+_Use cases for the web application interface._
+
+---
+
+#### UC-020: [Website Use Case Name]
+
+**Goal:** [What does this feature provide?]
+
+**User Story:** As a user, I want to [action] so that [benefit].
+
+**Data Required:**
+- TBD
+
+**Screens/Components:**
+- TBD
+
+**Status:** Draft
+
+---
+
+### iOS Native App
+
+_Use cases for the iOS mobile application._
+
+---
+
+#### UC-030: [iOS App Use Case Name]
+
+**Goal:** [What does this feature provide?]
+
+**User Story:** As a mobile user, I want to [action] so that [benefit].
+
+**Data Required:**
+- TBD
+
+**Screens/Components:**
+- TBD
+
+**Status:** Draft
+
+---
+
 ## Data Model Summary
 
 _As use cases are defined, summarize the domain entities needed here._
