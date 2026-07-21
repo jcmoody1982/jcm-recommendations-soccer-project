@@ -121,6 +121,37 @@ When adding a new use case, copy this template:
 
 ---
 
+### UC-003: Maintain Referee List with Statistics
+
+**Goal:** Build and maintain a list of referees with their officiating statistics for each league/season.
+
+**User Story:** As a user, I want to see referee statistics so that I can understand tendencies (cards, goals, penalties) for upcoming fixtures.
+
+**Data Required:**
+- **Referee (basic)**: id, full_name, first_name, last_name, known_as
+- **Referee (match outcomes)**: appearances_overall, wins_home, wins_away, draws_overall
+- **Referee (outcome percentages)**: wins_per_home, wins_per_away, draws_per
+- **Referee (goals & BTTS)**: goals_overall, goals_home, goals_away, goals_per_match_overall, goals_per_match_home, goals_per_match_away, btts_overall, btts_percentage
+- **Referee (penalties)**: penalties_given_overall, penalties_given_home, penalties_given_away, penalties_given_per_match_overall, penalties_given_per_match_home, penalties_given_per_match_away, penalties_given_percentage_overall, penalties_given_percentage_home, penalties_given_percentage_away
+- **Referee (cards)**: cards_overall, cards_home, cards_away, cards_per_match_overall, cards_per_match_home, cards_per_match_away, yellow_cards_overall, red_cards_overall, over05_cards_overall to over65_cards_overall, over05_cards_percentage_overall to over65_cards_percentage_overall, min_per_card_overall
+
+**API Source:**
+- `/league-referees?season_id=XXX` — referees with statistics for a season
+
+**Behavior:**
+- For each league's current season, call `/league-referees?season_id=XXX`
+- Store referee basic info + all statistics
+- Link referees to their league/season
+- Upsert by referee ID (update stats on each refresh)
+- Refresh alongside fixtures (daily schedule)
+- Link to fixtures via `refereeID` field from UC-001
+
+**Dependencies:** UC-001 (need season IDs from league list; fixtures reference refereeID)
+
+**Status:** Draft
+
+---
+
 ## Data Model Summary
 
 _As use cases are defined, summarize the domain entities needed here._
@@ -133,6 +164,8 @@ _As use cases are defined, summarize the domain entities needed here._
 | Fixture | id, seasonId, homeTeam, awayTeam, dateUnix, stadium, status, gameWeek, refereeID, referee | API `/league-matches` | UC-001 |
 | FixtureOdds | fixtureId, odds_ft_1/x/2, odds_ft_over/under (0.5-4.5), odds_btts_yes/no | API `/league-matches` | UC-001 |
 | FixturePotentials | fixtureId, btts_potential, o15/o25/o35/o45_potential, corners_potential, cards_potential, avg_potential, etc. | API `/league-matches` | UC-001 |
+| Referee | id, full_name, first_name, last_name, known_as, seasonId | API `/league-referees` | UC-003 |
+| RefereeStats | refereeId, seasonId, appearances, outcomes, goals, btts, penalties, cards (all fields) | API `/league-referees` | UC-003 |
 
 ---
 
@@ -151,6 +184,7 @@ _Document the external APIs being used._
 | `/league-list` | Get supported leagues | `?key=XXX&chosen_leagues_only=true` |
 | `/league-matches` | Get all matches for a season | `?key=XXX&season_id=17146` |
 | `/league-teams` | Get teams with season stats | `?key=XXX&season_id=17146&include=stats` |
+| `/league-referees` | Get referees with stats | `?key=XXX&season_id=17146` |
 
 ### `/league-matches` Response Fields
 
