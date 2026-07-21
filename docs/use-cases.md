@@ -114,7 +114,7 @@ When adding a new use case, copy this template:
 
 **Dependencies:** UC-001 (need season IDs from league list)
 
-**Status:** Draft
+**Status:** Reviewed
 
 ---
 
