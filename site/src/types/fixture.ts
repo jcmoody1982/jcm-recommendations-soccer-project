@@ -31,6 +31,33 @@ export interface League {
   image: string;
 }
 
+export interface FixtureSummary {
+  fixtureId: number;
+  homeTeam: string;
+  awayTeam: string;
+  matchDate: string;
+}
+
+export interface Competition {
+  leagueId: number;
+  name: string;
+  logoUrl: string | null;
+  fixtureCount: number;
+  fixtures: FixtureSummary[];
+}
+
+export interface CountryGroup {
+  country: string;
+  countryCode: string;
+  competitions: Competition[];
+}
+
+export interface LeagueOverviewResponse {
+  countries: CountryGroup[];
+  totalFixtures: number;
+  lastUpdated: string;
+}
+
 export interface Team {
   id: number;
   name: string;

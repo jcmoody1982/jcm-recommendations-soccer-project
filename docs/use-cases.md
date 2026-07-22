@@ -1373,19 +1373,113 @@ _Use cases for the web application interface._
 
 ---
 
-#### UC-020: [Website Use Case Name]
+#### UC-020: Homepage - Competition Overview
 
-**Goal:** [What does this feature provide?]
+**Goal:** Provide an at-a-glance view of all supported competitions with upcoming fixture counts, allowing users to quickly navigate to areas of interest.
 
-**User Story:** As a user, I want to [action] so that [benefit].
+**User Story:** As a user, I want to land on the homepage and see a list of competitions with visual indicators showing how many fixtures are available, so that I can quickly identify which leagues have upcoming matches and navigate to them.
 
 **Data Required:**
-- TBD
+- League list (from `LeagueRepository`)
+- Fixture counts per league (from `FixtureRepository` - upcoming fixtures grouped by league)
+- League metadata: name, country, logo/badge
 
-**Screens/Components:**
-- TBD
+**UI Components:**
 
-**Status:** Draft
+1. **Country Groups**
+   - Competitions grouped by country
+   - Countries sorted alphabetically (A-Z)
+   - Country header with flag icon (if available)
+
+2. **Competition Card (Expandable)**
+   - Each card shows:
+     - League badge/logo (if available)
+     - League name
+     - Fixture count icon with number (e.g., 📅 10)
+     - Expand/collapse indicator (chevron)
+   - Clicking a card expands to reveal fixtures below
+   - Expanded section shows:
+     - List of upcoming fixtures for that competition
+     - Each fixture displays: home team vs away team, date/time
+     - Clicking again collapses the section
+
+3. **Empty State**
+   - Message when no competitions are available
+   - "No competitions configured" or similar
+
+**API Endpoint:**
+```
+GET /api/leagues/overview
+```
+
+**Response Structure:**
+```json
+{
+  "countries": [
+    {
+      "country": "England",
+      "countryCode": "GB-ENG",
+      "competitions": [
+        {
+          "leagueId": 1,
+          "name": "Premier League",
+          "logoUrl": "...",
+          "fixtureCount": 2,
+          "fixtures": [
+            {
+              "fixtureId": 101,
+              "homeTeam": "Arsenal",
+              "awayTeam": "Chelsea",
+              "matchDate": "2026-07-22T15:00:00Z"
+            },
+            {
+              "fixtureId": 102,
+              "homeTeam": "Liverpool",
+              "awayTeam": "Man United",
+              "matchDate": "2026-07-22T17:30:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "country": "Germany",
+      "countryCode": "DE",
+      "competitions": [
+        {
+          "leagueId": 2,
+          "name": "Bundesliga",
+          "logoUrl": "...",
+          "fixtureCount": 1,
+          "fixtures": [
+            {
+              "fixtureId": 201,
+              "homeTeam": "Bayern Munich",
+              "awayTeam": "Dortmund",
+              "matchDate": "2026-07-23T14:30:00Z"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "totalFixtures": 3,
+  "lastUpdated": "2026-07-21T03:00:00Z"
+}
+```
+
+**Acceptance Criteria:**
+- [ ] Homepage displays all supported competitions
+- [ ] Competitions are grouped by country
+- [ ] Countries are sorted alphabetically (A-Z)
+- [ ] Each competition shows fixture count with icon
+- [ ] Clicking a competition expands to show fixtures
+- [ ] Clicking again collapses the fixture list
+- [ ] Expanded fixtures show home vs away and date/time
+- [ ] Page loads within 500ms (cached data)
+- [ ] Responsive layout works on mobile and desktop
+
+**Status:** Reviewed
 
 ---
 

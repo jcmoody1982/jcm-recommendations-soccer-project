@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Recommendation, RecommendationSummary, RecommendationType, Fixture, League } from '../types';
+import type { Recommendation, RecommendationSummary, RecommendationType, Fixture, League, LeagueOverviewResponse } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -89,6 +89,11 @@ export const fixtureService = {
 export const leagueService = {
   getAll: async (): Promise<League[]> => {
     const response = await api.get<League[]>('/leagues');
+    return response.data;
+  },
+
+  getOverview: async (): Promise<LeagueOverviewResponse> => {
+    const response = await api.get<LeagueOverviewResponse>('/leagues/overview');
     return response.data;
   },
 };

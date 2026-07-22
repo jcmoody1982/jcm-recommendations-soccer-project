@@ -27,4 +27,9 @@ public interface FixtureRepository extends JpaRepository<Fixture, Long> {
     List<Fixture> findByHomeTeamIdOrAwayTeamId(Long homeTeamId, Long awayTeamId);
 
     List<Fixture> findByRefereeId(Long refereeId);
+
+    List<Fixture> findBySeasonIdAndDateUnixGreaterThanEqualOrderByDateUnixAsc(Long seasonId, Long dateUnix);
+
+    @Query("SELECT f FROM Fixture f WHERE f.dateUnix >= :startTime ORDER BY f.seasonId, f.dateUnix")
+    List<Fixture> findUpcomingFixtures(@Param("startTime") Long startTime);
 }
