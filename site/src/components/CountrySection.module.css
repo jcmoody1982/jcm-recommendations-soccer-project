@@ -1,0 +1,28 @@
+.section {
+  margin-bottom: 24px;
+}
+
+.countryHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color, #2d2d3d);
+}
+
+.flag {
+  font-size: 1.25rem;
+}
+
+.countryName {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.competitions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

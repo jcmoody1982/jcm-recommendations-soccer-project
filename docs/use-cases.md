@@ -1479,7 +1479,7 @@ GET /api/leagues/overview
 - [ ] Page loads within 500ms (cached data)
 - [ ] Responsive layout works on mobile and desktop
 
-**Status:** Draft
+**Status:** Reviewed
 
 ---
 

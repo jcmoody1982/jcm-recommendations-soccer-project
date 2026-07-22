@@ -1,66 +1,49 @@
 import { useQuery } from '@tanstack/react-query';
-import { recommendationService } from '../services/api';
-import { RecommendationCard } from '../components/RecommendationCard';
-import { SummaryCard } from '../components/SummaryCard';
+import { leagueService } from '../services/api';
+import { CountrySection } from '../components/CountrySection';
 import styles from './Dashboard.module.css';
 
 export default function Dashboard() {
-  const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['recommendation-summary'],
-    queryFn: () => recommendationService.getSummary(),
+  const { data: overview, isLoading, error } = useQuery({
+    queryKey: ['league-overview'],
+    queryFn: () => leagueService.getOverview(),
   });
 
-  const { data: strongRecs, isLoading: recsLoading } = useQuery({
-    queryKey: ['strong-recommendations'],
-    queryFn: () => recommendationService.getStrong(),
-  });
+  if (isLoading) {
+    return <div className={styles.loading}>Loading competitions...</div>;
+  }
 
-  if (summaryLoading || recsLoading) {
-    return <div className={styles.loading}>Loading...</div>;
+  if (error) {
+    return (
+      <div className={styles.error}>
+        Failed to load competitions. Please try again later.
+      </div>
+    );
+  }
+
+  if (!overview || overview.countries.length === 0) {
+    return (
+      <div className={styles.empty}>
+        <h2>No competitions configured</h2>
+        <p>Check back later for upcoming fixtures.</p>
+      </div>
+    );
   }
 
   return (
     <div className={styles.dashboard}>
-      <h1 className={styles.title}>Dashboard</h1>
+      <header className={styles.header}>
+        <h1 className={styles.title}>Competitions</h1>
+        <span className={styles.totalFixtures}>
+          {overview.totalFixtures} upcoming fixtures
+        </span>
+      </header>
 
-      {summary && (
-        <div className={styles.summaryGrid}>
-          <SummaryCard
-            title="Fixtures Analyzed"
-            value={summary.fixturesAnalyzed}
-            icon="📅"
-          />
-          <SummaryCard
-            title="Total Recommendations"
-            value={summary.totalRecommendations}
-            icon="💡"
-          />
-          <SummaryCard
-            title="Strong Picks"
-            value={summary.strongRecommendations}
-            icon="🎯"
-            highlight
-          />
-          <SummaryCard
-            title="Moderate Picks"
-            value={summary.moderateRecommendations}
-            icon="📊"
-          />
-        </div>
-      )}
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Top Picks Today</h2>
-        {strongRecs && strongRecs.length > 0 ? (
-          <div className={styles.recommendationGrid}>
-            {strongRecs.slice(0, 6).map((rec) => (
-              <RecommendationCard key={`${rec.fixtureId}-${rec.type}`} recommendation={rec} />
-            ))}
-          </div>
-        ) : (
-          <p className={styles.empty}>No strong recommendations available.</p>
-        )}
-      </section>
+      <div className={styles.countryList}>
+        {overview.countries.map((countryGroup) => (
+          <CountrySection key={countryGroup.country} countryGroup={countryGroup} />
+        ))}
+      </div>
     </div>
   );
 }
