@@ -1,0 +1,75 @@
+.row {
+  display: grid;
+  grid-template-columns: 32px 100px 1fr auto 60px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--card-bg, #1e1e2e);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.row:hover {
+  background: var(--hover-bg, #252535);
+}
+
+.sentiment {
+  font-size: 1rem;
+  text-align: center;
+}
+
+.datetime {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted, #888);
+  font-size: 0.8rem;
+}
+
+.date {
+  white-space: nowrap;
+}
+
+.time {
+  font-weight: 500;
+  color: var(--text-primary, #fff);
+}
+
+.fixture {
+  font-weight: 500;
+  color: var(--text-primary, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.market {
+  color: var(--text-muted, #888);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.score {
+  font-weight: 600;
+  color: var(--accent, #6366f1);
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: 28px 1fr auto;
+    gap: 8px;
+  }
+
+  .datetime {
+    display: none;
+  }
+
+  .market {
+    display: none;
+  }
+
+  .fixture {
+    font-size: 0.85rem;
+  }
+}

@@ -1,4 +1,5 @@
 export { RecommendationCard } from './RecommendationCard';
+export { RecommendationRow } from './RecommendationRow';
 export { RecommendationSection } from './RecommendationSection';
 export { SummaryCard } from './SummaryCard';
 export { FixtureCard } from './FixtureCard';

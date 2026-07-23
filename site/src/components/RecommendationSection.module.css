@@ -28,14 +28,8 @@
   font-weight: 400;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-}
-
-@media (max-width: 640px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }

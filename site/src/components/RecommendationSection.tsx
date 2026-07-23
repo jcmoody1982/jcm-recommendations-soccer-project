@@ -1,5 +1,5 @@
 import type { Recommendation, RecommendationType } from '../types';
-import { RecommendationCard } from './RecommendationCard';
+import { RecommendationRow } from './RecommendationRow';
 import styles from './RecommendationSection.module.css';
 
 interface Props {
@@ -43,9 +43,9 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
         <span className={styles.title}>{config.title}</span>
         <span className={styles.count}>{topRecommendations.length} picks</span>
       </h2>
-      <div className={styles.grid}>
+      <div className={styles.list}>
         {topRecommendations.map((rec) => (
-          <RecommendationCard key={`${rec.fixtureId}-${rec.type}`} recommendation={rec} />
+          <RecommendationRow key={`${rec.fixtureId}-${rec.type}`} recommendation={rec} />
         ))}
       </div>
     </section>
