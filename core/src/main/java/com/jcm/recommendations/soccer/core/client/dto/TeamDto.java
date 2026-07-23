@@ -20,108 +20,192 @@ public class TeamDto {
     @JsonProperty("competition_id")
     private Long competitionId;
 
-    private Integer matchesPlayed;
-    private Integer points;
-    private Integer position;
+    @JsonProperty("table_position")
+    private Integer tablePosition;
 
-    @JsonProperty("seasonWinsNum_overall")
-    private Integer seasonWinsOverall;
-    @JsonProperty("seasonWinsNum_home")
-    private Integer seasonWinsHome;
-    @JsonProperty("seasonWinsNum_away")
-    private Integer seasonWinsAway;
+    private TeamStatsDto stats;
 
-    @JsonProperty("seasonDrawsNum_overall")
-    private Integer seasonDrawsOverall;
-    @JsonProperty("seasonDrawsNum_home")
-    private Integer seasonDrawsHome;
-    @JsonProperty("seasonDrawsNum_away")
-    private Integer seasonDrawsAway;
+    public Integer getMatchesPlayed() {
+        return stats != null ? stats.getMatchesPlayed() : null;
+    }
 
-    @JsonProperty("seasonLossesNum_overall")
-    private Integer seasonLossesOverall;
-    @JsonProperty("seasonLossesNum_home")
-    private Integer seasonLossesHome;
-    @JsonProperty("seasonLossesNum_away")
-    private Integer seasonLossesAway;
+    public Integer getPoints() {
+        return stats != null ? stats.getPoints() : null;
+    }
 
-    @JsonProperty("seasonGoals_overall")
-    private Integer seasonGoalsOverall;
-    @JsonProperty("seasonGoals_home")
-    private Integer seasonGoalsHome;
-    @JsonProperty("seasonGoals_away")
-    private Integer seasonGoalsAway;
+    public Integer getPosition() {
+        return tablePosition != null ? tablePosition : (stats != null ? stats.getPosition() : null);
+    }
 
-    @JsonProperty("seasonConceded_overall")
-    private Integer seasonConcededOverall;
-    @JsonProperty("seasonConceded_home")
-    private Integer seasonConcededHome;
-    @JsonProperty("seasonConceded_away")
-    private Integer seasonConcededAway;
+    public Integer getSeasonWinsOverall() {
+        return stats != null ? stats.getSeasonWinsOverall() : null;
+    }
 
-    @JsonProperty("seasonGoalDifference_overall")
-    private Integer seasonGoalDifference;
+    public Integer getSeasonWinsHome() {
+        return stats != null ? stats.getSeasonWinsHome() : null;
+    }
 
-    @JsonProperty("seasonPPG_overall")
-    private Double ppgOverall;
-    @JsonProperty("seasonPPG_home")
-    private Double ppgHome;
-    @JsonProperty("seasonPPG_away")
-    private Double ppgAway;
+    public Integer getSeasonWinsAway() {
+        return stats != null ? stats.getSeasonWinsAway() : null;
+    }
 
-    @JsonProperty("seasonBTTS_overall")
-    private Integer seasonBttsOverall;
-    @JsonProperty("seasonBTTS_home")
-    private Integer seasonBttsHome;
-    @JsonProperty("seasonBTTS_away")
-    private Integer seasonBttsAway;
+    public Integer getSeasonDrawsOverall() {
+        return stats != null ? stats.getSeasonDrawsOverall() : null;
+    }
 
-    @JsonProperty("seasonBTTSPercentage_overall")
-    private Double seasonBttsPercentageOverall;
-    @JsonProperty("seasonBTTSPercentage_home")
-    private Double seasonBttsPercentageHome;
-    @JsonProperty("seasonBTTSPercentage_away")
-    private Double seasonBttsPercentageAway;
+    public Integer getSeasonDrawsHome() {
+        return stats != null ? stats.getSeasonDrawsHome() : null;
+    }
 
-    @JsonProperty("seasonOver15Num_overall")
-    private Integer seasonOver15Overall;
-    @JsonProperty("seasonOver25Num_overall")
-    private Integer seasonOver25Overall;
-    @JsonProperty("seasonOver35Num_overall")
-    private Integer seasonOver35Overall;
+    public Integer getSeasonDrawsAway() {
+        return stats != null ? stats.getSeasonDrawsAway() : null;
+    }
 
-    @JsonProperty("seasonOver15Percentage_overall")
-    private Double seasonOver15PercentageOverall;
-    @JsonProperty("seasonOver25Percentage_overall")
-    private Double seasonOver25PercentageOverall;
-    @JsonProperty("seasonOver35Percentage_overall")
-    private Double seasonOver35PercentageOverall;
+    public Integer getSeasonLossesOverall() {
+        return stats != null ? stats.getSeasonLossesOverall() : null;
+    }
 
-    @JsonProperty("seasonCS_overall")
-    private Integer seasonCleanSheetsOverall;
-    @JsonProperty("seasonCS_home")
-    private Integer seasonCleanSheetsHome;
-    @JsonProperty("seasonCS_away")
-    private Integer seasonCleanSheetsAway;
+    public Integer getSeasonLossesHome() {
+        return stats != null ? stats.getSeasonLossesHome() : null;
+    }
 
-    @JsonProperty("seasonFTS_overall")
-    private Integer seasonFailedToScoreOverall;
-    @JsonProperty("seasonFTS_home")
-    private Integer seasonFailedToScoreHome;
-    @JsonProperty("seasonFTS_away")
-    private Integer seasonFailedToScoreAway;
+    public Integer getSeasonLossesAway() {
+        return stats != null ? stats.getSeasonLossesAway() : null;
+    }
 
-    @JsonProperty("cornersAVG_overall")
-    private Double cornersAvgOverall;
-    @JsonProperty("cornersAVG_home")
-    private Double cornersAvgHome;
-    @JsonProperty("cornersAVG_away")
-    private Double cornersAvgAway;
+    public Integer getSeasonGoalsOverall() {
+        return stats != null ? stats.getSeasonGoalsOverall() : null;
+    }
 
-    @JsonProperty("cardsAVG_overall")
-    private Double cardsAvgOverall;
-    @JsonProperty("cardsAVG_home")
-    private Double cardsAvgHome;
-    @JsonProperty("cardsAVG_away")
-    private Double cardsAvgAway;
+    public Integer getSeasonGoalsHome() {
+        return stats != null ? stats.getSeasonGoalsHome() : null;
+    }
+
+    public Integer getSeasonGoalsAway() {
+        return stats != null ? stats.getSeasonGoalsAway() : null;
+    }
+
+    public Integer getSeasonConcededOverall() {
+        return stats != null ? stats.getSeasonConcededOverall() : null;
+    }
+
+    public Integer getSeasonConcededHome() {
+        return stats != null ? stats.getSeasonConcededHome() : null;
+    }
+
+    public Integer getSeasonConcededAway() {
+        return stats != null ? stats.getSeasonConcededAway() : null;
+    }
+
+    public Integer getSeasonGoalDifference() {
+        return stats != null ? stats.getSeasonGoalDifference() : null;
+    }
+
+    public Double getPpgOverall() {
+        return stats != null ? stats.getPpgOverall() : null;
+    }
+
+    public Double getPpgHome() {
+        return stats != null ? stats.getPpgHome() : null;
+    }
+
+    public Double getPpgAway() {
+        return stats != null ? stats.getPpgAway() : null;
+    }
+
+    public Integer getSeasonBttsOverall() {
+        return stats != null ? stats.getSeasonBttsOverall() : null;
+    }
+
+    public Integer getSeasonBttsHome() {
+        return stats != null ? stats.getSeasonBttsHome() : null;
+    }
+
+    public Integer getSeasonBttsAway() {
+        return stats != null ? stats.getSeasonBttsAway() : null;
+    }
+
+    public Double getSeasonBttsPercentageOverall() {
+        return stats != null ? stats.getSeasonBttsPercentageOverall() : null;
+    }
+
+    public Double getSeasonBttsPercentageHome() {
+        return stats != null ? stats.getSeasonBttsPercentageHome() : null;
+    }
+
+    public Double getSeasonBttsPercentageAway() {
+        return stats != null ? stats.getSeasonBttsPercentageAway() : null;
+    }
+
+    public Integer getSeasonOver15Overall() {
+        return stats != null ? stats.getSeasonOver15Overall() : null;
+    }
+
+    public Integer getSeasonOver25Overall() {
+        return stats != null ? stats.getSeasonOver25Overall() : null;
+    }
+
+    public Integer getSeasonOver35Overall() {
+        return stats != null ? stats.getSeasonOver35Overall() : null;
+    }
+
+    public Double getSeasonOver15PercentageOverall() {
+        return stats != null ? stats.getSeasonOver15PercentageOverall() : null;
+    }
+
+    public Double getSeasonOver25PercentageOverall() {
+        return stats != null ? stats.getSeasonOver25PercentageOverall() : null;
+    }
+
+    public Double getSeasonOver35PercentageOverall() {
+        return stats != null ? stats.getSeasonOver35PercentageOverall() : null;
+    }
+
+    public Integer getSeasonCleanSheetsOverall() {
+        return stats != null ? stats.getSeasonCleanSheetsOverall() : null;
+    }
+
+    public Integer getSeasonCleanSheetsHome() {
+        return stats != null ? stats.getSeasonCleanSheetsHome() : null;
+    }
+
+    public Integer getSeasonCleanSheetsAway() {
+        return stats != null ? stats.getSeasonCleanSheetsAway() : null;
+    }
+
+    public Integer getSeasonFailedToScoreOverall() {
+        return stats != null ? stats.getSeasonFailedToScoreOverall() : null;
+    }
+
+    public Integer getSeasonFailedToScoreHome() {
+        return stats != null ? stats.getSeasonFailedToScoreHome() : null;
+    }
+
+    public Integer getSeasonFailedToScoreAway() {
+        return stats != null ? stats.getSeasonFailedToScoreAway() : null;
+    }
+
+    public Double getCornersAvgOverall() {
+        return stats != null ? stats.getCornersAvgOverall() : null;
+    }
+
+    public Double getCornersAvgHome() {
+        return stats != null ? stats.getCornersAvgHome() : null;
+    }
+
+    public Double getCornersAvgAway() {
+        return stats != null ? stats.getCornersAvgAway() : null;
+    }
+
+    public Double getCardsAvgOverall() {
+        return stats != null ? stats.getCardsAvgOverall() : null;
+    }
+
+    public Double getCardsAvgHome() {
+        return stats != null ? stats.getCardsAvgHome() : null;
+    }
+
+    public Double getCardsAvgAway() {
+        return stats != null ? stats.getCardsAvgAway() : null;
+    }
 }
