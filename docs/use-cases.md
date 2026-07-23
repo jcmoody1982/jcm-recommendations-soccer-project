@@ -1386,14 +1386,20 @@ _Use cases for the web application interface._
 
 **UI Components:**
 
-1. **Country Groups**
+1. **Header/Navigation**
+   - Site name: "AccaBaccaGlory"
+   - Home link with 🏠 icon
+
+2. **Country Groups**
    - Competitions grouped by country
    - Countries sorted alphabetically (A-Z)
    - Country header with flag icon (if available)
+   - **Hide competitions with 0 fixtures**
+   - **Hide countries with no visible competitions**
 
-2. **Competition Card (Expandable)**
+3. **Competition Card (Expandable)**
    - Each card shows:
-     - League badge/logo (if available)
+     - League badge/logo with white background square (for visibility)
      - League name
      - Fixture count icon with number (e.g., 📅 10)
      - Expand/collapse indicator (chevron)
@@ -1403,9 +1409,9 @@ _Use cases for the web application interface._
      - Each fixture displays: home team vs away team, date/time
      - Clicking again collapses the section
 
-3. **Empty State**
-   - Message when no competitions are available
-   - "No competitions configured" or similar
+4. **Empty State**
+   - Message when no upcoming fixtures available
+   - "No upcoming fixtures" or similar
 
 **API Endpoint:**
 ```
@@ -1469,15 +1475,19 @@ GET /api/leagues/overview
 ```
 
 **Acceptance Criteria:**
-- [ ] Homepage displays all supported competitions
-- [ ] Competitions are grouped by country
-- [ ] Countries are sorted alphabetically (A-Z)
-- [ ] Each competition shows fixture count with icon
-- [ ] Clicking a competition expands to show fixtures
-- [ ] Clicking again collapses the fixture list
-- [ ] Expanded fixtures show home vs away and date/time
+- [x] Site branded as "AccaBaccaGlory"
+- [x] Home navigation link with 🏠 icon
+- [x] Homepage displays competitions with fixtures only
+- [x] Competitions with 0 fixtures are hidden
+- [x] Competitions are grouped by country
+- [x] Countries are sorted alphabetically (A-Z)
+- [x] League logos have white background for visibility
+- [x] Each competition shows fixture count with icon
+- [x] Clicking a competition expands to show fixtures
+- [x] Clicking again collapses the fixture list
+- [x] Expanded fixtures show home vs away and date/time
 - [ ] Page loads within 500ms (cached data)
-- [ ] Responsive layout works on mobile and desktop
+- [x] Responsive layout works on mobile and desktop
 
 **Status:** Reviewed
 

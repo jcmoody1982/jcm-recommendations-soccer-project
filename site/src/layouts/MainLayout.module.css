@@ -32,6 +32,13 @@
   padding: 0.5rem 1rem;
   border-radius: 6px;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.navIcon {
+  font-size: 1rem;
 }
 
 .navLink:hover {

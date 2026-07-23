@@ -2,9 +2,9 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import styles from './MainLayout.module.css';
 
 const navItems = [
-  { path: '/', label: 'Dashboard' },
-  { path: '/recommendations', label: 'Recommendations' },
-  { path: '/fixtures', label: 'Fixtures' },
+  { path: '/', label: 'Home', icon: '🏠' },
+  { path: '/recommendations', label: 'Recommendations', icon: null },
+  { path: '/fixtures', label: 'Fixtures', icon: null },
 ];
 
 export default function MainLayout() {
@@ -14,7 +14,7 @@ export default function MainLayout() {
     <div className={styles.layout}>
       <header className={styles.header}>
         <div className={styles.logo}>
-          <Link to="/">Soccer Recommendations</Link>
+          <Link to="/">AccaBaccaGlory</Link>
         </div>
         <nav className={styles.nav}>
           {navItems.map((item) => (
@@ -25,6 +25,7 @@ export default function MainLayout() {
                 location.pathname === item.path ? styles.active : ''
               }`}
             >
+              {item.icon && <span className={styles.navIcon}>{item.icon}</span>}
               {item.label}
             </Link>
           ))}
@@ -34,7 +35,7 @@ export default function MainLayout() {
         <Outlet />
       </main>
       <footer className={styles.footer}>
-        <p>&copy; 2026 Soccer Recommendations. All rights reserved.</p>
+        <p>&copy; 2026 AccaBaccaGlory. All rights reserved.</p>
       </footer>
     </div>
   );
