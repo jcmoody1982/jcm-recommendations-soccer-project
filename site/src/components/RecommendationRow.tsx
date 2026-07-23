@@ -33,6 +33,17 @@ export function RecommendationRow({ recommendation }: Props) {
       <span className={styles.sentiment} title={recommendation.confidence}>
         {sentimentIcon}
       </span>
+      <span className={styles.league}>
+        {recommendation.leagueImage ? (
+          <img 
+            src={recommendation.leagueImage} 
+            alt={recommendation.leagueName || 'League'} 
+            className={styles.leagueIcon}
+          />
+        ) : (
+          <span className={styles.leaguePlaceholder}>⚽</span>
+        )}
+      </span>
       <span className={styles.datetime}>
         <span className={styles.date}>{formattedDate}</span>
         <span className={styles.time}>{formattedTime}</span>

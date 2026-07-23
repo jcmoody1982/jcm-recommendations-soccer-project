@@ -12,6 +12,8 @@ public class FixtureContext {
     private FixtureOdds odds;
     private FixturePotentials potentials;
     
+    private League league;
+    
     private Team homeTeam;
     private Team awayTeam;
     

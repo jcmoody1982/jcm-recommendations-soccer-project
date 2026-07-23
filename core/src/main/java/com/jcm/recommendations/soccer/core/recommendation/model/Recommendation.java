@@ -17,6 +17,10 @@ public class Recommendation {
     private String awayTeamName;
     private Long matchDateUnix;
     
+    private Long leagueId;
+    private String leagueName;
+    private String leagueImage;
+    
     private RecommendationType type;
     private ConfidenceLevel confidence;
     private double score;

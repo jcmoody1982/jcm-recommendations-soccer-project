@@ -24,6 +24,9 @@ export interface Recommendation {
   homeTeamName: string;
   awayTeamName: string;
   matchDateUnix: number;
+  leagueId: number | null;
+  leagueName: string | null;
+  leagueImage: string | null;
   type: RecommendationType;
   confidence: ConfidenceLevel;
   score: number;

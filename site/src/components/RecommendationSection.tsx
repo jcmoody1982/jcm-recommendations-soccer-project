@@ -43,6 +43,14 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
         <span className={styles.title}>{config.title}</span>
         <span className={styles.count}>{topRecommendations.length} picks</span>
       </h2>
+      <div className={styles.tableHeader}>
+        <span>Pick Health</span>
+        <span>League</span>
+        <span>Date / Time</span>
+        <span>Fixture</span>
+        <span>Selection</span>
+        <span>Score</span>
+      </div>
       <div className={styles.list}>
         {topRecommendations.map((rec) => (
           <RecommendationRow key={`${rec.fixtureId}-${rec.type}`} recommendation={rec} />

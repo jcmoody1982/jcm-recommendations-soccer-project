@@ -18,6 +18,7 @@ public class FixtureContextBuilder {
     private final FixtureRepository fixtureRepository;
     private final FixtureOddsRepository fixtureOddsRepository;
     private final FixturePotentialsRepository fixturePotentialsRepository;
+    private final LeagueRepository leagueRepository;
     private final TeamRepository teamRepository;
     private final TeamSeasonStatsRepository teamSeasonStatsRepository;
     private final TeamRecentFormRepository teamRecentFormRepository;
@@ -28,6 +29,8 @@ public class FixtureContextBuilder {
 
         FixtureOdds odds = fixtureOddsRepository.findById(fixture.getId()).orElse(null);
         FixturePotentials potentials = fixturePotentialsRepository.findById(fixture.getId()).orElse(null);
+        
+        League league = leagueRepository.findById(fixture.getSeasonId()).orElse(null);
 
         Team homeTeam = teamRepository.findById(fixture.getHomeTeamId()).orElse(null);
         Team awayTeam = teamRepository.findById(fixture.getAwayTeamId()).orElse(null);
@@ -58,6 +61,7 @@ public class FixtureContextBuilder {
                 .fixture(fixture)
                 .odds(odds)
                 .potentials(potentials)
+                .league(league)
                 .homeTeam(homeTeam)
                 .awayTeam(awayTeam)
                 .homeTeamStats(homeStats)
