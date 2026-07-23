@@ -1568,14 +1568,14 @@ GET /api/recommendations/grouped?daysAhead=7
 ```
 
 **Acceptance Criteria:**
-- [ ] Page displays sections for all recommendation types
-- [ ] Each section shows up to 5 recommendations
-- [ ] Recommendations sorted by score (highest first)
-- [ ] Days ahead filter works across all sections
-- [ ] Empty sections are hidden or show "No picks" message
-- [ ] Responsive grid layout for recommendation cards
+- [x] Page displays sections for all recommendation types
+- [x] Each section shows up to 5 recommendations
+- [x] Recommendations sorted by score (highest first)
+- [x] Days ahead filter works across all sections
+- [x] Empty sections are hidden automatically
+- [x] Responsive grid layout for recommendation cards
 
-**Status:** Draft
+**Status:** Reviewed
 
 ---
 
