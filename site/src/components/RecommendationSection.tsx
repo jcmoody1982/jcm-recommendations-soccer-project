@@ -29,7 +29,7 @@ const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string }
 export function RecommendationSection({ type, recommendations, maxItems = 5 }: Props) {
   const config = SECTION_CONFIG[type] || { title: type, icon: '📊' };
   const topRecommendations = recommendations
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
     .slice(0, maxItems);
 
   if (topRecommendations.length === 0) {

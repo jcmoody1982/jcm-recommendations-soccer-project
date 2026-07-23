@@ -54,10 +54,10 @@ export function RecommendationCard({ recommendation }: Props) {
         <div className={styles.scoreBar}>
           <div
             className={styles.scoreFill}
-            style={{ width: `${Math.min(recommendation.score, 100)}%` }}
+            style={{ width: `${Math.min(Number(recommendation.score) || 0, 100)}%` }}
           />
         </div>
-        <span className={styles.scoreValue}>{recommendation.score.toFixed(1)}%</span>
+        <span className={styles.scoreValue}>{Number(recommendation.score || 0).toFixed(1)}%</span>
       </div>
 
       <div className={styles.footer}>
