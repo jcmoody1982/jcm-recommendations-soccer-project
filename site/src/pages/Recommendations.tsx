@@ -1,111 +1,77 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { recommendationService } from '../services/api';
-import { RecommendationCard } from '../components/RecommendationCard';
-import type { RecommendationType, ConfidenceLevel } from '../types';
+import { RecommendationSection } from '../components/RecommendationSection';
+import type { RecommendationType } from '../types';
 import styles from './Recommendations.module.css';
 
-const RECOMMENDATION_TYPES: { value: RecommendationType | 'ALL'; label: string }[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'BTTS', label: 'BTTS' },
-  { value: 'OVER_GOALS', label: 'Over Goals' },
-  { value: 'UNDER_GOALS', label: 'Under Goals' },
-  { value: 'BOOKING_POINTS', label: 'Booking Points' },
-  { value: 'VALUE_BET', label: 'Value Bets' },
-  { value: 'MATCH_RESULT', label: 'Match Result' },
-  { value: 'CLEAN_SHEET', label: 'Clean Sheet' },
-  { value: 'OVER_CORNERS', label: 'Over Corners' },
-  { value: 'DRAW', label: 'Draw' },
-];
-
-const CONFIDENCE_LEVELS: { value: ConfidenceLevel | 'ALL'; label: string }[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'STRONG', label: 'Strong' },
-  { value: 'MODERATE', label: 'Moderate' },
+const SECTION_ORDER: RecommendationType[] = [
+  'BTTS',
+  'OVER_GOALS',
+  'UNDER_GOALS',
+  'VALUE_BET',
+  'MATCH_RESULT',
+  'CLEAN_SHEET',
+  'BOOKING_POINTS',
+  'OVER_CORNERS',
+  'UNDER_CORNERS',
+  'FIRST_HALF_GOALS',
+  'SECOND_HALF_GOALS',
+  'WINNING_FORM_MISMATCH',
+  'LOSING_FORM_MISMATCH',
+  'HOME_AWAY_SPECIALIST',
+  'DRAW',
 ];
 
 export default function Recommendations() {
-  const [selectedType, setSelectedType] = useState<RecommendationType | 'ALL'>('ALL');
-  const [selectedConfidence, setSelectedConfidence] = useState<ConfidenceLevel | 'ALL'>('ALL');
   const [daysAhead, setDaysAhead] = useState(7);
 
-  const { data: recommendations, isLoading } = useQuery({
-    queryKey: ['recommendations', daysAhead],
-    queryFn: () => recommendationService.getAll(daysAhead),
+  const { data: groupedRecommendations, isLoading } = useQuery({
+    queryKey: ['recommendations-grouped', daysAhead],
+    queryFn: () => recommendationService.getGrouped(daysAhead),
   });
 
-  const filteredRecommendations = recommendations?.filter((rec) => {
-    const typeMatch = selectedType === 'ALL' || rec.type === selectedType;
-    const confidenceMatch = selectedConfidence === 'ALL' || rec.confidence === selectedConfidence;
-    return typeMatch && confidenceMatch;
-  });
+  const totalCount = groupedRecommendations
+    ? Object.values(groupedRecommendations).reduce((sum, recs) => sum + recs.length, 0)
+    : 0;
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Recommendations</h1>
-
-      <div className={styles.filters}>
-        <div className={styles.filterGroup}>
-          <label className={styles.filterLabel}>Type</label>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as RecommendationType | 'ALL')}
-            className={styles.select}
-          >
-            {RECOMMENDATION_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className={styles.filterGroup}>
-          <label className={styles.filterLabel}>Confidence</label>
-          <select
-            value={selectedConfidence}
-            onChange={(e) => setSelectedConfidence(e.target.value as ConfidenceLevel | 'ALL')}
-            className={styles.select}
-          >
-            {CONFIDENCE_LEVELS.map((level) => (
-              <option key={level.value} value={level.value}>
-                {level.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className={styles.filterGroup}>
-          <label className={styles.filterLabel}>Days Ahead</label>
+      <header className={styles.header}>
+        <h1 className={styles.title}>Recommendations</h1>
+        <div className={styles.headerRight}>
+          <span className={styles.totalCount}>{totalCount} total picks</span>
           <select
             value={daysAhead}
             onChange={(e) => setDaysAhead(Number(e.target.value))}
             className={styles.select}
           >
-            <option value={1}>1 Day</option>
-            <option value={3}>3 Days</option>
-            <option value={7}>7 Days</option>
-            <option value={14}>14 Days</option>
+            <option value={1}>Next 24 hours</option>
+            <option value={3}>Next 3 days</option>
+            <option value={7}>Next 7 days</option>
+            <option value={14}>Next 14 days</option>
           </select>
         </div>
-      </div>
+      </header>
 
       {isLoading ? (
         <div className={styles.loading}>Loading recommendations...</div>
-      ) : filteredRecommendations && filteredRecommendations.length > 0 ? (
-        <>
-          <p className={styles.count}>
-            Showing {filteredRecommendations.length} recommendation
-            {filteredRecommendations.length !== 1 ? 's' : ''}
-          </p>
-          <div className={styles.grid}>
-            {filteredRecommendations.map((rec) => (
-              <RecommendationCard key={`${rec.fixtureId}-${rec.type}`} recommendation={rec} />
-            ))}
-          </div>
-        </>
+      ) : groupedRecommendations && totalCount > 0 ? (
+        <div className={styles.sections}>
+          {SECTION_ORDER.map((type) => {
+            const recommendations = groupedRecommendations[type] || [];
+            return (
+              <RecommendationSection
+                key={type}
+                type={type}
+                recommendations={recommendations}
+                maxItems={5}
+              />
+            );
+          })}
+        </div>
       ) : (
-        <p className={styles.empty}>No recommendations found matching your filters.</p>
+        <p className={styles.empty}>No recommendations available for this time period.</p>
       )}
     </div>
   );

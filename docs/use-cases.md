@@ -1493,6 +1493,92 @@ GET /api/leagues/overview
 
 ---
 
+#### UC-021: Recommendations Page - Section-Based Display
+
+**Goal:** Display all recommendation types in dedicated sections, each showing the top 5 picks across all competitions and fixtures.
+
+**User Story:** As a user, I want to see recommendations organized by type with the best picks for each category, so I can quickly find the strongest opportunities in each market.
+
+**Data Required:**
+- All recommendations grouped by type (from `RecommendationService`)
+- Top 5 per type, sorted by score/confidence
+
+**UI Components:**
+
+1. **Page Header**
+   - Title: "Recommendations"
+   - Days ahead filter (1, 3, 7, 14 days)
+
+2. **Recommendation Sections**
+   - One section per recommendation type
+   - Section title with icon/badge
+   - Shows top 5 recommendations for that type
+   - Each recommendation card shows:
+     - Home vs Away teams
+     - Match date/time
+     - Confidence level (Strong/Moderate)
+     - Score/probability
+     - Key factors
+
+3. **Section Types (15 total):**
+   - Both Teams To Score (BTTS)
+   - Over Goals
+   - Under Goals
+   - Booking Points
+   - Value Bet
+   - Winning Form Mismatch
+   - Losing Form Mismatch
+   - Over Corners
+   - Under Corners
+   - Clean Sheet
+   - First Half Goals
+   - Second Half Goals
+   - Match Result
+   - Home/Away Specialist
+   - Draw
+
+4. **Empty Section**
+   - If a section has no recommendations, show subtle message or hide section
+
+**API Endpoint:**
+```
+GET /api/recommendations/grouped?daysAhead=7
+```
+
+**Response Structure:**
+```json
+{
+  "BTTS": [
+    {
+      "fixtureId": 101,
+      "homeTeamName": "Arsenal",
+      "awayTeamName": "Chelsea",
+      "matchDateUnix": 1721750400,
+      "type": "BTTS",
+      "confidence": "STRONG",
+      "score": 0.85,
+      "market": "BTTS Yes",
+      "description": "Both teams score regularly...",
+      "factors": { ... }
+    }
+  ],
+  "OVER_GOALS": [ ... ],
+  ...
+}
+```
+
+**Acceptance Criteria:**
+- [ ] Page displays sections for all recommendation types
+- [ ] Each section shows up to 5 recommendations
+- [ ] Recommendations sorted by score (highest first)
+- [ ] Days ahead filter works across all sections
+- [ ] Empty sections are hidden or show "No picks" message
+- [ ] Responsive grid layout for recommendation cards
+
+**Status:** Draft
+
+---
+
 ### iOS Native App
 
 _Use cases for the iOS mobile application._
