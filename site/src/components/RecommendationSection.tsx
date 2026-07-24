@@ -8,26 +8,26 @@ interface Props {
   maxItems?: number;
 }
 
-const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string }> = {
-  BTTS: { title: 'Both Teams To Score', icon: '⚽' },
-  OVER_GOALS: { title: 'Over Goals', icon: '🎯' },
-  UNDER_GOALS: { title: 'Under Goals', icon: '🛡️' },
-  BOOKING_POINTS: { title: 'Booking Points', icon: '🟨' },
-  VALUE_BET: { title: 'Value Bets', icon: '💰' },
-  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', icon: '🔥' },
-  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', icon: '📉' },
-  OVER_CORNERS: { title: 'Over Corners', icon: '📐' },
-  UNDER_CORNERS: { title: 'Under Corners', icon: '📏' },
-  CLEAN_SHEET: { title: 'Clean Sheet', icon: '🧤' },
-  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣' },
-  SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣' },
-  MATCH_RESULT: { title: 'Match Result', icon: '🏆' },
-  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️' },
-  DRAW: { title: 'Draw', icon: '🤝' },
+const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string; scoreLabel: string }> = {
+  BTTS: { title: 'Both Teams To Score', icon: '⚽', scoreLabel: 'Score' },
+  OVER_GOALS: { title: 'Over Goals', icon: '🎯', scoreLabel: 'Score' },
+  UNDER_GOALS: { title: 'Under Goals', icon: '🛡️', scoreLabel: 'Score' },
+  BOOKING_POINTS: { title: 'Booking Points', icon: '🟨', scoreLabel: 'Predicted Points' },
+  VALUE_BET: { title: 'Value Bets', icon: '💰', scoreLabel: 'Score' },
+  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', icon: '🔥', scoreLabel: 'Score' },
+  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', icon: '📉', scoreLabel: 'Score' },
+  OVER_CORNERS: { title: 'Over Corners', icon: '📐', scoreLabel: 'Score' },
+  UNDER_CORNERS: { title: 'Under Corners', icon: '📏', scoreLabel: 'Score' },
+  CLEAN_SHEET: { title: 'Clean Sheet', icon: '🧤', scoreLabel: 'Score' },
+  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', scoreLabel: 'Score' },
+  SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣', scoreLabel: 'Score' },
+  MATCH_RESULT: { title: 'Match Result', icon: '🏆', scoreLabel: 'Score' },
+  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', scoreLabel: 'Score' },
+  DRAW: { title: 'Draw', icon: '🤝', scoreLabel: 'Score' },
 };
 
 export function RecommendationSection({ type, recommendations, maxItems = 5 }: Props) {
-  const config = SECTION_CONFIG[type] || { title: type, icon: '📊' };
+  const config = SECTION_CONFIG[type] || { title: type, icon: '📊', scoreLabel: 'Score' };
   const topRecommendations = recommendations
     .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
     .slice(0, maxItems);
@@ -50,7 +50,7 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
         <span>Fixture</span>
         <span>Selection</span>
         <span>Price</span>
-        <span>Score</span>
+        <span>{config.scoreLabel}</span>
       </div>
       <div className={styles.list}>
         {topRecommendations.map((rec) => (

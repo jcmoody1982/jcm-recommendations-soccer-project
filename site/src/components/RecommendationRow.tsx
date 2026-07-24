@@ -26,6 +26,7 @@ export function RecommendationRow({ recommendation }: Props) {
   });
 
   const score = Number(recommendation.score || 0).toFixed(0);
+  const scoreUnit = recommendation.type === 'BOOKING_POINTS' ? ' pts' : '%';
   const sentimentIcon = CONFIDENCE_ICONS[recommendation.confidence] || '⚪';
 
   return (
@@ -55,7 +56,7 @@ export function RecommendationRow({ recommendation }: Props) {
       <span className={styles.price}>
         {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
       </span>
-      <span className={styles.score}>{score}%</span>
+      <span className={styles.score}>{score}{scoreUnit}</span>
     </div>
   );
 }
