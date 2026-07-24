@@ -79,12 +79,18 @@
   gap: 6px;
 }
 
-.showMoreButton {
+.buttonGroup {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.showMoreButton,
+.showLessButton {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  margin-top: 12px;
   padding: 10px 16px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -96,7 +102,8 @@
   transition: all 0.2s ease;
 }
 
-.showMoreButton:hover {
+.showMoreButton:hover,
+.showLessButton:hover {
   background: var(--bg-option-hover);
   color: var(--text-primary);
   border-color: var(--accent-color);

@@ -51,6 +51,7 @@ export function RecommendationSection({
   
   const visibleRecommendations = sortedRecommendations.slice(0, visibleCount);
   const hasMore = sortedRecommendations.length > visibleCount;
+  const canShowLess = visibleCount > initialItems;
   const remainingCount = sortedRecommendations.length - visibleCount;
 
   if (sortedRecommendations.length === 0) {
@@ -59,6 +60,10 @@ export function RecommendationSection({
 
   const handleShowMore = () => {
     setVisibleCount(prev => prev + incrementBy);
+  };
+
+  const handleShowLess = () => {
+    setVisibleCount(prev => Math.max(initialItems, prev - incrementBy));
   };
 
   const headerClass = config.showPrice ? styles.tableHeader : styles.tableHeaderNoPrice;
@@ -91,10 +96,19 @@ export function RecommendationSection({
           />
         ))}
       </div>
-      {hasMore && (
-        <button className={styles.showMoreButton} onClick={handleShowMore}>
-          Show {Math.min(incrementBy, remainingCount)} More
-        </button>
+      {(hasMore || canShowLess) && (
+        <div className={styles.buttonGroup}>
+          {canShowLess && (
+            <button className={styles.showLessButton} onClick={handleShowLess}>
+              Show Less
+            </button>
+          )}
+          {hasMore && (
+            <button className={styles.showMoreButton} onClick={handleShowMore}>
+              Show {Math.min(incrementBy, remainingCount)} More
+            </button>
+          )}
+        </div>
       )}
     </section>
   );
