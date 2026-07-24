@@ -44,7 +44,7 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
         <span className={styles.count}>{topRecommendations.length} picks</span>
       </h2>
       <div className={styles.tableHeader}>
-        <span>Confidence</span>
+        <span></span>
         <span>League</span>
         <span>Date / Time</span>
         <span>Fixture</span>
