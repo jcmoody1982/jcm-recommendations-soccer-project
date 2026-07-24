@@ -45,18 +45,37 @@
   transition: border-color 0.3s ease, color 0.3s ease;
 }
 
-.tableHeader span:last-child {
+.tableHeaderNoPrice {
+  display: grid;
+  grid-template-columns: 32px 55px 110px 1fr auto 80px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 6px;
+  transition: border-color 0.3s ease, color 0.3s ease;
+}
+
+.tableHeader span:last-child,
+.tableHeaderNoPrice span:last-child {
   text-align: right;
 }
 
-.list {
+.list,
+.listNoPrice {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 @media (max-width: 640px) {
-  .tableHeader {
+  .tableHeader,
+  .tableHeaderNoPrice {
     display: none;
   }
 }

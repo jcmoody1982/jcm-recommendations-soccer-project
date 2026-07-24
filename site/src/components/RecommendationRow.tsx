@@ -3,6 +3,7 @@ import styles from './RecommendationRow.module.css';
 
 interface Props {
   recommendation: Recommendation;
+  showPrice?: boolean;
 }
 
 const CONFIDENCE_ICONS: Record<string, string> = {
@@ -11,7 +12,7 @@ const CONFIDENCE_ICONS: Record<string, string> = {
   WEAK: '🔴',
 };
 
-export function RecommendationRow({ recommendation }: Props) {
+export function RecommendationRow({ recommendation, showPrice = true }: Props) {
   const matchDate = new Date(recommendation.matchDateUnix * 1000);
   
   const formattedDate = matchDate.toLocaleDateString('en-GB', {
@@ -33,8 +34,10 @@ export function RecommendationRow({ recommendation }: Props) {
   const scoreUnit = isBookingPoints || isFormMismatch || isHomeAwaySpecialist ? ' pts' : isCorners ? '' : '%';
   const sentimentIcon = CONFIDENCE_ICONS[recommendation.confidence] || '⚪';
 
+  const rowClass = showPrice ? styles.row : styles.rowNoPrice;
+
   return (
-    <div className={styles.row}>
+    <div className={rowClass}>
       <span className={styles.sentiment} title={recommendation.confidence}>
         {sentimentIcon}
       </span>
@@ -57,9 +60,11 @@ export function RecommendationRow({ recommendation }: Props) {
         {recommendation.homeTeamName} vs {recommendation.awayTeamName}
       </span>
       <span className={styles.market}>{recommendation.market}</span>
-      <span className={styles.price}>
-        {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
-      </span>
+      {showPrice && (
+        <span className={styles.price}>
+          {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
+        </span>
+      )}
       <span className={styles.score}>{score}{scoreUnit}</span>
     </div>
   );

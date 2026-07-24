@@ -8,26 +8,33 @@ interface Props {
   maxItems?: number;
 }
 
-const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string; scoreLabel: string }> = {
-  BTTS: { title: 'Both Teams To Score', icon: '⚽', scoreLabel: 'Score' },
-  OVER_GOALS: { title: 'Over Goals', icon: '🎯', scoreLabel: 'Score' },
-  UNDER_GOALS: { title: 'Under Goals', icon: '🛡️', scoreLabel: 'Score' },
-  BOOKING_POINTS: { title: 'Booking Points', icon: '🟨', scoreLabel: 'Predicted Points' },
-  VALUE_BET: { title: 'Value Bets', icon: '💰', scoreLabel: 'Score' },
-  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', icon: '🔥', scoreLabel: 'Form Divergence' },
-  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', icon: '📉', scoreLabel: 'Form Divergence' },
-  OVER_CORNERS: { title: 'Over Corners', icon: '📐', scoreLabel: 'Predicted Corners' },
-  UNDER_CORNERS: { title: 'Under Corners', icon: '📏', scoreLabel: 'Predicted Corners' },
-  CLEAN_SHEET: { title: 'Clean Sheet', icon: '🧤', scoreLabel: 'Score' },
-  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', scoreLabel: 'Confidence' },
-  SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣', scoreLabel: 'Score' },
-  MATCH_RESULT: { title: 'Match Result', icon: '🏆', scoreLabel: 'Score' },
-  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', scoreLabel: 'Disparity Index' },
-  DRAW: { title: 'Draw', icon: '🤝', scoreLabel: 'Score' },
+interface SectionConfig {
+  title: string;
+  icon: string;
+  scoreLabel: string;
+  showPrice: boolean;
+}
+
+const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
+  BTTS: { title: 'Both Teams To Score', icon: '⚽', scoreLabel: 'Score', showPrice: true },
+  OVER_GOALS: { title: 'Over Goals', icon: '🎯', scoreLabel: 'Score', showPrice: true },
+  UNDER_GOALS: { title: 'Under Goals', icon: '🛡️', scoreLabel: 'Score', showPrice: true },
+  BOOKING_POINTS: { title: 'Booking Points', icon: '🟨', scoreLabel: 'Predicted Points', showPrice: false },
+  VALUE_BET: { title: 'Value Bets', icon: '💰', scoreLabel: 'Score', showPrice: true },
+  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', icon: '🔥', scoreLabel: 'Form Divergence', showPrice: false },
+  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', icon: '📉', scoreLabel: 'Form Divergence', showPrice: false },
+  OVER_CORNERS: { title: 'Over Corners', icon: '📐', scoreLabel: 'Predicted Corners', showPrice: false },
+  UNDER_CORNERS: { title: 'Under Corners', icon: '📏', scoreLabel: 'Predicted Corners', showPrice: false },
+  CLEAN_SHEET: { title: 'Clean Sheet', icon: '🧤', scoreLabel: 'Score', showPrice: false },
+  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', scoreLabel: 'Confidence', showPrice: false },
+  SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣', scoreLabel: 'Score', showPrice: false },
+  MATCH_RESULT: { title: 'Match Result', icon: '🏆', scoreLabel: 'Score', showPrice: true },
+  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', scoreLabel: 'Disparity Index', showPrice: false },
+  DRAW: { title: 'Draw', icon: '🤝', scoreLabel: 'Score', showPrice: true },
 };
 
 export function RecommendationSection({ type, recommendations, maxItems = 5 }: Props) {
-  const config = SECTION_CONFIG[type] || { title: type, icon: '📊', scoreLabel: 'Score' };
+  const config = SECTION_CONFIG[type] || { title: type, icon: '📊', scoreLabel: 'Score', showPrice: true };
   const topRecommendations = recommendations
     .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
     .slice(0, maxItems);
@@ -36,6 +43,9 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
     return null;
   }
 
+  const headerClass = config.showPrice ? styles.tableHeader : styles.tableHeaderNoPrice;
+  const listClass = config.showPrice ? styles.list : styles.listNoPrice;
+
   return (
     <section className={styles.section}>
       <h2 className={styles.header}>
@@ -43,18 +53,22 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
         <span className={styles.title}>{config.title}</span>
         <span className={styles.count}>{topRecommendations.length} picks</span>
       </h2>
-      <div className={styles.tableHeader}>
+      <div className={headerClass}>
         <span></span>
         <span>League</span>
         <span>Date / Time</span>
         <span>Fixture</span>
         <span>Selection</span>
-        <span>Price</span>
+        {config.showPrice && <span>Price</span>}
         <span>{config.scoreLabel}</span>
       </div>
-      <div className={styles.list}>
+      <div className={listClass}>
         {topRecommendations.map((rec) => (
-          <RecommendationRow key={`${rec.fixtureId}-${rec.type}`} recommendation={rec} />
+          <RecommendationRow 
+            key={`${rec.fixtureId}-${rec.type}`} 
+            recommendation={rec} 
+            showPrice={config.showPrice}
+          />
         ))}
       </div>
     </section>

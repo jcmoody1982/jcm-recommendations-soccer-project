@@ -10,7 +10,20 @@
   transition: background 0.3s ease;
 }
 
-.row:hover {
+.rowNoPrice {
+  display: grid;
+  grid-template-columns: 32px 55px 110px 1fr auto 80px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: background 0.3s ease;
+}
+
+.row:hover,
+.rowNoPrice:hover {
   background: var(--bg-option-hover);
 }
 
@@ -84,6 +97,11 @@
 @media (max-width: 640px) {
   .row {
     grid-template-columns: 28px 28px 1fr auto auto;
+    gap: 8px;
+  }
+
+  .rowNoPrice {
+    grid-template-columns: 28px 28px 1fr auto;
     gap: 8px;
   }
 
