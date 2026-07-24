@@ -6,21 +6,21 @@ import type { RecommendationType } from '../types';
 import styles from './Recommendations.module.css';
 
 const SECTION_ORDER: RecommendationType[] = [
+  'MATCH_RESULT',
   'BTTS',
+  'DRAW',
+  'FIRST_HALF_GOALS',
+  'VALUE_BET',
   'OVER_GOALS',
   'UNDER_GOALS',
-  'VALUE_BET',
-  'MATCH_RESULT',
   'CLEAN_SHEET',
   'BOOKING_POINTS',
   'OVER_CORNERS',
   'UNDER_CORNERS',
-  'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
   'WINNING_FORM_MISMATCH',
   'LOSING_FORM_MISMATCH',
   'HOME_AWAY_SPECIALIST',
-  'DRAW',
 ];
 
 export default function Recommendations() {
