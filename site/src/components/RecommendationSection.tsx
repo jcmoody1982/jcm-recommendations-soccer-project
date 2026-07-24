@@ -49,6 +49,7 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
         <span>Date / Time</span>
         <span>Fixture</span>
         <span>Selection</span>
+        <span>Price</span>
         <span>Score</span>
       </div>
       <div className={styles.list}>

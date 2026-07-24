@@ -65,6 +65,7 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
         }
 
         String market = determineMarket(expectedGoals, score);
+        Double odds = getOddsForMarket(context, market);
         Map<String, Object> factors = buildFactors(context, score, expectedGoals);
 
         Recommendation recommendation = Recommendation.builder()
@@ -81,6 +82,7 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .score(score)
                 .market(market)
+                .odds(odds)
                 .description(buildDescription(context, confidence, expectedGoals, market))
                 .factors(factors)
                 .generatedAt(Instant.now())
@@ -202,5 +204,17 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
 
     private double safeDouble(Double value) {
         return value != null ? value : 1.0;
+    }
+
+    private Double getOddsForMarket(FixtureContext context, String market) {
+        if (!context.hasOdds()) {
+            return null;
+        }
+        return switch (market) {
+            case "Over 1.5 Goals" -> context.getOdds().getOddsFtOver15();
+            case "Over 2.5 Goals" -> context.getOdds().getOddsFtOver25();
+            case "Over 3.5 Goals" -> context.getOdds().getOddsFtOver35();
+            default -> context.getOdds().getOddsFtOver25();
+        };
     }
 }

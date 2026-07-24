@@ -1,6 +1,6 @@
 .row {
   display: grid;
-  grid-template-columns: 32px 55px 110px 1fr auto 60px;
+  grid-template-columns: 32px 55px 110px 1fr auto 60px 60px;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
@@ -68,6 +68,12 @@
   white-space: nowrap;
 }
 
+.price {
+  font-weight: 500;
+  color: var(--text-primary, #fff);
+  text-align: right;
+}
+
 .score {
   font-weight: 600;
   color: var(--accent, #6366f1);
@@ -76,7 +82,7 @@
 
 @media (max-width: 640px) {
   .row {
-    grid-template-columns: 28px 28px 1fr auto;
+    grid-template-columns: 28px 28px 1fr auto auto;
     gap: 8px;
   }
 
@@ -95,5 +101,9 @@
   .leagueIcon {
     width: 20px;
     height: 20px;
+  }
+
+  .price {
+    font-size: 0.85rem;
   }
 }

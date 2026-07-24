@@ -70,6 +70,7 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
                 .confidence(best.confidence)
                 .score(best.disparityScore)
                 .market(best.recommendation)
+                .odds(null)
                 .description(buildDescription(context, best))
                 .factors(factors)
                 .generatedAt(Instant.now())

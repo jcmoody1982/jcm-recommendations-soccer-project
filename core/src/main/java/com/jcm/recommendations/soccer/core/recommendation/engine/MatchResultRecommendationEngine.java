@@ -88,6 +88,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
+        Double odds = getOddsForOutcome(context, recommendedOutcome);
         Map<String, Object> factors = buildFactors(context, homeWinProb, drawProb, awayWinProb, valueVsOdds);
 
         Recommendation recommendation = Recommendation.builder()
@@ -104,6 +105,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .score(bestProb)
                 .market(recommendedOutcome)
+                .odds(odds)
                 .description(buildDescription(context, recommendedOutcome, bestProb, confidence, valueVsOdds))
                 .factors(factors)
                 .generatedAt(Instant.now())
@@ -303,5 +305,17 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
 
     private double safeDouble(Double value) {
         return value != null ? value : 0.0;
+    }
+
+    private Double getOddsForOutcome(FixtureContext context, String outcome) {
+        if (!context.hasOdds()) {
+            return null;
+        }
+        return switch (outcome) {
+            case "Home Win" -> context.getOdds().getOddsFt1();
+            case "Draw" -> context.getOdds().getOddsFtX();
+            case "Away Win" -> context.getOdds().getOddsFt2();
+            default -> null;
+        };
     }
 }

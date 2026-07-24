@@ -76,6 +76,7 @@ public class CornersRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .score(expectedCorners)
                 .market(market)
+                .odds(null)
                 .description(buildDescription(context, confidence, expectedCorners, market))
                 .factors(factors)
                 .generatedAt(Instant.now())

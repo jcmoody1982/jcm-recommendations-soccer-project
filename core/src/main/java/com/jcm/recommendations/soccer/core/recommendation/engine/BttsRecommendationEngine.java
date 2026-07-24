@@ -63,6 +63,8 @@ public class BttsRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(context, score);
 
+        Double odds = context.hasOdds() ? context.getOdds().getOddsBttsYes() : null;
+
         Recommendation recommendation = Recommendation.builder()
                 .fixtureId(context.getFixture().getId())
                 .homeTeamId(context.getHomeTeam().getId())
@@ -77,6 +79,7 @@ public class BttsRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .score(score)
                 .market("BTTS Yes")
+                .odds(odds)
                 .description(buildDescription(context, confidence, score))
                 .factors(factors)
                 .generatedAt(Instant.now())

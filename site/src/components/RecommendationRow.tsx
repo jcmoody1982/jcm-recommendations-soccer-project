@@ -52,6 +52,9 @@ export function RecommendationRow({ recommendation }: Props) {
         {recommendation.homeTeamName} vs {recommendation.awayTeamName}
       </span>
       <span className={styles.market}>{recommendation.market}</span>
+      <span className={styles.price}>
+        {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
+      </span>
       <span className={styles.score}>{score}%</span>
     </div>
   );

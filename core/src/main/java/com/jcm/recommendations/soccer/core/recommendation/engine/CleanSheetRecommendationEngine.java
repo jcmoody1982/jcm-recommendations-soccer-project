@@ -77,6 +77,7 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .score(best.score)
                 .market(best.teamName + " Clean Sheet")
+                .odds(null)
                 .description(buildDescription(context, best, confidence))
                 .factors(factors)
                 .generatedAt(Instant.now())

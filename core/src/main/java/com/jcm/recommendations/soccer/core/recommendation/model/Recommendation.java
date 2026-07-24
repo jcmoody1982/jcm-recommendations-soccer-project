@@ -25,6 +25,7 @@ public class Recommendation {
     private ConfidenceLevel confidence;
     private double score;
     private String market;
+    private Double odds;
     private String description;
     
     private Map<String, Object> factors;

@@ -65,6 +65,7 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
         }
 
         String market = determineMarket(expectedGoals, score);
+        Double odds = getOddsForMarket(context, market);
         Map<String, Object> factors = buildFactors(context, score, expectedGoals);
 
         Recommendation recommendation = Recommendation.builder()
@@ -81,6 +82,7 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .score(score)
                 .market(market)
+                .odds(odds)
                 .description(buildDescription(context, confidence, expectedGoals, market))
                 .factors(factors)
                 .generatedAt(Instant.now())
@@ -206,5 +208,17 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
 
     private double safeDouble(Double value) {
         return value != null ? value : 1.0;
+    }
+
+    private Double getOddsForMarket(FixtureContext context, String market) {
+        if (!context.hasOdds()) {
+            return null;
+        }
+        return switch (market) {
+            case "Under 1.5 Goals" -> context.getOdds().getOddsFtUnder15();
+            case "Under 2.5 Goals" -> context.getOdds().getOddsFtUnder25();
+            case "Under 3.5 Goals" -> context.getOdds().getOddsFtUnder35();
+            default -> context.getOdds().getOddsFtUnder25();
+        };
     }
 }

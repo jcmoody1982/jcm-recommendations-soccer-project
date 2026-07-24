@@ -70,6 +70,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
                 .confidence(bestOpportunity.confidence)
                 .score(bestOpportunity.valuePercentage)
                 .market(bestOpportunity.market)
+                .odds(bestOpportunity.odds)
                 .description(buildDescription(context, bestOpportunity))
                 .factors(factors)
                 .generatedAt(Instant.now())

@@ -52,6 +52,7 @@ public class DrawRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
+        Double odds = context.hasOdds() ? context.getOdds().getOddsFtX() : null;
         Map<String, Object> factors = buildFactors(context, score);
 
         Recommendation recommendation = Recommendation.builder()
@@ -68,6 +69,7 @@ public class DrawRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .score(score)
                 .market("Draw")
+                .odds(odds)
                 .description(buildDescription(context, confidence, score))
                 .factors(factors)
                 .generatedAt(Instant.now())

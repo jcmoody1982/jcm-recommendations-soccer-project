@@ -31,6 +31,7 @@ export interface Recommendation {
   confidence: ConfidenceLevel;
   score: number;
   market: string;
+  odds: number | null;
   description: string;
   factors: Record<string, unknown>;
   generatedAt: string;

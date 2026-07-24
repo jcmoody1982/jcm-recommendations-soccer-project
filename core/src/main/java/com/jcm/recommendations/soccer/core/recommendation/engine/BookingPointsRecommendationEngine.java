@@ -71,6 +71,7 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .score(expectedBookingPoints)
                 .market(market)
+                .odds(null)
                 .description(buildDescription(context, confidence, expectedBookingPoints, market))
                 .factors(factors)
                 .generatedAt(Instant.now())
