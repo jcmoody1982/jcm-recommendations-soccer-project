@@ -22,7 +22,7 @@ const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string; 
   FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', scoreLabel: 'Confidence' },
   SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣', scoreLabel: 'Score' },
   MATCH_RESULT: { title: 'Match Result', icon: '🏆', scoreLabel: 'Score' },
-  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', scoreLabel: 'Score' },
+  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', scoreLabel: 'Disparity Index' },
   DRAW: { title: 'Draw', icon: '🤝', scoreLabel: 'Score' },
 };
 

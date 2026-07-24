@@ -29,7 +29,8 @@ export function RecommendationRow({ recommendation }: Props) {
   const isBookingPoints = recommendation.type === 'BOOKING_POINTS';
   const isCorners = recommendation.type === 'OVER_CORNERS' || recommendation.type === 'UNDER_CORNERS';
   const isFormMismatch = recommendation.type === 'WINNING_FORM_MISMATCH' || recommendation.type === 'LOSING_FORM_MISMATCH';
-  const scoreUnit = isBookingPoints || isFormMismatch ? ' pts' : isCorners ? '' : '%';
+  const isHomeAwaySpecialist = recommendation.type === 'HOME_AWAY_SPECIALIST';
+  const scoreUnit = isBookingPoints || isFormMismatch || isHomeAwaySpecialist ? ' pts' : isCorners ? '' : '%';
   const sentimentIcon = CONFIDENCE_ICONS[recommendation.confidence] || '⚪';
 
   return (
