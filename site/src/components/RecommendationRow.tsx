@@ -28,7 +28,8 @@ export function RecommendationRow({ recommendation }: Props) {
   const score = Number(recommendation.score || 0).toFixed(0);
   const isBookingPoints = recommendation.type === 'BOOKING_POINTS';
   const isCorners = recommendation.type === 'OVER_CORNERS' || recommendation.type === 'UNDER_CORNERS';
-  const scoreUnit = isBookingPoints ? ' pts' : isCorners ? '' : '%';
+  const isFormMismatch = recommendation.type === 'WINNING_FORM_MISMATCH' || recommendation.type === 'LOSING_FORM_MISMATCH';
+  const scoreUnit = isBookingPoints || isFormMismatch ? ' pts' : isCorners ? '' : '%';
   const sentimentIcon = CONFIDENCE_ICONS[recommendation.confidence] || '⚪';
 
   return (
