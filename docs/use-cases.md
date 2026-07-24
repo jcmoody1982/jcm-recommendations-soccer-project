@@ -1579,6 +1579,63 @@ GET /api/recommendations/grouped?daysAhead=7
 
 ---
 
+#### UC-022: Settings - Theme Toggle (Light/Dark Mode)
+
+**Goal:** Provide users with a settings menu to customize their experience, starting with a light/dark mode toggle.
+
+**User Story:** As a user, I want to access settings from the header to toggle between light and dark modes, so that I can customize the appearance to my preference.
+
+**Data Required:**
+- User preference stored in localStorage
+- System preference detection (prefers-color-scheme)
+
+**UI Components:**
+1. **Settings Icon Button** (header, top-right)
+   - Gear/cog icon (⚙️)
+   - Opens dropdown menu on click
+   - Closes when clicking outside
+
+2. **Settings Dropdown Menu**
+   - Positioned below settings icon
+   - Contains theme toggle option
+   - Expandable for future settings
+
+3. **Theme Toggle**
+   - Label: "Theme"
+   - Options: Light / Dark / System
+   - Visual indicator of current selection
+
+**Behavior:**
+- Theme preference persisted to localStorage
+- "System" option follows OS preference
+- Immediate visual feedback on toggle
+- Smooth transition between themes
+
+**CSS Variables (Theme Support):**
+- `--bg-primary`: Main background color
+- `--bg-secondary`: Card/section backgrounds
+- `--bg-header`: Header background
+- `--text-primary`: Main text color
+- `--text-secondary`: Muted text color
+- `--border-color`: Border colors
+- `--accent-color`: Primary accent/brand color
+
+**API Endpoints:**
+- None (client-side only)
+
+**Acceptance Criteria:**
+- [ ] Settings icon visible in header (top-right)
+- [ ] Dropdown opens on click
+- [ ] Dropdown closes when clicking outside
+- [ ] Theme toggle switches between Light/Dark/System
+- [ ] Theme preference persisted across page reloads
+- [ ] Smooth CSS transitions between themes
+- [ ] All components respect theme variables
+
+**Status:** In Progress
+
+---
+
 ### iOS Native App
 
 _Use cases for the iOS mobile application._

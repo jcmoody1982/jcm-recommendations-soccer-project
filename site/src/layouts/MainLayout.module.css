@@ -5,16 +5,17 @@
 }
 
 .header {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  background: linear-gradient(135deg, var(--header-gradient-start) 0%, var(--header-gradient-end) 100%);
   padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 10px var(--shadow-color);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .logo a {
-  color: #fff;
+  color: var(--text-primary);
   font-size: 1.5rem;
   font-weight: 700;
   text-decoration: none;
@@ -26,7 +27,7 @@
 }
 
 .navLink {
-  color: #a0a0a0;
+  color: var(--text-secondary);
   text-decoration: none;
   font-weight: 500;
   padding: 0.5rem 1rem;
@@ -42,25 +43,33 @@
 }
 
 .navLink:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  background: rgba(128, 128, 128, 0.15);
 }
 
 .navLink.active {
-  color: #fff;
+  color: var(--text-primary);
   background: rgba(99, 102, 241, 0.3);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .main {
   flex: 1;
   padding: 2rem;
-  background: #0f0f1a;
+  background: var(--bg-primary);
+  transition: background 0.3s ease;
 }
 
 .footer {
-  background: #1a1a2e;
+  background: var(--bg-secondary);
   padding: 1rem 2rem;
   text-align: center;
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.875rem;
+  transition: background 0.3s ease, color 0.3s ease;
 }

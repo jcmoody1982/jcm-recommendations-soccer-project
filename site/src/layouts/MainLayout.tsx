@@ -1,4 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
+import { SettingsDropdown } from '../components/SettingsDropdown';
 import styles from './MainLayout.module.css';
 
 const navItems = [
@@ -30,6 +31,9 @@ export default function MainLayout() {
             </Link>
           ))}
         </nav>
+        <div className={styles.headerActions}>
+          <SettingsDropdown />
+        </div>
       </header>
       <main className={styles.main}>
         <Outlet />

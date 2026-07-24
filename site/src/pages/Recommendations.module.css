@@ -9,13 +9,14 @@
   align-items: center;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid #2d2d3d;
+  border-bottom: 1px solid var(--border-color);
   flex-wrap: wrap;
   gap: 1rem;
+  transition: border-color 0.3s ease;
 }
 
 .title {
-  color: #fff;
+  color: var(--text-primary);
   font-size: 1.75rem;
   margin: 0;
 }
@@ -27,23 +28,24 @@
 }
 
 .totalCount {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
 
 .select {
   padding: 0.5rem 1rem;
-  background: #1e1e2e;
-  border: 1px solid #2d2d3d;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 0.9rem;
   cursor: pointer;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .select:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: var(--accent-color);
 }
 
 .sections {
@@ -52,16 +54,17 @@
 }
 
 .loading {
-  color: #fff;
+  color: var(--text-primary);
   text-align: center;
   padding: 4rem;
   font-size: 1.125rem;
 }
 
 .empty {
-  color: #888;
+  color: var(--text-muted);
   text-align: center;
   padding: 4rem 2rem;
-  background: #1a1a2e;
+  background: var(--bg-secondary);
   border-radius: 8px;
+  transition: background 0.3s ease, color 0.3s ease;
 }

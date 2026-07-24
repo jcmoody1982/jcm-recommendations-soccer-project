@@ -8,7 +8,8 @@
   gap: 0.75rem;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #2d2d3d;
+  border-bottom: 1px solid var(--border-color);
+  transition: border-color 0.3s ease;
 }
 
 .icon {
@@ -18,13 +19,13 @@
 .title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .count {
   margin-left: auto;
   font-size: 0.875rem;
-  color: #888;
+  color: var(--text-muted);
   font-weight: 400;
 }
 
@@ -36,11 +37,12 @@
   padding: 8px 12px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--border-color, #2d2d3d);
+  border-bottom: 1px solid var(--border-color);
   margin-bottom: 6px;
+  transition: border-color 0.3s ease, color 0.3s ease;
 }
 
 .tableHeader span:last-child {
