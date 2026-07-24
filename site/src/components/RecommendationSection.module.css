@@ -61,12 +61,14 @@
   transition: border-color 0.3s ease, color 0.3s ease;
 }
 
-.tableHeader span:nth-child(6) {
-  text-align: center;
+.tableHeader span:nth-child(5),
+.tableHeader span:nth-child(6),
+.tableHeader span:nth-child(7) {
+  text-align: right;
 }
 
-.tableHeader span:last-child,
-.tableHeaderNoPrice span:last-child {
+.tableHeaderNoPrice span:nth-child(5),
+.tableHeaderNoPrice span:nth-child(6) {
   text-align: right;
 }
 
