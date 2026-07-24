@@ -110,24 +110,34 @@
 }
 
 @media (max-width: 640px) {
+  .section {
+    margin-bottom: 2rem;
+  }
+
   .header {
+    display: flex !important;
     flex-wrap: wrap;
     gap: 0.5rem;
+    padding-bottom: 0.5rem;
   }
 
   .icon {
     font-size: 1.1rem;
+    flex-shrink: 0;
   }
 
   .title {
-    font-size: 1.1rem;
+    font-size: 1rem;
+    flex: 1;
+    min-width: 0;
   }
 
   .count {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     width: 100%;
     margin-left: 0;
     margin-top: 0.25rem;
+    order: 3;
   }
 
   .tableHeader,
