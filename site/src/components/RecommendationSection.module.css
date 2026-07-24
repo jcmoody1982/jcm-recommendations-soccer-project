@@ -110,8 +110,33 @@
 }
 
 @media (max-width: 640px) {
+  .header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .icon {
+    font-size: 1.1rem;
+  }
+
+  .title {
+    font-size: 1.1rem;
+  }
+
+  .count {
+    font-size: 0.8rem;
+    width: 100%;
+    margin-left: 0;
+    margin-top: 0.25rem;
+  }
+
   .tableHeader,
   .tableHeaderNoPrice {
     display: none;
+  }
+
+  .buttonGroup {
+    flex-direction: column;
+    gap: 8px;
   }
 }
