@@ -73,6 +73,29 @@
   gap: 6px;
 }
 
+.showMoreButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.showMoreButton:hover {
+  background: var(--bg-option-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+}
+
 @media (max-width: 640px) {
   .tableHeader,
   .tableHeaderNoPrice {

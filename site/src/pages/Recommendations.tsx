@@ -65,7 +65,7 @@ export default function Recommendations() {
                 key={type}
                 type={type}
                 recommendations={recommendations}
-                maxItems={5}
+                initialItems={5}
               />
             );
           })}

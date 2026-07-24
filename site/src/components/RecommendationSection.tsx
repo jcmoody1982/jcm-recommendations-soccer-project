@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Recommendation, RecommendationType } from '../types';
 import { RecommendationRow } from './RecommendationRow';
 import styles from './RecommendationSection.module.css';
@@ -5,7 +6,8 @@ import styles from './RecommendationSection.module.css';
 interface Props {
   type: RecommendationType;
   recommendations: Recommendation[];
-  maxItems?: number;
+  initialItems?: number;
+  incrementBy?: number;
 }
 
 interface SectionConfig {
@@ -33,15 +35,31 @@ const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
   DRAW: { title: 'Draw', icon: '🤝', scoreLabel: 'Score', showPrice: true },
 };
 
-export function RecommendationSection({ type, recommendations, maxItems = 5 }: Props) {
+export function RecommendationSection({ 
+  type, 
+  recommendations, 
+  initialItems = 5,
+  incrementBy = 5 
+}: Props) {
+  const [visibleCount, setVisibleCount] = useState(initialItems);
+  
   const config = SECTION_CONFIG[type] || { title: type, icon: '📊', scoreLabel: 'Score', showPrice: true };
-  const topRecommendations = recommendations
-    .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
-    .slice(0, maxItems);
+  
+  const sortedRecommendations = [...recommendations].sort(
+    (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0)
+  );
+  
+  const visibleRecommendations = sortedRecommendations.slice(0, visibleCount);
+  const hasMore = sortedRecommendations.length > visibleCount;
+  const remainingCount = sortedRecommendations.length - visibleCount;
 
-  if (topRecommendations.length === 0) {
+  if (sortedRecommendations.length === 0) {
     return null;
   }
+
+  const handleShowMore = () => {
+    setVisibleCount(prev => prev + incrementBy);
+  };
 
   const headerClass = config.showPrice ? styles.tableHeader : styles.tableHeaderNoPrice;
   const listClass = config.showPrice ? styles.list : styles.listNoPrice;
@@ -51,7 +69,9 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
       <h2 className={styles.header}>
         <span className={styles.icon}>{config.icon}</span>
         <span className={styles.title}>{config.title}</span>
-        <span className={styles.count}>{topRecommendations.length} picks</span>
+        <span className={styles.count}>
+          {visibleRecommendations.length} of {sortedRecommendations.length} picks
+        </span>
       </h2>
       <div className={headerClass}>
         <span></span>
@@ -63,7 +83,7 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
         <span>{config.scoreLabel}</span>
       </div>
       <div className={listClass}>
-        {topRecommendations.map((rec) => (
+        {visibleRecommendations.map((rec) => (
           <RecommendationRow 
             key={`${rec.fixtureId}-${rec.type}`} 
             recommendation={rec} 
@@ -71,6 +91,11 @@ export function RecommendationSection({ type, recommendations, maxItems = 5 }: P
           />
         ))}
       </div>
+      {hasMore && (
+        <button className={styles.showMoreButton} onClick={handleShowMore}>
+          Show {Math.min(incrementBy, remainingCount)} More
+        </button>
+      )}
     </section>
   );
 }
