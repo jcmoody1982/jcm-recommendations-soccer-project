@@ -1624,15 +1624,15 @@ GET /api/recommendations/grouped?daysAhead=7
 - None (client-side only)
 
 **Acceptance Criteria:**
-- [ ] Settings icon visible in header (top-right)
-- [ ] Dropdown opens on click
-- [ ] Dropdown closes when clicking outside
-- [ ] Theme toggle switches between Light/Dark/System
-- [ ] Theme preference persisted across page reloads
-- [ ] Smooth CSS transitions between themes
-- [ ] All components respect theme variables
+- [x] Settings icon visible in header (top-right)
+- [x] Dropdown opens on click
+- [x] Dropdown closes when clicking outside
+- [x] Theme toggle switches between Light/Dark/System
+- [x] Theme preference persisted across page reloads
+- [x] Smooth CSS transitions between themes
+- [x] All components respect theme variables
 
-**Status:** In Progress
+**Status:** Implemented
 
 ---
 
