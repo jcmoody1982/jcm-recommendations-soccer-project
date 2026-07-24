@@ -3,7 +3,7 @@ import { SettingsDropdown } from '../components/SettingsDropdown';
 import styles from './MainLayout.module.css';
 
 const navItems = [
-  { path: '/', label: 'Home', icon: '🏠' },
+  { path: '/', label: 'Home', icon: null },
   { path: '/recommendations', label: 'Recommendations', icon: null },
   { path: '/fixtures', label: 'Fixtures', icon: null },
 ];
