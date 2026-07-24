@@ -18,9 +18,9 @@ const SECTION_ORDER: RecommendationType[] = [
   'BOOKING_POINTS',
   'OVER_CORNERS',
   'UNDER_CORNERS',
+  'HOME_AWAY_SPECIALIST',
   'WINNING_FORM_MISMATCH',
   'LOSING_FORM_MISMATCH',
-  'HOME_AWAY_SPECIALIST',
 ];
 
 export default function Recommendations() {
