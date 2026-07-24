@@ -62,21 +62,21 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         if (homeWinProb >= awayWinProb && homeWinProb >= drawProb) {
             recommendedOutcome = "Home Win";
             bestProb = homeWinProb;
-            if (context.hasOdds() && context.getOdds().getOddsFt1() != null) {
+            if (context.hasOdds() && context.getOdds().getOddsFt1() != null && context.getOdds().getOddsFt1() > 0) {
                 double implied = (1.0 / context.getOdds().getOddsFt1()) * 100;
                 valueVsOdds = homeWinProb - implied;
             }
         } else if (awayWinProb >= homeWinProb && awayWinProb >= drawProb) {
             recommendedOutcome = "Away Win";
             bestProb = awayWinProb;
-            if (context.hasOdds() && context.getOdds().getOddsFt2() != null) {
+            if (context.hasOdds() && context.getOdds().getOddsFt2() != null && context.getOdds().getOddsFt2() > 0) {
                 double implied = (1.0 / context.getOdds().getOddsFt2()) * 100;
                 valueVsOdds = awayWinProb - implied;
             }
         } else {
             recommendedOutcome = "Draw";
             bestProb = drawProb;
-            if (context.hasOdds() && context.getOdds().getOddsFtX() != null) {
+            if (context.hasOdds() && context.getOdds().getOddsFtX() != null && context.getOdds().getOddsFtX() > 0) {
                 double implied = (1.0 / context.getOdds().getOddsFtX()) * 100;
                 valueVsOdds = drawProb - implied;
             }
@@ -138,7 +138,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         double goalDiffFactor = calculateGoalDiffFactor(homeStats, awayStats);
 
         double impliedProb = 33.3;
-        if (context.hasOdds() && context.getOdds().getOddsFt1() != null) {
+        if (context.hasOdds() && context.getOdds().getOddsFt1() != null && context.getOdds().getOddsFt1() > 0) {
             impliedProb = (1.0 / context.getOdds().getOddsFt1()) * 100;
         }
 
@@ -169,7 +169,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         double goalDiffFactor = 100.0 - calculateGoalDiffFactor(homeStats, awayStats);
 
         double impliedProb = 33.3;
-        if (context.hasOdds() && context.getOdds().getOddsFt2() != null) {
+        if (context.hasOdds() && context.getOdds().getOddsFt2() != null && context.getOdds().getOddsFt2() > 0) {
             impliedProb = (1.0 / context.getOdds().getOddsFt2()) * 100;
         }
 

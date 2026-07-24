@@ -100,7 +100,7 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         double refereeFactor = calculateRefereeFactor(context);
 
         double impliedOdds = 25.0;
-        if (context.hasOdds() && context.getOdds().getOddsFtX() != null) {
+        if (context.hasOdds() && context.getOdds().getOddsFtX() != null && context.getOdds().getOddsFtX() > 0) {
             impliedOdds = (1.0 / context.getOdds().getOddsFtX()) * 100;
         }
 
@@ -257,7 +257,7 @@ public class DrawRecommendationEngine implements RecommendationEngine {
             factors.put("refereeDrawPct", safeDouble(context.getRefereeStats().getDrawsPer()));
         }
 
-        if (context.hasOdds() && context.getOdds().getOddsFtX() != null) {
+        if (context.hasOdds() && context.getOdds().getOddsFtX() != null && context.getOdds().getOddsFtX() > 0) {
             factors.put("drawOdds", context.getOdds().getOddsFtX());
             factors.put("impliedProbability", (1.0 / context.getOdds().getOddsFtX()) * 100);
         }
