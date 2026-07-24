@@ -108,7 +108,6 @@
 }
 
 .mobileMenu {
-  display: none;
   position: absolute;
   top: 100%;
   left: 0;
@@ -237,10 +236,6 @@
 
   .hamburger {
     display: flex;
-  }
-
-  .mobileMenu {
-    display: block;
   }
 
   .main {

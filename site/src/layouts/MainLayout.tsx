@@ -67,42 +67,42 @@ export default function MainLayout() {
           <span className={`${styles.hamburgerLine} ${mobileMenuOpen ? styles.open : ''}`}></span>
           <span className={`${styles.hamburgerLine} ${mobileMenuOpen ? styles.open : ''}`}></span>
         </button>
-      </header>
 
-      {mobileMenuOpen && (
-        <div className={styles.mobileMenu}>
-          <nav className={styles.mobileNav}>
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`${styles.mobileNavLink} ${
-                  location.pathname === item.path ? styles.active : ''
-                }`}
-                onClick={closeMobileMenu}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          
-          <div className={styles.mobileSettings}>
-            <span className={styles.mobileSettingsLabel}>Theme</span>
-            <div className={styles.mobileThemeOptions}>
-              {THEME_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  className={`${styles.mobileThemeOption} ${theme === option.value ? styles.active : ''}`}
-                  onClick={() => setTheme(option.value)}
+        {mobileMenuOpen && (
+          <div className={styles.mobileMenu}>
+            <nav className={styles.mobileNav}>
+              {navItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`${styles.mobileNavLink} ${
+                    location.pathname === item.path ? styles.active : ''
+                  }`}
+                  onClick={closeMobileMenu}
                 >
-                  <span>{option.icon}</span>
-                  <span>{option.label}</span>
-                </button>
+                  {item.label}
+                </Link>
               ))}
+            </nav>
+            
+            <div className={styles.mobileSettings}>
+              <span className={styles.mobileSettingsLabel}>Theme</span>
+              <div className={styles.mobileThemeOptions}>
+                {THEME_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    className={`${styles.mobileThemeOption} ${theme === option.value ? styles.active : ''}`}
+                    onClick={() => setTheme(option.value)}
+                  >
+                    <span>{option.icon}</span>
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </header>
 
       <main className={styles.main}>
         <Outlet />
