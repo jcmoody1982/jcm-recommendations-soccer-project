@@ -85,7 +85,7 @@
 .price {
   font-weight: 500;
   color: var(--text-primary);
-  text-align: right;
+  text-align: center;
 }
 
 .score {
