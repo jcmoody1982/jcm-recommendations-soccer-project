@@ -19,7 +19,7 @@ const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string; 
   OVER_CORNERS: { title: 'Over Corners', icon: '📐', scoreLabel: 'Predicted Corners' },
   UNDER_CORNERS: { title: 'Under Corners', icon: '📏', scoreLabel: 'Predicted Corners' },
   CLEAN_SHEET: { title: 'Clean Sheet', icon: '🧤', scoreLabel: 'Score' },
-  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', scoreLabel: 'Score' },
+  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', scoreLabel: 'Confidence' },
   SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣', scoreLabel: 'Score' },
   MATCH_RESULT: { title: 'Match Result', icon: '🏆', scoreLabel: 'Score' },
   HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', scoreLabel: 'Score' },
