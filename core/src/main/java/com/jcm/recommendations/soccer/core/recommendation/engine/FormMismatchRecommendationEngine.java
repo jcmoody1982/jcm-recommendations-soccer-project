@@ -81,7 +81,7 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
                 .type(type)
                 .confidence(confidence)
                 .score(Math.abs(bestMismatch.mismatchScore))
-                .market(bestMismatch.isHomeTeam ? "Back Home" : "Back Away")
+                .market("Back " + bestMismatch.teamName)
                 .odds(null)
                 .description(buildDescription(context, bestMismatch, type, confidence))
                 .factors(factors)

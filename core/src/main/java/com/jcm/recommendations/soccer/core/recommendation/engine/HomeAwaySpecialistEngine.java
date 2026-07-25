@@ -56,6 +56,17 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(best, candidates);
 
+        // Determine the team to back based on the recommendation type
+        String teamToBack;
+        if (best.isHomeTeam || best.classification.equals("Poor Traveler")) {
+            // Home specialist, fortress, or poor traveler (back the home team)
+            teamToBack = context.getHomeTeam().getName();
+        } else {
+            // Away specialist
+            teamToBack = context.getAwayTeam().getName();
+        }
+        String market = "Back " + teamToBack;
+
         Recommendation recommendation = Recommendation.builder()
                 .fixtureId(context.getFixture().getId())
                 .homeTeamId(context.getHomeTeam().getId())
@@ -69,7 +80,7 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
                 .type(RecommendationType.HOME_AWAY_SPECIALIST)
                 .confidence(best.confidence)
                 .score(best.disparityScore)
-                .market(best.recommendation)
+                .market(market)
                 .odds(null)
                 .description(buildDescription(context, best))
                 .factors(factors)

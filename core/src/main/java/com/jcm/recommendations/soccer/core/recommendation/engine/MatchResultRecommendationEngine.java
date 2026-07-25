@@ -55,25 +55,29 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         awayWinProb = (awayWinProb / total) * 100;
         drawProb = (drawProb / total) * 100;
 
-        String recommendedOutcome;
+        String outcomeType; // HOME, DRAW, or AWAY - used for odds lookup
+        String recommendedOutcome; // Display name with team name
         double bestProb;
         double valueVsOdds = 0.0;
 
         if (homeWinProb >= awayWinProb && homeWinProb >= drawProb) {
-            recommendedOutcome = "Home Win";
+            outcomeType = "HOME";
+            recommendedOutcome = context.getHomeTeam().getName() + " Win";
             bestProb = homeWinProb;
             if (context.hasOdds() && context.getOdds().getOddsFt1() != null && context.getOdds().getOddsFt1() > 0) {
                 double implied = (1.0 / context.getOdds().getOddsFt1()) * 100;
                 valueVsOdds = homeWinProb - implied;
             }
         } else if (awayWinProb >= homeWinProb && awayWinProb >= drawProb) {
-            recommendedOutcome = "Away Win";
+            outcomeType = "AWAY";
+            recommendedOutcome = context.getAwayTeam().getName() + " Win";
             bestProb = awayWinProb;
             if (context.hasOdds() && context.getOdds().getOddsFt2() != null && context.getOdds().getOddsFt2() > 0) {
                 double implied = (1.0 / context.getOdds().getOddsFt2()) * 100;
                 valueVsOdds = awayWinProb - implied;
             }
         } else {
+            outcomeType = "DRAW";
             recommendedOutcome = "Draw";
             bestProb = drawProb;
             if (context.hasOdds() && context.getOdds().getOddsFtX() != null && context.getOdds().getOddsFtX() > 0) {
@@ -88,7 +92,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        Double odds = getOddsForOutcome(context, recommendedOutcome);
+        Double odds = getOddsForOutcome(context, outcomeType);
         Map<String, Object> factors = buildFactors(context, homeWinProb, drawProb, awayWinProb, valueVsOdds);
 
         Recommendation recommendation = Recommendation.builder()
@@ -307,14 +311,14 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         return value != null ? value : 0.0;
     }
 
-    private Double getOddsForOutcome(FixtureContext context, String outcome) {
+    private Double getOddsForOutcome(FixtureContext context, String outcomeType) {
         if (!context.hasOdds()) {
             return null;
         }
-        return switch (outcome) {
-            case "Home Win" -> context.getOdds().getOddsFt1();
-            case "Draw" -> context.getOdds().getOddsFtX();
-            case "Away Win" -> context.getOdds().getOddsFt2();
+        return switch (outcomeType) {
+            case "HOME" -> context.getOdds().getOddsFt1();
+            case "DRAW" -> context.getOdds().getOddsFtX();
+            case "AWAY" -> context.getOdds().getOddsFt2();
             default -> null;
         };
     }
