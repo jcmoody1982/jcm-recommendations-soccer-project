@@ -65,7 +65,7 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
             // Away specialist
             teamToBack = context.getAwayTeam().getName();
         }
-        String market = "Back " + teamToBack;
+        String market = teamToBack;
 
         Recommendation recommendation = Recommendation.builder()
                 .fixtureId(context.getFixture().getId())
