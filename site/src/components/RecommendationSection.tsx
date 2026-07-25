@@ -45,16 +45,12 @@ export function RecommendationSection({
   
   const config = SECTION_CONFIG[type] || { title: type, icon: '📊', scoreLabel: 'Score', showPrice: true };
   
-  const sortedRecommendations = [...recommendations].sort(
-    (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0)
-  );
-  
-  const visibleRecommendations = sortedRecommendations.slice(0, visibleCount);
-  const hasMore = sortedRecommendations.length > visibleCount;
+  const visibleRecommendations = recommendations.slice(0, visibleCount);
+  const hasMore = recommendations.length > visibleCount;
   const canShowLess = visibleCount > initialItems;
-  const remainingCount = sortedRecommendations.length - visibleCount;
+  const remainingCount = recommendations.length - visibleCount;
 
-  if (sortedRecommendations.length === 0) {
+  if (recommendations.length === 0) {
     return null;
   }
 
@@ -75,7 +71,7 @@ export function RecommendationSection({
         <span className={styles.icon}>{config.icon}</span>
         <span className={styles.title}>{config.title}</span>
         <span className={styles.count}>
-          {visibleRecommendations.length} of {sortedRecommendations.length} picks
+          {visibleRecommendations.length} of {recommendations.length} picks
         </span>
       </h2>
       <div className={headerClass}>
