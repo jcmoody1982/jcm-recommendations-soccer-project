@@ -48,13 +48,6 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
     <>
       {/* Desktop row layout */}
       <div className={rowClass}>
-        <button 
-          className={`${styles.starButton} ${isInShortlist ? styles.starred : ''}`}
-          onClick={handleToggleShortlist}
-          title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
-        >
-          {isInShortlist ? '★' : '☆'}
-        </button>
         <span className={styles.sentiment} title={recommendation.confidence}>
           {sentimentIcon}
         </span>
@@ -83,18 +76,18 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
           </span>
         )}
         <span className={styles.score}>{score}{scoreUnit}</span>
+        <button 
+          className={`${styles.starButton} ${isInShortlist ? styles.starred : ''}`}
+          onClick={handleToggleShortlist}
+          title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
+        >
+          {isInShortlist ? '★' : '☆'}
+        </button>
       </div>
 
       {/* Mobile card layout */}
       <div className={styles.mobileCard}>
         <div className={styles.mobileCardHeader}>
-          <button 
-            className={`${styles.mobileStarButton} ${isInShortlist ? styles.starred : ''}`}
-            onClick={handleToggleShortlist}
-            title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
-          >
-            {isInShortlist ? '★' : '☆'}
-          </button>
           <span className={styles.mobileSentiment}>{sentimentIcon}</span>
           {recommendation.leagueImage ? (
             <img 
@@ -108,6 +101,13 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
           <span className={styles.mobileFixture}>
             {recommendation.homeTeamName} vs {recommendation.awayTeamName}
           </span>
+          <button 
+            className={`${styles.mobileStarButton} ${isInShortlist ? styles.starred : ''}`}
+            onClick={handleToggleShortlist}
+            title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
+          >
+            {isInShortlist ? '★' : '☆'}
+          </button>
         </div>
         <div className={styles.mobileCardBody}>
           <div className={styles.mobileInfo}>

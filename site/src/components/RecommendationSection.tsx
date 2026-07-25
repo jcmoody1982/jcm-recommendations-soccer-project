@@ -76,13 +76,13 @@ export function RecommendationSection({
       </h2>
       <div className={headerClass}>
         <span></span>
-        <span></span>
         <span>League</span>
         <span>Date / Time</span>
         <span>Fixture</span>
         <span>Selection</span>
         {config.showPrice && <span>Price</span>}
         <span>{config.scoreLabel}</span>
+        <span></span>
       </div>
       <div className={listClass}>
         {visibleRecommendations.map((rec) => (
