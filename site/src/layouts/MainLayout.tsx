@@ -4,8 +4,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import styles from './MainLayout.module.css';
 
 const navItems = [
-  { path: '/', label: 'Home' },
-  { path: '/recommendations', label: 'Recommendations' },
+  { path: '/', label: 'Recommendations' },
+  { path: '/fixtures', label: 'Fixtures' },
 ];
 
 type Theme = 'light' | 'dark' | 'system';
