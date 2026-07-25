@@ -7,10 +7,30 @@ interface Props {
   showPrice?: boolean;
 }
 
-const CONFIDENCE_ICONS: Record<string, string> = {
-  STRONG: '🔥',
-  MODERATE: '😬',
-  WEAK: '🔴',
+const ConfidenceIcon = ({ level }: { level: string }) => {
+  if (level === 'STRONG') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="10" cy="10" r="9" fill="#22c55e" stroke="#16a34a" strokeWidth="1"/>
+        <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    );
+  }
+  if (level === 'MODERATE') {
+    return (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="10" cy="10" r="9" fill="#f59e0b" stroke="#d97706" strokeWidth="1"/>
+        <path d="M10 6V10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+        <circle cx="10" cy="13" r="1" fill="white"/>
+      </svg>
+    );
+  }
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="10" cy="10" r="9" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
+      <path d="M7 7L13 13M13 7L7 13" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  );
 };
 
 export function RecommendationRow({ recommendation, showPrice = true }: Props) {
@@ -40,7 +60,6 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
   const isFormMismatch = recommendation.type === 'WINNING_FORM_MISMATCH' || recommendation.type === 'LOSING_FORM_MISMATCH';
   const isHomeAwaySpecialist = recommendation.type === 'HOME_AWAY_SPECIALIST';
   const scoreUnit = isBookingPoints || isFormMismatch || isHomeAwaySpecialist ? ' pts' : isCorners ? '' : '%';
-  const sentimentIcon = CONFIDENCE_ICONS[recommendation.confidence] || '⚪';
 
   const rowClass = showPrice ? styles.row : styles.rowNoPrice;
 
@@ -49,7 +68,7 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
       {/* Desktop row layout */}
       <div className={rowClass}>
         <span className={styles.sentiment} title={recommendation.confidence}>
-          {sentimentIcon}
+          <ConfidenceIcon level={recommendation.confidence} />
         </span>
         <span className={styles.league}>
           {recommendation.leagueImage ? (
@@ -88,7 +107,9 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
       {/* Mobile card layout */}
       <div className={styles.mobileCard}>
         <div className={styles.mobileCardHeader}>
-          <span className={styles.mobileSentiment}>{sentimentIcon}</span>
+          <span className={styles.mobileSentiment}>
+            <ConfidenceIcon level={recommendation.confidence} />
+          </span>
           {recommendation.leagueImage ? (
             <img 
               src={recommendation.leagueImage} 
