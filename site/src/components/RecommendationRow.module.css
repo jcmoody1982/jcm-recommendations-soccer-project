@@ -1,7 +1,7 @@
 /* Desktop row layout */
 .row {
   display: grid;
-  grid-template-columns: 32px 55px 110px 1fr auto 60px 60px;
+  grid-template-columns: 28px 32px 55px 110px 1fr auto 60px 60px;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
@@ -13,7 +13,7 @@
 
 .rowNoPrice {
   display: grid;
-  grid-template-columns: 32px 55px 110px 1fr auto 80px;
+  grid-template-columns: 28px 32px 55px 110px 1fr auto 80px;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
@@ -26,6 +26,26 @@
 .row:hover,
 .rowNoPrice:hover {
   background: var(--bg-option-hover);
+}
+
+.starButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.starButton:hover {
+  color: #f59e0b;
+  transform: scale(1.1);
+}
+
+.starButton.starred {
+  color: #f59e0b;
 }
 
 .sentiment {
@@ -124,6 +144,21 @@
     margin-bottom: 10px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border-color);
+  }
+
+  .mobileStarButton {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s ease;
+  }
+
+  .mobileStarButton.starred {
+    color: #f59e0b;
   }
 
   .mobileSentiment {

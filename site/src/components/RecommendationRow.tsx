@@ -1,4 +1,5 @@
 import type { Recommendation } from '../types';
+import { useShortlist } from '../contexts/ShortlistContext';
 import styles from './RecommendationRow.module.css';
 
 interface Props {
@@ -13,6 +14,13 @@ const CONFIDENCE_ICONS: Record<string, string> = {
 };
 
 export function RecommendationRow({ recommendation, showPrice = true }: Props) {
+  const { isShortlisted, toggleShortlist } = useShortlist();
+  const isInShortlist = isShortlisted(recommendation.fixtureId, recommendation.type);
+
+  const handleToggleShortlist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleShortlist(recommendation.fixtureId, recommendation.type);
+  };
   const matchDate = new Date(recommendation.matchDateUnix * 1000);
   
   const formattedDate = matchDate.toLocaleDateString('en-GB', {
@@ -40,6 +48,13 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
     <>
       {/* Desktop row layout */}
       <div className={rowClass}>
+        <button 
+          className={`${styles.starButton} ${isInShortlist ? styles.starred : ''}`}
+          onClick={handleToggleShortlist}
+          title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
+        >
+          {isInShortlist ? '★' : '☆'}
+        </button>
         <span className={styles.sentiment} title={recommendation.confidence}>
           {sentimentIcon}
         </span>
@@ -73,6 +88,13 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
       {/* Mobile card layout */}
       <div className={styles.mobileCard}>
         <div className={styles.mobileCardHeader}>
+          <button 
+            className={`${styles.mobileStarButton} ${isInShortlist ? styles.starred : ''}`}
+            onClick={handleToggleShortlist}
+            title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
+          >
+            {isInShortlist ? '★' : '☆'}
+          </button>
           <span className={styles.mobileSentiment}>{sentimentIcon}</span>
           {recommendation.leagueImage ? (
             <img 

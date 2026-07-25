@@ -80,6 +80,7 @@ export function RecommendationSection({
       </h2>
       <div className={headerClass}>
         <span></span>
+        <span></span>
         <span>League</span>
         <span>Date / Time</span>
         <span>Fixture</span>

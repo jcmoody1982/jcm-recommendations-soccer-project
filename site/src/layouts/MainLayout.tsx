@@ -5,6 +5,7 @@ import styles from './MainLayout.module.css';
 
 const navItems = [
   { path: '/', label: 'Recommendations' },
+  { path: '/shortlist', label: 'Shortlist' },
   { path: '/fixtures', label: 'Fixtures' },
 ];
 
