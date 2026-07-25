@@ -46,7 +46,7 @@ export default function Dashboard() {
   return (
     <div className={styles.dashboard}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Competitions</h1>
+        <h1 className={styles.title}>Fixtures</h1>
         <span className={styles.totalFixtures}>
           {overview.totalFixtures} upcoming fixtures
         </span>
