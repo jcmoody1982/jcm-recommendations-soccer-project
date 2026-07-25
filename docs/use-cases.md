@@ -1367,6 +1367,289 @@ Fixture Timing:
 
 ---
 
+#### UC-024: Double Chance Recommendations
+
+**Goal:** Identify fixtures where backing two outcomes (Home/Draw or Draw/Away) offers strong probability with reduced risk.
+
+**User Story:** As a user, I want to find matches where a double chance bet offers good value with high confidence, reducing my risk while maintaining reasonable returns.
+
+**Data Required:**
+- Team win percentages (home/away)
+- Draw percentages
+- Points per game (PPG)
+- League position
+- Recent form (last 5 matches)
+- Match odds for 1X, X2 markets
+
+**Logic:**
+```
+Double Chance Probability Calculation:
+
+Home/Draw (1X):
+  Combined Probability = Home Win % + Draw %
+  
+  Factors:
+  - Home team PPG home ≥ 1.5                    (strong home side)
+  - Away team win % away < 25%                  (poor travelers)
+  - Home team unbeaten at home > 60%            (fortress factor)
+  - Position: Home team higher ranked           (quality advantage)
+
+Draw/Away (X2):
+  Combined Probability = Draw % + Away Win %
+  
+  Factors:
+  - Away team PPG away ≥ 1.3                    (competent away)
+  - Home team win % home < 40%                  (weak home form)
+  - Away team unbeaten away > 50%               (road warriors)
+  - Away team higher ranked by 5+ places        (quality advantage)
+```
+
+**When to Recommend 1X (Home/Draw):**
+```
+Strong Indicators:
+  - Home team rarely loses at home (< 20% loss rate)
+  - Away team struggles away (< 30% win rate away)
+  - Home team in top half, away team in bottom half
+  - Home team's last 5 home: 0-1 losses
+  
+Combined Probability Threshold:
+  - 1X Probability ≥ 70% = Strong recommendation
+  - 1X Probability 60-69% = Moderate recommendation
+```
+
+**When to Recommend X2 (Draw/Away):**
+```
+Strong Indicators:
+  - Away team strong on road (> 35% win rate away)
+  - Home team poor at home (< 40% win rate home)
+  - Away team clearly higher quality (10+ positions above)
+  - Home team's last 5 home: 2+ losses
+  
+Combined Probability Threshold:
+  - X2 Probability ≥ 65% = Strong recommendation
+  - X2 Probability 55-64% = Moderate recommendation
+```
+
+**Value Calculation:**
+```
+Market odds typically:
+  - 1X: 1.20 - 1.60
+  - X2: 1.30 - 1.80
+
+Value = Calculated Probability - Implied Probability
+Recommend when Value ≥ 5%
+```
+
+**Confidence Levels:**
+- **Strong:** Combined probability ≥ 70% AND Value ≥ 5%
+- **Moderate:** Combined probability ≥ 60%
+- **Weak:** Combined probability < 60% (filter out)
+
+**Output:**
+- Market: "Home/Draw (1X)" or "Draw/Away (X2)"
+- Combined probability percentage
+- Individual probabilities breakdown (Home %, Draw %, Away %)
+- Value vs odds indicator
+- Key factor highlights
+
+**Status:** Draft
+
+---
+
+#### UC-025: Result + BTTS Combo Recommendations
+
+**Goal:** Identify fixtures where a combined Result + Both Teams To Score bet has strong probability, offering enhanced odds with good confidence.
+
+**User Story:** As a user, I want to find matches where I can confidently back a result combined with BTTS for better odds than a single result bet.
+
+**Data Required:**
+- Team win percentages (home/away)
+- BTTS percentages (overall, home, away)
+- Goals scored/conceded averages
+- Clean sheet percentages (inverse relationship)
+- Failed to score percentages
+- Match result odds + BTTS odds (if available)
+
+**Logic:**
+```
+Result + BTTS Probability = Result Probability × BTTS Probability
+
+Example:
+  - Home Win probability: 55%
+  - BTTS probability: 65%
+  - Home Win + BTTS Yes: 55% × 65% = 35.75%
+```
+
+**Markets to Consider:**
+```
+1. Home Win + BTTS Yes
+   Requirements:
+   - Home win probability ≥ 50%
+   - BTTS probability ≥ 55%
+   - Home team scores frequently (avg > 1.3/game)
+   - Home team concedes regularly (avg > 0.8/game)
+   
+2. Away Win + BTTS Yes
+   Requirements:
+   - Away win probability ≥ 45%
+   - BTTS probability ≥ 55%
+   - Away team scores away (avg > 1.0/game away)
+   - Away team concedes away (avg > 0.7/game away)
+   
+3. Draw + BTTS Yes (Score Draw)
+   Requirements:
+   - Draw probability ≥ 25%
+   - BTTS probability ≥ 60%
+   - Both teams score regularly
+   - Evenly matched (PPG difference < 0.4)
+```
+
+**Key Exclusion Criteria:**
+```
+Do NOT recommend when:
+  - Winning team has high clean sheet % (> 40%)
+  - Winning team's opponent has high failed to score % (> 35%)
+  - One team is extremely dominant (likely win to nil)
+```
+
+**Confidence Calculation:**
+```
+Combined Score = Result Probability × BTTS Probability
+
+Adjustments:
+  + 10% if both teams scored in last 3 meetings
+  + 5% if both teams concede regularly (< 25% clean sheet rate)
+  - 10% if either team has > 35% clean sheet rate
+  - 5% if either team fails to score > 30% of games
+```
+
+**Thresholds:**
+- **Strong:** Combined probability ≥ 35% AND both individual probs meet thresholds
+- **Moderate:** Combined probability ≥ 28%
+- **Weak:** Combined probability < 28% (filter out)
+
+**Output:**
+- Market: "Home Win + BTTS", "Away Win + BTTS", or "Draw + BTTS"
+- Combined probability percentage
+- Individual breakdown (Result %, BTTS %)
+- Key supporting stats (goals avg, clean sheet %, etc.)
+- Expected odds range indication
+
+**Status:** Draft
+
+---
+
+#### UC-026: Top vs Bottom Recommendations
+
+**Goal:** Identify fixtures featuring extreme league position mismatches (top teams vs bottom teams) and provide appropriate betting recommendations.
+
+**User Story:** As a user, I want to identify matches where there's a significant quality gap between teams, allowing me to back the stronger team with confidence or find value in unlikely outcomes.
+
+**Data Required:**
+- League positions for both teams
+- Points per game
+- Goal differences
+- Recent form (last 5)
+- Head-to-head history (upsets?)
+- Home/away performance splits
+
+**Logic:**
+```
+Position Mismatch Detection:
+  - Extreme: Top 3 vs Bottom 3 (≥ 14 position gap)
+  - Strong: Top 5 vs Bottom 5 (≥ 10 position gap)
+  - Moderate: Top 6 vs Bottom 6 (≥ 8 position gap)
+```
+
+**Recommendation Types:**
+
+**1. Back the Favorite (Strong Team Win):**
+```
+When to recommend:
+  - Position gap ≥ 10 places
+  - Favorite PPG ≥ 1.8
+  - Underdog PPG ≤ 1.0
+  - Favorite's goal difference positive by 15+
+  - Underdog's goal difference negative by 10+
+
+Confidence Boost:
+  + If favorite is at home
+  + If underdog has poor away record (< 20% win rate)
+  + If favorite won last H2H convincingly (2+ goals)
+```
+
+**2. Handicap/Goals Line (Alternative Market):**
+```
+When favorite odds are too short (< 1.40):
+  - Recommend: Favorite -1.5 goals
+  - Or: Over 2.5/3.5 goals
+  
+Logic:
+  - Top teams often score 2+ against bottom teams
+  - Bottom teams often concede multiple goals
+```
+
+**3. Upset Alert (Underdog Value):**
+```
+When to flag potential upset:
+  - Underdog at home
+  - Underdog's recent form improving (W or D in last 2)
+  - Favorite's away form poor (< 50% win rate away)
+  - Historical H2H shows underdog can compete
+  - Favorite has fixture congestion (mid-week game prior)
+
+If upset factors present:
+  - Flag: "Upset Watch" 
+  - Recommend: Double Chance (1X) for home underdog
+  - Or: Draw at value odds
+```
+
+**4. BTTS in Mismatch:**
+```
+Surprisingly common scenario:
+  - Top team attacks freely, bottom team desperate
+  - Bottom teams at home often score 1 against big teams
+  
+Recommend BTTS when:
+  - Bottom team scores in 50%+ of home games
+  - Top team concedes in 40%+ of away games
+  - Top team's clean sheet away < 35%
+```
+
+**Position Gap Scoring:**
+```
+Gap Score = |Home Position - Away Position|
+
+Quality Score Calculation:
+  - PPG difference
+  - Goal difference comparison  
+  - Recent form comparison (points from last 5)
+  - Head-to-head record
+
+Combined Mismatch Score = Gap Score × Quality Score Multiplier
+```
+
+**Confidence Levels:**
+- **Strong:** Gap ≥ 12 AND favorite at home AND quality indicators align
+- **Moderate:** Gap ≥ 8 AND quality indicators mostly align
+- **Weak:** Gap < 8 OR conflicting indicators (filter out)
+
+**Output:**
+- Primary market recommendation (Favorite Win, Handicap, or Upset Alert)
+- Position gap and league context
+- Key stats comparison (PPG, GD, form)
+- Risk indicator (High confidence / Upset potential)
+- Alternative market suggestions
+
+**Special Flags:**
+- "Banker" - Very high confidence favorite win
+- "Upset Watch" - Underdog has factors in their favor
+- "Goals Expected" - High-scoring game likely
+
+**Status:** Draft
+
+---
+
 ### Website
 
 _Use cases for the web application interface._
