@@ -37,35 +37,68 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
   const rowClass = showPrice ? styles.row : styles.rowNoPrice;
 
   return (
-    <div className={rowClass}>
-      <span className={styles.sentiment} title={recommendation.confidence}>
-        {sentimentIcon}
-      </span>
-      <span className={styles.league}>
-        {recommendation.leagueImage ? (
-          <img 
-            src={recommendation.leagueImage} 
-            alt={recommendation.leagueName || 'League'} 
-            className={styles.leagueIcon}
-          />
-        ) : (
-          <span className={styles.leaguePlaceholder}>⚽</span>
-        )}
-      </span>
-      <span className={styles.datetime}>
-        <span className={styles.date}>{formattedDate}</span>
-        <span className={styles.time}>{formattedTime}</span>
-      </span>
-      <span className={styles.fixture}>
-        {recommendation.homeTeamName} vs {recommendation.awayTeamName}
-      </span>
-      <span className={styles.market}>{recommendation.market}</span>
-      {showPrice && (
-        <span className={styles.price}>
-          {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
+    <>
+      {/* Desktop row layout */}
+      <div className={rowClass}>
+        <span className={styles.sentiment} title={recommendation.confidence}>
+          {sentimentIcon}
         </span>
-      )}
-      <span className={styles.score}>{score}{scoreUnit}</span>
-    </div>
+        <span className={styles.league}>
+          {recommendation.leagueImage ? (
+            <img 
+              src={recommendation.leagueImage} 
+              alt={recommendation.leagueName || 'League'} 
+              className={styles.leagueIcon}
+            />
+          ) : (
+            <span className={styles.leaguePlaceholder}>⚽</span>
+          )}
+        </span>
+        <span className={styles.datetime}>
+          <span className={styles.date}>{formattedDate}</span>
+          <span className={styles.time}>{formattedTime}</span>
+        </span>
+        <span className={styles.fixture}>
+          {recommendation.homeTeamName} vs {recommendation.awayTeamName}
+        </span>
+        <span className={styles.market}>{recommendation.market}</span>
+        {showPrice && (
+          <span className={styles.price}>
+            {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
+          </span>
+        )}
+        <span className={styles.score}>{score}{scoreUnit}</span>
+      </div>
+
+      {/* Mobile card layout */}
+      <div className={styles.mobileCard}>
+        <div className={styles.mobileCardHeader}>
+          <span className={styles.mobileSentiment}>{sentimentIcon}</span>
+          <span className={styles.mobileFixture}>
+            {recommendation.homeTeamName} vs {recommendation.awayTeamName}
+          </span>
+        </div>
+        <div className={styles.mobileCardBody}>
+          <div className={styles.mobileInfo}>
+            <span className={styles.mobileLabel}>When</span>
+            <span className={styles.mobileValue}>{formattedDate} {formattedTime}</span>
+          </div>
+          <div className={styles.mobileInfo}>
+            <span className={styles.mobileLabel}>Selection</span>
+            <span className={styles.mobileValue}>{recommendation.market}</span>
+          </div>
+          {showPrice && recommendation.odds && (
+            <div className={styles.mobileInfo}>
+              <span className={styles.mobileLabel}>Price</span>
+              <span className={styles.mobileValue}>{recommendation.odds.toFixed(2)}</span>
+            </div>
+          )}
+          <div className={styles.mobileInfo}>
+            <span className={styles.mobileLabel}>Score</span>
+            <span className={styles.mobileScore}>{score}{scoreUnit}</span>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
