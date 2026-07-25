@@ -15,7 +15,10 @@ public enum RecommendationType {
     SECOND_HALF_GOALS("Second Half Goals", "UC-016"),
     MATCH_RESULT("Match Result", "UC-017"),
     HOME_AWAY_SPECIALIST("Home/Away Specialist", "UC-018"),
-    DRAW("Draw", "UC-019");
+    DRAW("Draw", "UC-019"),
+    DOUBLE_CHANCE("Double Chance", "UC-024"),
+    RESULT_BTTS("Result + BTTS", "UC-025"),
+    TOP_VS_BOTTOM("Top vs Bottom", "UC-026");
 
     private final String displayName;
     private final String useCaseId;

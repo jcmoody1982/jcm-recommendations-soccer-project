@@ -8,6 +8,9 @@ import styles from './Recommendations.module.css';
 const SECTION_ORDER: RecommendationType[] = [
   'MATCH_RESULT',
   'BTTS',
+  'DOUBLE_CHANCE',
+  'RESULT_BTTS',
+  'TOP_VS_BOTTOM',
   'DRAW',
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',

@@ -15,7 +15,10 @@ export type RecommendationType =
   | 'SECOND_HALF_GOALS'
   | 'MATCH_RESULT'
   | 'HOME_AWAY_SPECIALIST'
-  | 'DRAW';
+  | 'DRAW'
+  | 'DOUBLE_CHANCE'
+  | 'RESULT_BTTS'
+  | 'TOP_VS_BOTTOM';
 
 export interface Recommendation {
   fixtureId: number;

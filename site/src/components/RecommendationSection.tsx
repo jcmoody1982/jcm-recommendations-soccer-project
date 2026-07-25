@@ -33,6 +33,9 @@ const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
   MATCH_RESULT: { title: 'Match Result', icon: '🏆', scoreLabel: 'Score', showPrice: true },
   HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', scoreLabel: 'Disparity Index', showPrice: false },
   DRAW: { title: 'Draw', icon: '🤝', scoreLabel: 'Score', showPrice: true },
+  DOUBLE_CHANCE: { title: 'Double Chance', icon: '🎲', scoreLabel: 'Probability', showPrice: false },
+  RESULT_BTTS: { title: 'Result + BTTS', icon: '🎯⚽', scoreLabel: 'Combined', showPrice: false },
+  TOP_VS_BOTTOM: { title: 'Top vs Bottom', icon: '⬆️⬇️', scoreLabel: 'Quality Score', showPrice: false },
 };
 
 export function RecommendationSection({ 
