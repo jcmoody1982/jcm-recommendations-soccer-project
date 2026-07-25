@@ -1636,6 +1636,82 @@ GET /api/recommendations/grouped?daysAhead=7
 
 ---
 
+#### UC-023: Shortlist Page - Save & Manage Picks
+
+**Goal:** Allow users to save recommendations to a personal shortlist for easy reference and tracking, with the ability to add/remove picks at any time.
+
+**User Story:** As a user, I want to add recommendations to a shortlist so that I can keep track of the picks I'm interested in and easily reference them later.
+
+**Data Required:**
+- Shortlisted recommendation IDs stored in localStorage
+- Full recommendation data fetched from existing API endpoints
+
+**UI Components:**
+
+1. **Add to Shortlist Button (on Recommendations Page)**
+   - Icon button on each recommendation row/card
+   - Star or bookmark icon (☆ empty, ★ filled)
+   - Visual feedback when toggled
+   - Persists selection to localStorage
+
+2. **Shortlist Page**
+   - Accessible via navigation: "Shortlist"
+   - Displays all shortlisted recommendations
+   - Same card/row format as recommendations page
+   - Empty state when no items shortlisted
+
+3. **Remove from Shortlist**
+   - Same toggle button removes item
+   - Immediate visual feedback
+   - Item removed from shortlist page
+
+4. **Shortlist Counter (Optional)**
+   - Badge on navigation showing shortlist count
+   - Updates dynamically as items are added/removed
+
+**Behavior:**
+- Shortlist persisted to localStorage (survives page refresh)
+- Adding a pick: Click empty star → fills, item added to shortlist
+- Removing a pick: Click filled star → empties, item removed from shortlist
+- Shortlist page filters to only show saved recommendations
+- Works across all recommendation types
+
+**Storage Structure:**
+```json
+{
+  "shortlist": [
+    {
+      "fixtureId": 101,
+      "type": "BTTS",
+      "addedAt": "2026-07-25T01:00:00Z"
+    },
+    {
+      "fixtureId": 102,
+      "type": "MATCH_RESULT",
+      "addedAt": "2026-07-25T01:05:00Z"
+    }
+  ]
+}
+```
+
+**API Endpoints:**
+- None (client-side only, uses existing recommendation APIs)
+
+**Acceptance Criteria:**
+- [ ] Star/bookmark icon visible on each recommendation
+- [ ] Clicking icon toggles shortlist state
+- [ ] Visual distinction between shortlisted and non-shortlisted items
+- [ ] Shortlist page accessible from navigation
+- [ ] Shortlist page displays all saved recommendations
+- [ ] Removing from shortlist updates page immediately
+- [ ] Shortlist persists across page reloads (localStorage)
+- [ ] Empty state shown when shortlist is empty
+- [ ] Works on both desktop and mobile layouts
+
+**Status:** Draft
+
+---
+
 ### iOS Native App
 
 _Use cases for the iOS mobile application._
