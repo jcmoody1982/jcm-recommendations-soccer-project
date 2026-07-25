@@ -33,7 +33,10 @@ export default function MainLayout() {
     <div className={styles.layout}>
       <header className={styles.header}>
         <div className={styles.logo}>
-          <Link to="/">AccaBaccaGlory</Link>
+          <Link to="/">
+            <img src="/logo.png" alt="AccaBaccaGlory" className={styles.logoImage} />
+            <span className={styles.logoText}>AccaBaccaGlory</span>
+          </Link>
         </div>
         
         <nav className={styles.nav}>

@@ -20,6 +20,19 @@
   font-size: 1.5rem;
   font-weight: 700;
   text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logoImage {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+.logoText {
+  color: var(--text-primary);
 }
 
 .nav {
@@ -224,6 +237,15 @@
 
   .logo a {
     font-size: 1.25rem;
+  }
+
+  .logoImage {
+    width: 32px;
+    height: 32px;
+  }
+
+  .logoText {
+    display: none;
   }
 
   .nav {
