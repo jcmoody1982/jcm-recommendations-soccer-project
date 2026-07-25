@@ -20,7 +20,7 @@ public class FixtureController {
     @GetMapping
     public ResponseEntity<List<Fixture>> getUpcomingFixtures(
             @RequestParam(required = false) Long seasonId,
-            @RequestParam(required = false, defaultValue = "7") int daysAhead) {
+            @RequestParam(required = false, defaultValue = "7") double daysAhead) {
 
         List<Fixture> fixtures;
         if (seasonId != null) {

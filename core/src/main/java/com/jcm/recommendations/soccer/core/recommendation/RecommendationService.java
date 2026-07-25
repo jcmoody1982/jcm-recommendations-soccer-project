@@ -25,7 +25,7 @@ public class RecommendationService {
         return generateAllRecommendations(7);
     }
 
-    public List<Recommendation> generateAllRecommendations(int daysAhead) {
+    public List<Recommendation> generateAllRecommendations(double daysAhead) {
         log.info("Generating recommendations for fixtures: daysAhead={}", daysAhead);
         Instant startTime = Instant.now();
 
@@ -106,7 +106,7 @@ public class RecommendationService {
         return getRecommendationsByType(type, 7);
     }
 
-    public List<Recommendation> getRecommendationsByType(RecommendationType type, int daysAhead) {
+    public List<Recommendation> getRecommendationsByType(RecommendationType type, double daysAhead) {
         log.info("Generating recommendations by type: type={}, daysAhead={}", type, daysAhead);
 
         List<Fixture> fixtures = fixtureService.getUpcomingFixtures(daysAhead);
@@ -132,7 +132,7 @@ public class RecommendationService {
         return getStrongRecommendations(7);
     }
 
-    public List<Recommendation> getStrongRecommendations(int daysAhead) {
+    public List<Recommendation> getStrongRecommendations(double daysAhead) {
         log.info("Getting strong recommendations: daysAhead={}", daysAhead);
 
         List<Recommendation> all = generateAllRecommendations(daysAhead);
@@ -148,7 +148,7 @@ public class RecommendationService {
         return getRecommendationsGroupedByType(7);
     }
 
-    public Map<RecommendationType, List<Recommendation>> getRecommendationsGroupedByType(int daysAhead) {
+    public Map<RecommendationType, List<Recommendation>> getRecommendationsGroupedByType(double daysAhead) {
         log.info("Generating grouped recommendations: daysAhead={}", daysAhead);
 
         List<Recommendation> all = generateAllRecommendations(daysAhead);
@@ -197,7 +197,7 @@ public class RecommendationService {
         return getSummary(7);
     }
 
-    public RecommendationSummary getSummary(int daysAhead) {
+    public RecommendationSummary getSummary(double daysAhead) {
         log.info("Generating recommendation summary: daysAhead={}", daysAhead);
 
         List<Fixture> fixtures = fixtureService.getUpcomingFixtures(daysAhead);

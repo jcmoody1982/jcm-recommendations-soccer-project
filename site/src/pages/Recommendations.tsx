@@ -40,16 +40,16 @@ export default function Recommendations() {
       <header className={styles.header}>
         <h1 className={styles.title}>Recommendations</h1>
         <div className={styles.headerRight}>
-          <span className={styles.totalCount}>{totalCount} total picks</span>
+          <label className={styles.filterLabel}>Filter</label>
           <select
             value={daysAhead}
             onChange={(e) => setDaysAhead(Number(e.target.value))}
             className={styles.select}
           >
+            <option value={0.5}>Next 12 hours</option>
             <option value={1}>Next 24 hours</option>
             <option value={3}>Next 3 days</option>
             <option value={7}>Next 7 days</option>
-            <option value={14}>Next 14 days</option>
           </select>
         </div>
       </header>
@@ -73,6 +73,10 @@ export default function Recommendations() {
       ) : (
         <p className={styles.empty}>No recommendations available for this time period.</p>
       )}
+
+      <footer className={styles.footer}>
+        <span className={styles.totalCount}>{totalCount} total picks</span>
+      </footer>
     </div>
   );
 }

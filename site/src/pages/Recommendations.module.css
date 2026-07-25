@@ -24,7 +24,13 @@
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+}
+
+.filterLabel {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .totalCount {
@@ -67,4 +73,12 @@
   background: var(--bg-secondary);
   border-radius: 8px;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+.footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+  transition: border-color 0.3s ease;
 }

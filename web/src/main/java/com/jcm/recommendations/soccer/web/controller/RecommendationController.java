@@ -22,7 +22,7 @@ public class RecommendationController {
 
     @GetMapping
     public ResponseEntity<List<Recommendation>> getAllRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.generateAllRecommendations(daysAhead);
         return ResponseEntity.ok(recommendations);
@@ -30,7 +30,7 @@ public class RecommendationController {
 
     @GetMapping("/strong")
     public ResponseEntity<List<Recommendation>> getStrongRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/strong requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getStrongRecommendations(daysAhead);
         return ResponseEntity.ok(recommendations);
@@ -50,7 +50,7 @@ public class RecommendationController {
     @GetMapping("/type/{type}")
     public ResponseEntity<List<Recommendation>> getRecommendationsByType(
             @PathVariable String type,
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/type/{} requested: daysAhead={}", type, daysAhead);
         
         RecommendationType recommendationType;
@@ -68,7 +68,7 @@ public class RecommendationController {
 
     @GetMapping("/btts")
     public ResponseEntity<List<Recommendation>> getBttsRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/btts requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
                 RecommendationType.BTTS, daysAhead);
@@ -77,7 +77,7 @@ public class RecommendationController {
 
     @GetMapping("/over-goals")
     public ResponseEntity<List<Recommendation>> getOverGoalsRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/over-goals requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
                 RecommendationType.OVER_GOALS, daysAhead);
@@ -86,7 +86,7 @@ public class RecommendationController {
 
     @GetMapping("/under-goals")
     public ResponseEntity<List<Recommendation>> getUnderGoalsRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/under-goals requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
                 RecommendationType.UNDER_GOALS, daysAhead);
@@ -95,7 +95,7 @@ public class RecommendationController {
 
     @GetMapping("/booking-points")
     public ResponseEntity<List<Recommendation>> getBookingPointsRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/booking-points requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
                 RecommendationType.BOOKING_POINTS, daysAhead);
@@ -104,7 +104,7 @@ public class RecommendationController {
 
     @GetMapping("/value-bets")
     public ResponseEntity<List<Recommendation>> getValueBetRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/value-bets requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
                 RecommendationType.VALUE_BET, daysAhead);
@@ -113,7 +113,7 @@ public class RecommendationController {
 
     @GetMapping("/corners")
     public ResponseEntity<List<Recommendation>> getCornersRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/corners requested: daysAhead={}", daysAhead);
         List<Recommendation> overCorners = recommendationService.getRecommendationsByType(
                 RecommendationType.OVER_CORNERS, daysAhead);
@@ -129,7 +129,7 @@ public class RecommendationController {
 
     @GetMapping("/clean-sheets")
     public ResponseEntity<List<Recommendation>> getCleanSheetRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/clean-sheets requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
                 RecommendationType.CLEAN_SHEET, daysAhead);
@@ -138,7 +138,7 @@ public class RecommendationController {
 
     @GetMapping("/match-results")
     public ResponseEntity<List<Recommendation>> getMatchResultRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/match-results requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
                 RecommendationType.MATCH_RESULT, daysAhead);
@@ -147,7 +147,7 @@ public class RecommendationController {
 
     @GetMapping("/draws")
     public ResponseEntity<List<Recommendation>> getDrawRecommendations(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/draws requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
                 RecommendationType.DRAW, daysAhead);
@@ -156,7 +156,7 @@ public class RecommendationController {
 
     @GetMapping("/grouped")
     public ResponseEntity<Map<RecommendationType, List<Recommendation>>> getRecommendationsGrouped(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/grouped requested: daysAhead={}", daysAhead);
         Map<RecommendationType, List<Recommendation>> grouped = 
                 recommendationService.getRecommendationsGroupedByType(daysAhead);
@@ -165,7 +165,7 @@ public class RecommendationController {
 
     @GetMapping("/summary")
     public ResponseEntity<RecommendationSummary> getSummary(
-            @RequestParam(defaultValue = "7") int daysAhead) {
+            @RequestParam(defaultValue = "7") double daysAhead) {
         log.info("GET /api/recommendations/summary requested: daysAhead={}", daysAhead);
         RecommendationSummary summary = recommendationService.getSummary(daysAhead);
         return ResponseEntity.ok(summary);

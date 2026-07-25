@@ -81,9 +81,9 @@ public class FixtureService {
         return fixtureRepository.findByDateRangeAndStatus(now, endTime, STATUS_INCOMPLETE);
     }
 
-    public List<Fixture> getUpcomingFixtures(int daysAhead) {
+    public List<Fixture> getUpcomingFixtures(double daysAhead) {
         long now = Instant.now().getEpochSecond();
-        long endTime = now + (daysAhead * SECONDS_PER_DAY);
+        long endTime = now + (long)(daysAhead * SECONDS_PER_DAY);
         return fixtureRepository.findByDateRangeAndStatus(now, endTime, STATUS_INCOMPLETE);
     }
 
