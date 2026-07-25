@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+*.iml
+.vscode
+
+# Build artifacts
+target/
+*/target/
+
+# Node modules (frontend)
+site/node_modules/
+site/dist/
+
+# Documentation
+docs/
+*.md
+
+# Local data
+data/
+*.db
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
