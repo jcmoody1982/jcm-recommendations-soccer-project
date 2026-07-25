@@ -7,8 +7,8 @@ interface Props {
 }
 
 const CONFIDENCE_ICONS: Record<string, string> = {
-  STRONG: '🟢',
-  MODERATE: '🟡',
+  STRONG: '🔥',
+  MODERATE: '😬',
   WEAK: '🔴',
 };
 
