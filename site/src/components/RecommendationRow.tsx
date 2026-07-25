@@ -74,6 +74,15 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
       <div className={styles.mobileCard}>
         <div className={styles.mobileCardHeader}>
           <span className={styles.mobileSentiment}>{sentimentIcon}</span>
+          {recommendation.leagueImage ? (
+            <img 
+              src={recommendation.leagueImage} 
+              alt={recommendation.leagueName || 'League'} 
+              className={styles.mobileLeagueIcon}
+            />
+          ) : (
+            <span className={styles.mobileLeaguePlaceholder}>⚽</span>
+          )}
           <span className={styles.mobileFixture}>
             {recommendation.homeTeamName} vs {recommendation.awayTeamName}
           </span>

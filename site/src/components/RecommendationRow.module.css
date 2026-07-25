@@ -130,6 +130,21 @@
     font-size: 1rem;
   }
 
+  .mobileLeagueIcon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 4px;
+    padding: 2px;
+    flex-shrink: 0;
+  }
+
+  .mobileLeaguePlaceholder {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
   .mobileFixture {
     font-weight: 600;
     color: var(--text-primary);
