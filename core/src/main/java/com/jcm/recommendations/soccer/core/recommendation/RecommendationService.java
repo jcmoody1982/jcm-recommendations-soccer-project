@@ -156,6 +156,37 @@ public class RecommendationService {
         Map<RecommendationType, List<Recommendation>> grouped = all.stream()
                 .collect(Collectors.groupingBy(Recommendation::getType));
 
+        // Apply type-specific sorting
+        grouped.forEach((type, recommendations) -> {
+            if (type == RecommendationType.BOOKING_POINTS) {
+                // Sort booking points by market direction:
+                // Under markets: ascending (lower expected points = better)
+                // Over markets: descending (higher expected points = better)
+                recommendations.sort((a, b) -> {
+                    boolean aIsUnder = a.getMarket() != null && a.getMarket().toLowerCase().contains("under");
+                    boolean bIsUnder = b.getMarket() != null && b.getMarket().toLowerCase().contains("under");
+                    
+                    // Group Under and Over separately, Under first
+                    if (aIsUnder != bIsUnder) {
+                        return aIsUnder ? -1 : 1;
+                    }
+                    
+                    // Within same market direction, sort appropriately
+                    if (aIsUnder) {
+                        // Under: ascending by score (lower = better)
+                        return Double.compare(a.getScore(), b.getScore());
+                    } else {
+                        // Over: descending by score (higher = better)
+                        return Double.compare(b.getScore(), a.getScore());
+                    }
+                });
+            } else if (type == RecommendationType.UNDER_GOALS || 
+                       type == RecommendationType.UNDER_CORNERS) {
+                // For Under markets, lower expected values are better
+                recommendations.sort((a, b) -> Double.compare(a.getScore(), b.getScore()));
+            }
+        });
+
         log.info("Grouped recommendations: types={}, totalRecs={}",
                 grouped.size(), all.size());
 
