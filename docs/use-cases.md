@@ -1452,7 +1452,7 @@ Recommend when Value ≥ 5%
 - Value vs odds indicator
 - Key factor highlights
 
-**Status:** Draft
+**Status:** `Implemented`
 
 ---
 
@@ -1535,7 +1535,7 @@ Adjustments:
 - Key supporting stats (goals avg, clean sheet %, etc.)
 - Expected odds range indication
 
-**Status:** Draft
+**Status:** `Implemented`
 
 ---
 
@@ -1646,7 +1646,7 @@ Combined Mismatch Score = Gap Score × Quality Score Multiplier
 - "Upset Watch" - Underdog has factors in their favor
 - "Goals Expected" - High-scoring game likely
 
-**Status:** Draft
+**Status:** `Implemented`
 
 ---
 
