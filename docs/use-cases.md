@@ -2045,7 +2045,13 @@ GET /api/recommendations/grouped?daysAhead=7
 - [ ] Empty shortlist shows disabled export button
 - [ ] Works on both desktop and mobile
 
-**Status:** Draft
+**Design Notes:**
+- Light mode design with compact cards
+- Include league icons next to fixtures
+- Combined odds displayed in footer
+- AccaBaccaGlory branding in header
+
+**Status:** `Reviewed`
 
 ---
 
