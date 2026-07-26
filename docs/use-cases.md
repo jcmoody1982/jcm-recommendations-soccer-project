@@ -1995,6 +1995,230 @@ GET /api/recommendations/grouped?daysAhead=7
 
 ---
 
+#### UC-027: Export Shortlist - Share & Export Picks
+
+**Goal:** Allow users to export their shortlisted picks in shareable formats (image, text, or link) for sharing on social media or with friends.
+
+**User Story:** As a user, I want to export my shortlist as an image or text so that I can share my picks with friends or on social media.
+
+**Data Required:**
+- Shortlist items from localStorage/context
+- Full recommendation details (fixture, market, odds, confidence, date/time)
+- Branding elements (logo, colors)
+
+**Export Formats:**
+
+1. **Image Export (Primary)**
+   - Branded card/graphic with AccaBaccaGlory logo
+   - Shows all shortlisted picks in a visually appealing format
+   - Includes: Fixture, Selection, Odds, Confidence indicator
+   - Date/time stamp of when exported
+   - Optimized for social media sharing (Instagram story, Twitter)
+
+2. **Text Export**
+   - Plain text format for copying to clipboard
+   - Format: `[Date] [Fixture] - [Selection] @ [Odds] ([Confidence])`
+   - Includes total combined odds if multiple picks
+
+3. **Share Link (Future)**
+   - Generate unique URL that displays the shortlist
+   - Link expires after X days or after matches complete
+
+**UI Components:**
+- Export button on Shortlist page (share icon)
+- Export modal with format options
+- Preview of export before sharing
+- "Copy to clipboard" for text format
+- "Download image" for image format
+- Native share sheet integration (mobile)
+
+**Image Generation Approach:**
+- Use HTML Canvas or html2canvas library
+- Server-side generation alternative for consistency
+- Template with slots for picks data
+
+**Acceptance Criteria:**
+- [ ] Export button visible on Shortlist page when items exist
+- [ ] Image export generates a branded graphic with all picks
+- [ ] Text export copies formatted picks to clipboard
+- [ ] Image can be downloaded or shared via native share
+- [ ] Empty shortlist shows disabled export button
+- [ ] Works on both desktop and mobile
+
+**Status:** Draft
+
+---
+
+#### UC-028: Performance Tracking - Historical Hit Rates
+
+**Goal:** Track the historical accuracy of recommendations to show users how well each recommendation type performs over time, building trust and helping users make informed decisions.
+
+**User Story:** As a user, I want to see how accurate past recommendations have been so that I can understand which recommendation types are most reliable.
+
+**Data Required:**
+- Historical recommendations (stored before match starts)
+- Match results (final scores, cards, corners, etc.)
+- Outcome resolution (win/loss/void for each recommendation)
+
+**Backend Requirements:**
+
+1. **Recommendation Storage:**
+   - Store all generated recommendations with timestamp
+   - Include all factors and confidence levels
+   - Link to fixture ID for result matching
+
+2. **Result Processing:**
+   - After match completion, fetch final results
+   - Resolve each recommendation: WIN / LOSS / VOID / PUSH
+   - Calculate running statistics per type
+
+3. **Statistics Calculated:**
+   - Hit rate % per recommendation type (last 7/30/90 days)
+   - Hit rate by confidence level (Strong vs Moderate)
+   - ROI % (if odds were tracked)
+   - Streak tracking (current win/loss streak)
+   - Total picks analyzed
+
+**Database Schema Additions:**
+```
+RecommendationHistory:
+  - id
+  - fixtureId
+  - type (RecommendationType)
+  - market (e.g., "BTTS Yes", "Over 2.5")
+  - confidence
+  - score
+  - odds (if available)
+  - generatedAt
+  - resolvedAt
+  - outcome (WIN/LOSS/VOID/PUSH)
+  - matchResult (stored JSON of relevant stats)
+```
+
+**UI Components:**
+
+1. **Performance Dashboard Page** (`/performance`)
+   - Overall hit rate summary
+   - Hit rate by recommendation type (table/chart)
+   - Filter by time period (7d / 30d / 90d / All time)
+   - Filter by confidence level
+
+2. **Type Performance Cards:**
+   - Type name and icon
+   - Hit rate % with trend indicator (↑↓)
+   - Sample size (e.g., "based on 127 picks")
+   - ROI % if odds tracked
+
+3. **Visual Elements:**
+   - Bar chart showing hit rates by type
+   - Line chart showing hit rate over time
+   - Color coding: Green (>55%), Amber (45-55%), Red (<45%)
+
+**API Endpoints:**
+- `GET /api/performance/summary` - Overall stats
+- `GET /api/performance/by-type` - Stats per recommendation type
+- `GET /api/performance/history` - Recent resolved picks
+
+**Acceptance Criteria:**
+- [ ] Recommendations are stored before matches start
+- [ ] Results are fetched and outcomes resolved after matches
+- [ ] Performance page shows hit rate by type
+- [ ] Time period filter works correctly
+- [ ] Confidence level breakdown available
+- [ ] Stats update automatically after matches complete
+- [ ] Minimum sample size indicator (e.g., "Not enough data" if < 10 picks)
+
+**Status:** Draft
+
+---
+
+#### UC-029: Push Notifications - High Confidence Alerts
+
+**Goal:** Notify users when high-confidence recommendations become available, ensuring they don't miss valuable betting opportunities.
+
+**User Story:** As a user, I want to receive notifications when strong recommendations are available so that I don't miss time-sensitive betting opportunities.
+
+**Notification Triggers:**
+1. **New Strong Recommendation** - When a STRONG confidence pick is generated
+2. **Match Starting Soon** - Reminder for shortlisted picks (30 min / 1 hour before)
+3. **Daily Digest** - Summary of best picks for the day (optional)
+
+**Technical Approach:**
+
+1. **Web Push Notifications (PWA)**
+   - Service Worker registration
+   - Push API subscription
+   - Backend notification service
+
+2. **Notification Preferences:**
+   - Enable/disable all notifications
+   - Choose which types to receive alerts for
+   - Set quiet hours (no notifications between X and Y)
+   - Frequency limit (max N notifications per day)
+
+**Backend Requirements:**
+
+1. **Push Subscription Storage:**
+   ```
+   PushSubscription:
+     - id
+     - endpoint
+     - keys (p256dh, auth)
+     - userId (optional, for logged-in users)
+     - createdAt
+     - preferences (JSON)
+   ```
+
+2. **Notification Service:**
+   - Web Push library (e.g., web-push for Node.js)
+   - Queue system for sending notifications
+   - Rate limiting per subscriber
+
+3. **Trigger Points:**
+   - After recommendation generation (check for STRONG confidence)
+   - Scheduled job for match reminders
+   - Daily digest at configurable time
+
+**UI Components:**
+
+1. **Notification Settings** (in Settings dropdown)
+   - Master toggle: Enable notifications
+   - Per-type toggles for each recommendation type
+   - Match reminder toggle + time selection
+   - Daily digest toggle + time selection
+   - Quiet hours configuration
+
+2. **Permission Request Flow:**
+   - Subtle prompt after user interaction (not on page load)
+   - Explain value: "Get notified about high-confidence picks"
+   - Respect "Block" - don't ask again
+
+3. **Notification Content:**
+   - Title: "🔥 Strong Pick Available"
+   - Body: "[Home] vs [Away] - [Market] @ [Odds]"
+   - Action: "View Pick" → Opens recommendation
+   - Icon: AccaBaccaGlory logo
+
+**Privacy Considerations:**
+- Anonymous subscriptions (no account required)
+- Clear unsubscribe option
+- No tracking of notification interactions (beyond delivery)
+
+**Acceptance Criteria:**
+- [ ] Users can enable push notifications
+- [ ] Permission prompt appears at appropriate time
+- [ ] Notifications sent for STRONG confidence picks
+- [ ] Match reminders sent for shortlisted items
+- [ ] Settings allow granular control of notification types
+- [ ] Quiet hours respected
+- [ ] Unsubscribe works correctly
+- [ ] Works on desktop browsers (Chrome, Firefox, Edge)
+- [ ] Works on mobile browsers (where supported)
+
+**Status:** Draft
+
+---
+
 ### iOS Native App
 
 _Use cases for the iOS mobile application._
