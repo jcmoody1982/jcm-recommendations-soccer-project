@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useShortlist } from '../contexts/ShortlistContext';
@@ -29,9 +29,27 @@ export default function MainLayout() {
     setMobileMenuOpen(prev => !prev);
   };
 
-  const closeMobileMenu = () => {
+  const closeMobileMenu = useCallback(() => {
     setMobileMenuOpen(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        closeMobileMenu();
+      }
+    };
+
+    if (mobileMenuOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen, closeMobileMenu]);
 
   return (
     <div className={styles.layout}>
@@ -76,41 +94,48 @@ export default function MainLayout() {
         </button>
 
         {mobileMenuOpen && (
-          <div className={styles.mobileMenu}>
-            <nav className={styles.mobileNav}>
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`${styles.mobileNavLink} ${
-                    location.pathname === item.path ? styles.active : ''
-                  }`}
-                  onClick={closeMobileMenu}
-                >
-                  {item.label}
-                  {item.showBadge && shortlistCount > 0 && (
-                    <span className={styles.badge}>{shortlistCount}</span>
-                  )}
-                </Link>
-              ))}
-            </nav>
-            
-            <div className={styles.mobileSettings}>
-              <span className={styles.mobileSettingsLabel}>Theme</span>
-              <div className={styles.mobileThemeOptions}>
-                {THEME_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    className={`${styles.mobileThemeOption} ${theme === option.value ? styles.active : ''}`}
-                    onClick={() => setTheme(option.value)}
+          <>
+            <div 
+              className={styles.backdrop} 
+              onClick={closeMobileMenu}
+              aria-hidden="true"
+            />
+            <div className={styles.mobileMenu}>
+              <nav className={styles.mobileNav}>
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`${styles.mobileNavLink} ${
+                      location.pathname === item.path ? styles.active : ''
+                    }`}
+                    onClick={closeMobileMenu}
                   >
-                    <span>{option.icon}</span>
-                    <span>{option.label}</span>
-                  </button>
+                    {item.label}
+                    {item.showBadge && shortlistCount > 0 && (
+                      <span className={styles.badge}>{shortlistCount}</span>
+                    )}
+                  </Link>
                 ))}
+              </nav>
+              
+              <div className={styles.mobileSettings}>
+                <span className={styles.mobileSettingsLabel}>Theme</span>
+                <div className={styles.mobileThemeOptions}>
+                  {THEME_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      className={`${styles.mobileThemeOption} ${theme === option.value ? styles.active : ''}`}
+                      onClick={() => setTheme(option.value)}
+                    >
+                      <span>{option.icon}</span>
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          </>
         )}
       </header>
 

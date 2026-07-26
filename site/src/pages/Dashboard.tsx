@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { leagueService } from '../services/api';
-import { CountrySection } from '../components/CountrySection';
+import { CountrySection, DashboardSkeleton } from '../components';
 import type { CountryGroup } from '../types';
 import styles from './Dashboard.module.css';
 
 export default function Dashboard() {
-  const { data: overview, isLoading, error } = useQuery({
+  const { data: overview, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['league-overview'],
     queryFn: () => leagueService.getOverview(),
   });
@@ -23,13 +23,32 @@ export default function Dashboard() {
   }, [overview]);
 
   if (isLoading) {
-    return <div className={styles.loading}>Loading competitions...</div>;
+    return (
+      <div className={styles.dashboard}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Fixtures</h1>
+        </header>
+        <DashboardSkeleton />
+      </div>
+    );
   }
 
-  if (error) {
+  if (isError) {
     return (
-      <div className={styles.error}>
-        Failed to load competitions. Please try again later.
+      <div className={styles.dashboard}>
+        <header className={styles.header}>
+          <h1 className={styles.title}>Fixtures</h1>
+        </header>
+        <div className={styles.error}>
+          <div className={styles.errorIcon}>⚠️</div>
+          <h2 className={styles.errorTitle}>Failed to load fixtures</h2>
+          <p className={styles.errorMessage}>
+            {error instanceof Error ? error.message : 'An unexpected error occurred.'}
+          </p>
+          <button className={styles.retryButton} onClick={() => refetch()}>
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
