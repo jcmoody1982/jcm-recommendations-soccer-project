@@ -29,7 +29,7 @@ const SECTION_ORDER: RecommendationType[] = [
 export default function Recommendations() {
   const [daysAhead, setDaysAhead] = useState(7);
 
-  const { data: groupedRecommendations, isLoading } = useQuery({
+  const { data: groupedRecommendations, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['recommendations-grouped', daysAhead],
     queryFn: () => recommendationService.getGrouped(daysAhead),
   });
@@ -59,6 +59,17 @@ export default function Recommendations() {
 
       {isLoading ? (
         <div className={styles.loading}>Loading recommendations...</div>
+      ) : isError ? (
+        <div className={styles.error}>
+          <div className={styles.errorIcon}>⚠️</div>
+          <h2 className={styles.errorTitle}>Failed to load recommendations</h2>
+          <p className={styles.errorMessage}>
+            {error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'}
+          </p>
+          <button className={styles.retryButton} onClick={() => refetch()}>
+            Try Again
+          </button>
+        </div>
       ) : groupedRecommendations && totalCount > 0 ? (
         <div className={styles.sections}>
           {SECTION_ORDER.map((type) => {

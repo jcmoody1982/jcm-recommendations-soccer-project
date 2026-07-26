@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useShortlist } from '../contexts/ShortlistContext';
+import { SettingsDropdown } from '../components/SettingsDropdown';
 import styles from './MainLayout.module.css';
 
 const navItems = [
   { path: '/', label: 'Recommendations' },
-  { path: '/shortlist', label: 'Shortlist' },
+  { path: '/shortlist', label: 'Shortlist', showBadge: true },
   { path: '/fixtures', label: 'Fixtures' },
 ];
 
@@ -21,6 +23,7 @@ export default function MainLayout() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { shortlistCount } = useShortlist();
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(prev => !prev);
@@ -50,14 +53,15 @@ export default function MainLayout() {
               }`}
             >
               {item.label}
+              {item.showBadge && shortlistCount > 0 && (
+                <span className={styles.badge}>{shortlistCount}</span>
+              )}
             </Link>
           ))}
         </nav>
 
         <div className={styles.headerActions}>
-          <button className={styles.settingsButton} aria-label="Settings">
-            ⚙️
-          </button>
+          <SettingsDropdown />
         </div>
 
         <button 
@@ -84,6 +88,9 @@ export default function MainLayout() {
                   onClick={closeMobileMenu}
                 >
                   {item.label}
+                  {item.showBadge && shortlistCount > 0 && (
+                    <span className={styles.badge}>{shortlistCount}</span>
+                  )}
                 </Link>
               ))}
             </nav>
