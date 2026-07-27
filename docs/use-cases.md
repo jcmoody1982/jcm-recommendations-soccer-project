@@ -2051,7 +2051,7 @@ GET /api/recommendations/grouped?daysAhead=7
 - Combined odds displayed in footer
 - AccaBaccaGlory branding in header
 
-**Status:** `Reviewed`
+**Status:** `Implemented`
 
 ---
 
