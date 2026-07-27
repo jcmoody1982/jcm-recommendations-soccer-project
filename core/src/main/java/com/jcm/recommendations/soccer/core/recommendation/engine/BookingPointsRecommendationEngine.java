@@ -19,12 +19,13 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
     private static final int YELLOW_CARD_POINTS = 10;
     private static final int RED_CARD_POINTS = 25;
 
-    private static final double WEIGHT_HOME_CARDS = 0.20;
-    private static final double WEIGHT_AWAY_CARDS = 0.20;
-    private static final double WEIGHT_REFEREE_CARDS = 0.25;
-    private static final double WEIGHT_RED_CARD_RISK = 0.10;
-    private static final double WEIGHT_REFEREE_RELIABILITY = 0.10;
-    private static final double WEIGHT_MATCH_INTENSITY = 0.15;
+    private static final double WEIGHT_HOME_CARDS = 0.18;
+    private static final double WEIGHT_AWAY_CARDS = 0.18;
+    private static final double WEIGHT_REFEREE_CARDS = 0.22;
+    private static final double WEIGHT_RED_CARD_RISK = 0.08;
+    private static final double WEIGHT_REFEREE_RELIABILITY = 0.09;
+    private static final double WEIGHT_MATCH_INTENSITY = 0.10;
+    private static final double WEIGHT_API_CARDS_POTENTIAL = 0.15;
 
     private static final double THRESHOLD_STRONG_OVER = 50.0;
     private static final double THRESHOLD_MODERATE_OVER = 40.0;
@@ -108,11 +109,17 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
         double redCardRisk = calculateRedCardRisk(context);
         double matchIntensity = calculateMatchIntensity(context);
 
+        double apiCardsPotential = 40.0;
+        if (context.hasPotentials() && context.getPotentials().getCardsPotential() != null) {
+            apiCardsPotential = context.getPotentials().getCardsPotential();
+        }
+
         double basePoints = (homeCardsAvg * WEIGHT_HOME_CARDS)
                 + (awayCardsAvg * WEIGHT_AWAY_CARDS)
                 + (refereeCardsAvg * WEIGHT_REFEREE_CARDS)
                 + (redCardRisk * WEIGHT_RED_CARD_RISK)
-                + (refereeReliability * refereeCardsAvg * WEIGHT_REFEREE_RELIABILITY);
+                + (refereeReliability * refereeCardsAvg * WEIGHT_REFEREE_RELIABILITY)
+                + (apiCardsPotential * WEIGHT_API_CARDS_POTENTIAL);
 
         return basePoints * matchIntensity;
     }
@@ -201,6 +208,10 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
             factors.put("refereeCardsAvg", safeDouble(refStats.getCardsPerMatchOverall()));
             factors.put("refereeAppearances", refStats.getAppearancesOverall());
             factors.put("refereeReliability", calculateRefereeReliability(refStats));
+        }
+
+        if (context.hasPotentials() && context.getPotentials().getCardsPotential() != null) {
+            factors.put("apiCardsPotential", context.getPotentials().getCardsPotential());
         }
 
         return factors;

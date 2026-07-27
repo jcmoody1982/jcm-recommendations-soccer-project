@@ -226,19 +226,33 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     }
 
     private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+        int matchesAtVenue = calculateMatchesAtVenue(stats, isHome);
+        if (matchesAtVenue == 0) {
             return 33.3;
         }
         int wins = isHome ? safeInt(stats.getSeasonWinsHome()) : safeInt(stats.getSeasonWinsAway());
-        return (wins * 100.0) / stats.getMatchesPlayed();
+        return (wins * 100.0) / matchesAtVenue;
     }
 
     private double calculateLossPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+        int matchesAtVenue = calculateMatchesAtVenue(stats, isHome);
+        if (matchesAtVenue == 0) {
             return 33.3;
         }
         int losses = isHome ? safeInt(stats.getSeasonLossesHome()) : safeInt(stats.getSeasonLossesAway());
-        return (losses * 100.0) / stats.getMatchesPlayed();
+        return (losses * 100.0) / matchesAtVenue;
+    }
+
+    private int calculateMatchesAtVenue(TeamSeasonStats stats, boolean isHome) {
+        if (isHome) {
+            return safeInt(stats.getSeasonWinsHome()) 
+                    + safeInt(stats.getSeasonDrawsHome()) 
+                    + safeInt(stats.getSeasonLossesHome());
+        } else {
+            return safeInt(stats.getSeasonWinsAway()) 
+                    + safeInt(stats.getSeasonDrawsAway()) 
+                    + safeInt(stats.getSeasonLossesAway());
+        }
     }
 
     private double calculateFormWinPct(Integer wins) {

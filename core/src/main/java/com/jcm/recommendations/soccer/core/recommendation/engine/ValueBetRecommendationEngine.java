@@ -233,27 +233,51 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
     }
 
     private double calculateHomeWinProbability(FixtureContext context) {
-        if (context.getHomeTeamStats() == null || context.getHomeTeamStats().getMatchesPlayed() == null) {
+        if (context.getHomeTeamStats() == null) {
+            return 0.33;
+        }
+        int homeMatches = calculateMatchesAtVenue(context.getHomeTeamStats(), true);
+        if (homeMatches == 0) {
             return 0.33;
         }
         int homeWins = context.getHomeTeamStats().getSeasonWinsHome() != null 
                 ? context.getHomeTeamStats().getSeasonWinsHome() : 0;
-        return homeWins / (double) context.getHomeTeamStats().getMatchesPlayed();
+        return homeWins / (double) homeMatches;
     }
 
     private double calculateAwayWinProbability(FixtureContext context) {
-        if (context.getAwayTeamStats() == null || context.getAwayTeamStats().getMatchesPlayed() == null) {
+        if (context.getAwayTeamStats() == null) {
+            return 0.33;
+        }
+        int awayMatches = calculateMatchesAtVenue(context.getAwayTeamStats(), false);
+        if (awayMatches == 0) {
             return 0.33;
         }
         int awayWins = context.getAwayTeamStats().getSeasonWinsAway() != null 
                 ? context.getAwayTeamStats().getSeasonWinsAway() : 0;
-        return awayWins / (double) context.getAwayTeamStats().getMatchesPlayed();
+        return awayWins / (double) awayMatches;
     }
 
     private double calculateDrawProbability(FixtureContext context) {
         double homeWin = calculateHomeWinProbability(context);
         double awayWin = calculateAwayWinProbability(context);
         return Math.max(0.1, 1.0 - homeWin - awayWin);
+    }
+
+    private int calculateMatchesAtVenue(com.jcm.recommendations.soccer.domain.TeamSeasonStats stats, boolean isHome) {
+        if (isHome) {
+            return safeInt(stats.getSeasonWinsHome()) 
+                    + safeInt(stats.getSeasonDrawsHome()) 
+                    + safeInt(stats.getSeasonLossesHome());
+        } else {
+            return safeInt(stats.getSeasonWinsAway()) 
+                    + safeInt(stats.getSeasonDrawsAway()) 
+                    + safeInt(stats.getSeasonLossesAway());
+        }
+    }
+
+    private int safeInt(Integer value) {
+        return value != null ? value : 0;
     }
 
     private ConfidenceLevel determineConfidence(double valuePercentage, double expectedValue) {

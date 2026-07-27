@@ -2,6 +2,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.domain.FixturePotentials;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,16 +16,19 @@ import java.util.Optional;
 @Slf4j
 public class CornersRecommendationEngine implements RecommendationEngine {
 
-    private static final double WEIGHT_HOME_CORNERS = 0.24;
-    private static final double WEIGHT_AWAY_CORNERS = 0.24;
-    private static final double WEIGHT_HOME_FORM_CORNERS = 0.24;
-    private static final double WEIGHT_AWAY_FORM_CORNERS = 0.24;
-    private static final double WEIGHT_API_POTENTIAL = 0.04;
+    private static final double WEIGHT_HOME_CORNERS = 0.20;
+    private static final double WEIGHT_AWAY_CORNERS = 0.20;
+    private static final double WEIGHT_HOME_FORM_CORNERS = 0.20;
+    private static final double WEIGHT_AWAY_FORM_CORNERS = 0.20;
+    private static final double WEIGHT_API_POTENTIAL = 0.20;
 
     private static final double THRESHOLD_STRONG_OVER = 12.0;
     private static final double THRESHOLD_MODERATE_OVER = 10.0;
     private static final double THRESHOLD_MODERATE_UNDER = 9.5;
     private static final double THRESHOLD_STRONG_UNDER = 8.0;
+
+    private static final double API_LINE_STRONG_THRESHOLD = 65.0;
+    private static final double API_LINE_MODERATE_THRESHOLD = 55.0;
 
     @Override
     public RecommendationType getType() {
@@ -48,14 +52,32 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         ConfidenceLevel confidence;
         String market;
 
+        Double apiO85 = context.hasPotentials() ? context.getPotentials().getCornersO85Potential() : null;
+        Double apiO95 = context.hasPotentials() ? context.getPotentials().getCornersO95Potential() : null;
+        Double apiO105 = context.hasPotentials() ? context.getPotentials().getCornersO105Potential() : null;
+
         if (expectedCorners >= THRESHOLD_MODERATE_OVER) {
             type = RecommendationType.OVER_CORNERS;
-            confidence = expectedCorners >= THRESHOLD_STRONG_OVER ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
-            market = expectedCorners >= THRESHOLD_STRONG_OVER ? "Over 10.5 Corners" : "Over 9.5 Corners";
+            
+            if (expectedCorners >= THRESHOLD_STRONG_OVER || isApiLineStrong(apiO105)) {
+                market = "Over 10.5 Corners";
+                confidence = (expectedCorners >= THRESHOLD_STRONG_OVER && isApiLineModerate(apiO105)) 
+                        ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+            } else {
+                market = "Over 9.5 Corners";
+                confidence = isApiLineStrong(apiO95) ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+            }
         } else if (expectedCorners <= THRESHOLD_MODERATE_UNDER) {
             type = RecommendationType.UNDER_CORNERS;
-            confidence = expectedCorners <= THRESHOLD_STRONG_UNDER ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
-            market = expectedCorners <= THRESHOLD_STRONG_UNDER ? "Under 8.5 Corners" : "Under 9.5 Corners";
+            
+            if (expectedCorners <= THRESHOLD_STRONG_UNDER || isApiLineWeak(apiO85)) {
+                market = "Under 8.5 Corners";
+                confidence = (expectedCorners <= THRESHOLD_STRONG_UNDER && isApiLineWeak(apiO95)) 
+                        ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+            } else {
+                market = "Under 9.5 Corners";
+                confidence = isApiLineWeak(apiO95) ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+            }
         } else {
             return Optional.empty();
         }
@@ -109,22 +131,19 @@ public class CornersRecommendationEngine implements RecommendationEngine {
             awayFormCorners = safeDouble(context.getAwayTeamForm().getCornersAvgAway());
         }
 
-        double apiPotential = 9.5;
+        double apiCornersPotential = 9.5;
         if (context.hasPotentials() && context.getPotentials().getCornersPotential() != null) {
-            apiPotential = context.getPotentials().getCornersPotential();
+            apiCornersPotential = context.getPotentials().getCornersPotential();
         }
 
         double playingStyleFactor = calculatePlayingStyleFactor(homeStats, awayStats);
 
-        double baseExpected = (homeCornersAvg * WEIGHT_HOME_CORNERS / 2)
-                + (awayCornersAvg * WEIGHT_AWAY_CORNERS / 2)
-                + (homeFormCorners * WEIGHT_HOME_FORM_CORNERS / 2)
-                + (awayFormCorners * WEIGHT_AWAY_FORM_CORNERS / 2)
-                + (apiPotential * WEIGHT_API_POTENTIAL);
-
-        double weightedCorners = (homeCornersAvg + awayCornersAvg + homeFormCorners + awayFormCorners) / 2.0;
+        double statsBasedExpected = (homeCornersAvg + awayCornersAvg + homeFormCorners + awayFormCorners) / 2.0;
         
-        return weightedCorners * playingStyleFactor;
+        double expected = (statsBasedExpected * (1 - WEIGHT_API_POTENTIAL)) 
+                + (apiCornersPotential * WEIGHT_API_POTENTIAL);
+        
+        return expected * playingStyleFactor;
     }
 
     private double calculatePlayingStyleFactor(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
@@ -164,8 +183,20 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         factors.put("awayCornersAvg", safeDouble(awayStats.getCornersAvgAway()));
         factors.put("playingStyleFactor", calculatePlayingStyleFactor(homeStats, awayStats));
 
-        if (context.hasPotentials() && context.getPotentials().getCornersPotential() != null) {
-            factors.put("apiCornersPotential", context.getPotentials().getCornersPotential());
+        if (context.hasPotentials()) {
+            FixturePotentials potentials = context.getPotentials();
+            if (potentials.getCornersPotential() != null) {
+                factors.put("apiCornersPotential", potentials.getCornersPotential());
+            }
+            if (potentials.getCornersO85Potential() != null) {
+                factors.put("apiCornersO85Potential", potentials.getCornersO85Potential());
+            }
+            if (potentials.getCornersO95Potential() != null) {
+                factors.put("apiCornersO95Potential", potentials.getCornersO95Potential());
+            }
+            if (potentials.getCornersO105Potential() != null) {
+                factors.put("apiCornersO105Potential", potentials.getCornersO105Potential());
+            }
         }
 
         if (context.hasRecentForm()) {
@@ -187,5 +218,17 @@ public class CornersRecommendationEngine implements RecommendationEngine {
 
     private double safeDouble(Double value) {
         return value != null ? value : 5.0;
+    }
+
+    private boolean isApiLineStrong(Double potential) {
+        return potential != null && potential >= API_LINE_STRONG_THRESHOLD;
+    }
+
+    private boolean isApiLineModerate(Double potential) {
+        return potential != null && potential >= API_LINE_MODERATE_THRESHOLD;
+    }
+
+    private boolean isApiLineWeak(Double potential) {
+        return potential != null && potential < (100 - API_LINE_STRONG_THRESHOLD);
     }
 }
