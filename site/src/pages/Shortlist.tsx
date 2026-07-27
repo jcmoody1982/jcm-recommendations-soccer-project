@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useShortlist } from '../contexts/ShortlistContext';
 import { recommendationService } from '../services/api';
-import { RecommendationRow } from '../components/RecommendationRow';
+import { RecommendationRow, ExportModal } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
 import styles from './Shortlist.module.css';
 
@@ -28,6 +29,7 @@ const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string; 
 
 export default function Shortlist() {
   const { shortlist, clearShortlist } = useShortlist();
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const { data: allRecommendations, isLoading } = useQuery({
     queryKey: ['recommendations-grouped', 7],
@@ -63,11 +65,22 @@ export default function Shortlist() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Shortlist</h1>
-        {shortlist.length > 0 && (
-          <button className={styles.clearButton} onClick={clearShortlist}>
-            Clear All
-          </button>
-        )}
+        <div className={styles.headerActions}>
+          {shortlistedRecommendations.length > 0 && (
+            <button 
+              className={styles.exportButton} 
+              onClick={() => setShowExportModal(true)}
+              aria-label="Export shortlist"
+            >
+              📤 Export
+            </button>
+          )}
+          {shortlist.length > 0 && (
+            <button className={styles.clearButton} onClick={clearShortlist}>
+              Clear All
+            </button>
+          )}
+        </div>
       </header>
 
       {isLoading ? (
@@ -109,6 +122,12 @@ export default function Shortlist() {
       <footer className={styles.footer}>
         <span className={styles.totalCount}>{shortlist.length} shortlisted pick{shortlist.length !== 1 ? 's' : ''}</span>
       </footer>
+
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        recommendations={shortlistedRecommendations}
+      />
     </div>
   );
 }
