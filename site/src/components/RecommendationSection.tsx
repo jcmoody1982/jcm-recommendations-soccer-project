@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { Recommendation, RecommendationType } from '../types';
 import { RecommendationRow } from './RecommendationRow';
-import { RecommendationIcons, ChartIcon } from './Icons';
 import styles from './RecommendationSection.module.css';
 
 interface Props {
@@ -13,29 +12,30 @@ interface Props {
 
 interface SectionConfig {
   title: string;
+  icon: string;
   scoreLabel: string;
   showPrice: boolean;
 }
 
 const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
-  BTTS: { title: 'Both Teams To Score', scoreLabel: 'Score', showPrice: true },
-  OVER_GOALS: { title: 'Over Goals', scoreLabel: 'Score', showPrice: true },
-  UNDER_GOALS: { title: 'Under Goals', scoreLabel: 'Score', showPrice: true },
-  BOOKING_POINTS: { title: 'Booking Points', scoreLabel: 'Predicted Points', showPrice: false },
-  VALUE_BET: { title: 'Value Bets', scoreLabel: 'Score', showPrice: true },
-  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', scoreLabel: 'Form Divergence', showPrice: false },
-  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', scoreLabel: 'Form Divergence', showPrice: false },
-  OVER_CORNERS: { title: 'Over Corners', scoreLabel: 'Predicted Corners', showPrice: false },
-  UNDER_CORNERS: { title: 'Under Corners', scoreLabel: 'Predicted Corners', showPrice: false },
-  CLEAN_SHEET: { title: 'Clean Sheet', scoreLabel: 'Score', showPrice: false },
-  FIRST_HALF_GOALS: { title: 'First Half Goals', scoreLabel: 'Confidence', showPrice: false },
-  SECOND_HALF_GOALS: { title: 'Second Half Goals', scoreLabel: 'Score', showPrice: false },
-  MATCH_RESULT: { title: 'Match Result', scoreLabel: 'Score', showPrice: true },
-  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', scoreLabel: 'Disparity Index', showPrice: false },
-  DRAW: { title: 'Draw', scoreLabel: 'Score', showPrice: true },
-  DOUBLE_CHANCE: { title: 'Double Chance', scoreLabel: 'Probability', showPrice: false },
-  RESULT_BTTS: { title: 'Result + BTTS', scoreLabel: 'Combined', showPrice: false },
-  TOP_VS_BOTTOM: { title: 'Top vs Bottom', scoreLabel: 'Quality Score', showPrice: false },
+  BTTS: { title: 'Both Teams To Score', icon: '⚽', scoreLabel: 'Score', showPrice: true },
+  OVER_GOALS: { title: 'Over Goals', icon: '🎯', scoreLabel: 'Score', showPrice: true },
+  UNDER_GOALS: { title: 'Under Goals', icon: '🛡️', scoreLabel: 'Score', showPrice: true },
+  BOOKING_POINTS: { title: 'Booking Points', icon: '🟨', scoreLabel: 'Predicted Points', showPrice: false },
+  VALUE_BET: { title: 'Value Bets', icon: '💰', scoreLabel: 'Score', showPrice: true },
+  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', icon: '🔥', scoreLabel: 'Form Divergence', showPrice: false },
+  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', icon: '📉', scoreLabel: 'Form Divergence', showPrice: false },
+  OVER_CORNERS: { title: 'Over Corners', icon: '📐', scoreLabel: 'Predicted Corners', showPrice: false },
+  UNDER_CORNERS: { title: 'Under Corners', icon: '📏', scoreLabel: 'Predicted Corners', showPrice: false },
+  CLEAN_SHEET: { title: 'Clean Sheet', icon: '🧤', scoreLabel: 'Score', showPrice: false },
+  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', scoreLabel: 'Confidence', showPrice: false },
+  SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣', scoreLabel: 'Score', showPrice: false },
+  MATCH_RESULT: { title: 'Match Result', icon: '🏆', scoreLabel: 'Score', showPrice: true },
+  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', scoreLabel: 'Disparity Index', showPrice: false },
+  DRAW: { title: 'Draw', icon: '🤝', scoreLabel: 'Score', showPrice: true },
+  DOUBLE_CHANCE: { title: 'Double Chance', icon: '🎲', scoreLabel: 'Probability', showPrice: false },
+  RESULT_BTTS: { title: 'Result + BTTS', icon: '🎯⚽', scoreLabel: 'Combined', showPrice: false },
+  TOP_VS_BOTTOM: { title: 'Top vs Bottom', icon: '⬆️⬇️', scoreLabel: 'Quality Score', showPrice: false },
 };
 
 export function RecommendationSection({ 
@@ -46,8 +46,7 @@ export function RecommendationSection({
 }: Props) {
   const [visibleCount, setVisibleCount] = useState(initialItems);
   
-  const config = SECTION_CONFIG[type] || { title: type, scoreLabel: 'Score', showPrice: true };
-  const IconComponent = RecommendationIcons[type] || ChartIcon;
+  const config = SECTION_CONFIG[type] || { title: type, icon: '📊', scoreLabel: 'Score', showPrice: true };
   
   const visibleRecommendations = recommendations.slice(0, visibleCount);
   const hasMore = recommendations.length > visibleCount;
@@ -72,7 +71,7 @@ export function RecommendationSection({
   return (
     <section className={styles.section}>
       <h2 className={styles.header}>
-        <span className={styles.icon}><IconComponent size={22} /></span>
+        <span className={styles.icon}>{config.icon}</span>
         <span className={styles.title}>{config.title}</span>
         <span className={styles.count}>
           {visibleRecommendations.length} of {recommendations.length} picks

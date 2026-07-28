@@ -89,10 +89,6 @@
   font-size: 0.9rem;
   font-weight: 500;
   transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
 }
 
 .formatOption:hover {
@@ -208,18 +204,7 @@
 }
 
 .exportConfidence {
-  font-size: 1rem;
-  font-weight: bold;
-  width: 16px;
-  text-align: center;
-}
-
-.exportConfidence.strong {
-  color: #22c55e;
-}
-
-.exportConfidence.moderate {
-  color: #f59e0b;
+  font-size: 0.85rem;
 }
 
 .exportMarket {
@@ -289,10 +274,6 @@
   font-size: 0.95rem;
   font-weight: 600;
   transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
 }
 
 .exportButton:hover:not(:disabled) {

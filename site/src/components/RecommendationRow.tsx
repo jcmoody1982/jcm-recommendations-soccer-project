@@ -1,6 +1,5 @@
 import type { Recommendation } from '../types';
 import { useShortlist } from '../contexts/ShortlistContext';
-import { SoccerBallIcon, StarFilledIcon, StarOutlineIcon } from './Icons';
 import styles from './RecommendationRow.module.css';
 
 interface Props {
@@ -79,7 +78,7 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
               className={styles.leagueIcon}
             />
           ) : (
-            <span className={styles.leaguePlaceholder}><SoccerBallIcon size={24} /></span>
+            <span className={styles.leaguePlaceholder}>⚽</span>
           )}
         </span>
         <span className={styles.datetime}>
@@ -101,7 +100,7 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
           onClick={handleToggleShortlist}
           title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
         >
-          {isInShortlist ? <StarFilledIcon size={18} /> : <StarOutlineIcon size={18} />}
+          {isInShortlist ? '★' : '☆'}
         </button>
       </div>
 
@@ -118,7 +117,7 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
               className={styles.mobileLeagueIcon}
             />
           ) : (
-            <span className={styles.mobileLeaguePlaceholder}><SoccerBallIcon size={20} /></span>
+            <span className={styles.mobileLeaguePlaceholder}>⚽</span>
           )}
           <span className={styles.mobileFixture}>
             {recommendation.homeTeamName} vs {recommendation.awayTeamName}
@@ -128,7 +127,7 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
             onClick={handleToggleShortlist}
             title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
           >
-            {isInShortlist ? <StarFilledIcon size={16} /> : <StarOutlineIcon size={16} />}
+            {isInShortlist ? '★' : '☆'}
           </button>
         </div>
         <div className={styles.mobileCardBody}>

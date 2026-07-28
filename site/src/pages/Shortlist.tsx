@@ -3,29 +3,28 @@ import { useQuery } from '@tanstack/react-query';
 import { useShortlist } from '../contexts/ShortlistContext';
 import { recommendationService } from '../services/api';
 import { RecommendationRow, ExportModal } from '../components';
-import { RecommendationIcons, ChartIcon, ExportIcon, StarOutlineIcon } from '../components/Icons';
 import type { Recommendation, RecommendationType } from '../types';
 import styles from './Shortlist.module.css';
 
-const SECTION_CONFIG: Record<RecommendationType, { title: string; showPrice: boolean }> = {
-  BTTS: { title: 'Both Teams To Score', showPrice: true },
-  OVER_GOALS: { title: 'Over Goals', showPrice: true },
-  UNDER_GOALS: { title: 'Under Goals', showPrice: true },
-  BOOKING_POINTS: { title: 'Booking Points', showPrice: false },
-  VALUE_BET: { title: 'Value Bets', showPrice: true },
-  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', showPrice: false },
-  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', showPrice: false },
-  OVER_CORNERS: { title: 'Over Corners', showPrice: false },
-  UNDER_CORNERS: { title: 'Under Corners', showPrice: false },
-  CLEAN_SHEET: { title: 'Clean Sheet', showPrice: false },
-  FIRST_HALF_GOALS: { title: 'First Half Goals', showPrice: false },
-  SECOND_HALF_GOALS: { title: 'Second Half Goals', showPrice: false },
-  MATCH_RESULT: { title: 'Match Result', showPrice: true },
-  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', showPrice: false },
-  DRAW: { title: 'Draw', showPrice: true },
-  DOUBLE_CHANCE: { title: 'Double Chance', showPrice: false },
-  RESULT_BTTS: { title: 'Result + BTTS', showPrice: false },
-  TOP_VS_BOTTOM: { title: 'Top vs Bottom', showPrice: false },
+const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string; showPrice: boolean }> = {
+  BTTS: { title: 'Both Teams To Score', icon: '⚽', showPrice: true },
+  OVER_GOALS: { title: 'Over Goals', icon: '🎯', showPrice: true },
+  UNDER_GOALS: { title: 'Under Goals', icon: '🛡️', showPrice: true },
+  BOOKING_POINTS: { title: 'Booking Points', icon: '🟨', showPrice: false },
+  VALUE_BET: { title: 'Value Bets', icon: '💰', showPrice: true },
+  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', icon: '🔥', showPrice: false },
+  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', icon: '📉', showPrice: false },
+  OVER_CORNERS: { title: 'Over Corners', icon: '📐', showPrice: false },
+  UNDER_CORNERS: { title: 'Under Corners', icon: '📏', showPrice: false },
+  CLEAN_SHEET: { title: 'Clean Sheet', icon: '🧤', showPrice: false },
+  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', showPrice: false },
+  SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣', showPrice: false },
+  MATCH_RESULT: { title: 'Match Result', icon: '🏆', showPrice: true },
+  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', showPrice: false },
+  DRAW: { title: 'Draw', icon: '🤝', showPrice: true },
+  DOUBLE_CHANCE: { title: 'Double Chance', icon: '🎲', showPrice: false },
+  RESULT_BTTS: { title: 'Result + BTTS', icon: '🎯⚽', showPrice: false },
+  TOP_VS_BOTTOM: { title: 'Top vs Bottom', icon: '⬆️⬇️', showPrice: false },
 };
 
 export default function Shortlist() {
@@ -73,7 +72,7 @@ export default function Shortlist() {
               onClick={() => setShowExportModal(true)}
               aria-label="Export shortlist"
             >
-              <ExportIcon size={16} /> Export
+              📤 Export
             </button>
           )}
           {shortlist.length > 0 && (
@@ -90,13 +89,12 @@ export default function Shortlist() {
         <div className={styles.sections}>
           {sortedTypes.map((type) => {
             const recommendations = groupedByType[type];
-            const config = SECTION_CONFIG[type] || { title: type, showPrice: true };
-            const IconComponent = RecommendationIcons[type] || ChartIcon;
+            const config = SECTION_CONFIG[type] || { title: type, icon: '📊', showPrice: true };
             
             return (
               <section key={type} className={styles.section}>
                 <h2 className={styles.sectionHeader}>
-                  <span className={styles.sectionIcon}><IconComponent size={22} /></span>
+                  <span className={styles.sectionIcon}>{config.icon}</span>
                   <span className={styles.sectionTitle}>{config.title}</span>
                   <span className={styles.sectionCount}>{recommendations.length} pick{recommendations.length !== 1 ? 's' : ''}</span>
                 </h2>
@@ -115,7 +113,7 @@ export default function Shortlist() {
         </div>
       ) : (
         <div className={styles.empty}>
-          <span className={styles.emptyIcon}><StarOutlineIcon size={48} /></span>
+          <span className={styles.emptyIcon}>☆</span>
           <h2>No picks shortlisted</h2>
           <p>Add recommendations to your shortlist by clicking the star icon on any pick.</p>
         </div>

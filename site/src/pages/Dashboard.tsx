@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { leagueService } from '../services/api';
 import { CountrySection, DashboardSkeleton } from '../components';
-import { WarningIcon } from '../components/Icons';
 import type { CountryGroup } from '../types';
 import styles from './Dashboard.module.css';
 
@@ -41,7 +40,7 @@ export default function Dashboard() {
           <h1 className={styles.title}>Fixtures</h1>
         </header>
         <div className={styles.error}>
-          <div className={styles.errorIcon}><WarningIcon size={48} /></div>
+          <div className={styles.errorIcon}>⚠️</div>
           <h2 className={styles.errorTitle}>Failed to load fixtures</h2>
           <p className={styles.errorMessage}>
             {error instanceof Error ? error.message : 'An unexpected error occurred.'}

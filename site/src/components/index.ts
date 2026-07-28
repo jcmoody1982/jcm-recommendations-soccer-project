@@ -8,4 +8,3 @@ export { CountrySection } from './CountrySection';
 export { SettingsDropdown } from './SettingsDropdown';
 export { Skeleton, RecommendationsPageSkeleton, DashboardSkeleton } from './Skeleton';
 export { ExportModal } from './ExportModal';
-export * from './Icons';
