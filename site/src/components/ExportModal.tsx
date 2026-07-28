@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import type { Recommendation } from '../types';
+import { CloseIcon, ImageIcon, TextIcon, DownloadIcon, CopyIcon, CheckIcon } from './Icons';
 import styles from './ExportModal.module.css';
 
 interface ExportModalProps {
@@ -10,27 +11,6 @@ interface ExportModalProps {
 }
 
 type ExportFormat = 'image' | 'text';
-
-const SECTION_TITLES: Record<string, string> = {
-  BTTS: 'BTTS',
-  OVER_GOALS: 'Over Goals',
-  UNDER_GOALS: 'Under Goals',
-  BOOKING_POINTS: 'Booking Points',
-  VALUE_BET: 'Value Bet',
-  WINNING_FORM_MISMATCH: 'Form Mismatch',
-  LOSING_FORM_MISMATCH: 'Form Mismatch',
-  OVER_CORNERS: 'Over Corners',
-  UNDER_CORNERS: 'Under Corners',
-  CLEAN_SHEET: 'Clean Sheet',
-  FIRST_HALF_GOALS: '1st Half Goals',
-  SECOND_HALF_GOALS: '2nd Half Goals',
-  MATCH_RESULT: 'Match Result',
-  HOME_AWAY_SPECIALIST: 'Specialist',
-  DRAW: 'Draw',
-  DOUBLE_CHANCE: 'Double Chance',
-  RESULT_BTTS: 'Result + BTTS',
-  TOP_VS_BOTTOM: 'Top vs Bottom',
-};
 
 function formatDate(unix: number): string {
   const date = new Date(unix * 1000);
@@ -148,7 +128,7 @@ export function ExportModal({ isOpen, onClose, recommendations }: ExportModalPro
         <header className={styles.header}>
           <h2 className={styles.title}>Export Shortlist</h2>
           <button className={styles.closeButton} onClick={onClose} aria-label="Close">
-            ✕
+            <CloseIcon size={18} />
           </button>
         </header>
 
@@ -157,13 +137,13 @@ export function ExportModal({ isOpen, onClose, recommendations }: ExportModalPro
             className={`${styles.formatOption} ${format === 'image' ? styles.active : ''}`}
             onClick={() => setFormat('image')}
           >
-            🖼️ Image
+            <ImageIcon size={16} /> Image
           </button>
           <button
             className={`${styles.formatOption} ${format === 'text' ? styles.active : ''}`}
             onClick={() => setFormat('text')}
           >
-            📝 Text
+            <TextIcon size={16} /> Text
           </button>
         </div>
 
@@ -193,8 +173,8 @@ export function ExportModal({ isOpen, onClose, recommendations }: ExportModalPro
                         </div>
                       </div>
                       <div className={styles.exportPickSelection}>
-                        <span className={styles.exportConfidence}>
-                          {rec.confidence === 'STRONG' ? '🔥' : '⚡'}
+                        <span className={`${styles.exportConfidence} ${rec.confidence === 'STRONG' ? styles.strong : styles.moderate}`}>
+                          {rec.confidence === 'STRONG' ? '●' : '○'}
                         </span>
                         <span className={styles.exportMarket}>{rec.market}</span>
                         {rec.odds && (
@@ -229,14 +209,14 @@ export function ExportModal({ isOpen, onClose, recommendations }: ExportModalPro
               onClick={handleImageExport}
               disabled={isExporting}
             >
-              {isExporting ? 'Generating...' : '📥 Download Image'}
+              {isExporting ? 'Generating...' : <><DownloadIcon size={16} /> Download Image</>}
             </button>
           ) : (
             <button
               className={styles.exportButton}
               onClick={handleTextExport}
             >
-              {copied ? '✓ Copied!' : '📋 Copy to Clipboard'}
+              {copied ? <><CheckIcon size={16} /> Copied!</> : <><CopyIcon size={16} /> Copy to Clipboard</>}
             </button>
           )}
         </footer>

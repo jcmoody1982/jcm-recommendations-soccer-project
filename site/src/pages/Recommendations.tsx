@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { recommendationService } from '../services/api';
 import { RecommendationSection, RecommendationsPageSkeleton } from '../components';
+import { SearchIcon, CloseIcon, WarningIcon } from '../components/Icons';
 import type { Recommendation, RecommendationType } from '../types';
 import styles from './Recommendations.module.css';
 
@@ -111,7 +112,7 @@ export default function Recommendations() {
 
       <div className={styles.filters}>
         <div className={styles.searchContainer}>
-          <span className={styles.searchIcon}>🔍</span>
+          <span className={styles.searchIcon}><SearchIcon size={18} /></span>
           <input
             type="text"
             placeholder="Search teams or leagues..."
@@ -125,7 +126,7 @@ export default function Recommendations() {
               onClick={() => setSearchQuery('')}
               aria-label="Clear search"
             >
-              ✕
+              <CloseIcon size={14} />
             </button>
           )}
         </div>
@@ -164,7 +165,7 @@ export default function Recommendations() {
         <RecommendationsPageSkeleton />
       ) : isError ? (
         <div className={styles.error}>
-          <div className={styles.errorIcon}>⚠️</div>
+          <div className={styles.errorIcon}><WarningIcon size={48} /></div>
           <h2 className={styles.errorTitle}>Failed to load recommendations</h2>
           <p className={styles.errorMessage}>
             {error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'}
