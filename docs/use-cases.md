@@ -521,41 +521,89 @@ If xG data available:
 **User Story:** As a user, I want to see expected booking points for matches so I can bet on cards markets.
 
 **Data Required:**
-- Team cards averages (home/away)
+- Team cards averages (season + form)
 - Referee cards per match stats
-- Referee yellow/red card tendencies
+- Referee over 3.5 cards percentage
+- Referee yellow/red card breakdown
+- API cards potential
 
 **Logic:**
+
+*Base Weights (when referee AND form data available):*
 ```
-Expected Booking Points = sum of:
-  - Home team cards avg per match (home) × 10      × 0.20
-  - Away team cards avg per match (away) × 10     × 0.20
-  - Referee cards per match avg × 10              × 0.25
-  - Home team red card rate × 25                  × 0.05
-  - Away team red card rate × 25                  × 0.05
-  - Referee reliability factor                    × 0.10
-    (appearances ≥ 10 = 1.0, 5-9 = 0.8, <5 = 0.5)
-  - Match intensity factor                        × 0.15
-    (derby/rivalry = 1.5, same league position ±3 = 1.2, normal = 1.0)
+Expected Booking Points = weighted sum of:
+  - Home team cards avg (season, home) × 10       × 0.12
+  - Away team cards avg (season, away) × 10      × 0.12
+  - Home team cards avg (form, home) × 10        × 0.10
+  - Away team cards avg (form, away) × 10        × 0.10
+  - Referee cards per match avg × 10             × 0.20
+  - Referee over 3.5 cards % (scaled)            × 0.08
+  - Red card risk                                × 0.06
+  - API cards potential (scaled)                 × 0.10
+  × Match intensity multiplier                   × 0.12 weight
 ```
 
-**Calculation:**
-- Base expected points from team card averages
-- Adjust heavily based on referee tendencies
-- Scale by referee data reliability
-- Boost for high-intensity matchups (derbies, close standings)
+*Redistributed Weights (when no referee data):*
+```
+  - Home team cards avg (season) × 10            × 0.20
+  - Away team cards avg (season) × 10            × 0.20
+  - Home team cards avg (form) × 10              × 0.15
+  - Away team cards avg (form) × 10              × 0.15
+  - API cards potential (scaled)                 × 0.18
+  × Match intensity multiplier
+```
 
-**Thresholds (for Over/Under 40 booking points):**
-- **Strong Over:** Expected ≥ 50 points
-- **Moderate Over:** Expected 40-49 points
-- **Moderate Under:** Expected 30-39 points
-- **Strong Under:** Expected < 30 points
+*Redistributed Weights (when no form data):*
+```
+  - Home team cards avg (season) × 10            × 0.18
+  - Away team cards avg (season) × 10            × 0.18
+  - Referee cards + O3.5% + red card risk        (normal weights)
+  - API cards potential (scaled)                 × 0.14
+  × Match intensity multiplier
+```
+
+**High-Cards Matchup Boost:**
+```
+When both teams average ≥ 2.0 cards per game, add +5 points.
+```
+
+**Referee Strictness Boost:**
+```
+When referee's Over 3.5 cards percentage ≥ 60%, add +5 points.
+```
+
+**Match Intensity Multiplier:**
+```
+Position difference ≤ 3: × 1.2 (close rivals)
+Position difference 4-6: × 1.1 (competitive)
+Position difference > 6: × 1.0 (normal)
+```
+
+**Thresholds (for Over/Under booking points markets):**
+- **Strong Over:** Expected ≥ 50 points → "Over 50 Booking Points"
+- **Moderate Over:** Expected 40-49 points → "Over 40 Booking Points"
+- **Moderate Under:** Expected 30-39 points → "Under 40 Booking Points"
+- **Strong Under:** Expected < 30 points → "Under 30 Booking Points"
 
 **Output:**
 - Ranked list by expected booking points
 - Include: team card stats, referee stats, intensity flag, confidence level
+- Factors tracked:
+  - `formDataAvailable` / `refereeDataAvailable` - data availability
+  - `homeCardsSeasonAvg` / `awayCardsSeasonAvg` - season cards averages
+  - `homeCardsFormAvg` / `awayCardsFormAvg` - form cards averages
+  - `refereeCardsAvg` - referee's cards per match
+  - `refereeOver35CardsPct` - referee's over 3.5 cards percentage
+  - `refereeYellowCards` / `refereeRedCards` - referee card breakdown
+  - `refereeAppearances` / `refereeReliability` - referee data quality
+  - `apiCardsPotential` - FootyStats cards potential
+  - `matchIntensityFactor` - intensity multiplier
+  - `homePosition` / `awayPosition` / `positionDifference` - league standings
+  - `highCardsBoostApplied` / `highCardsBoostAmount` - high-cards boost
+  - `refereeStrictnessBoostApplied` / `refereeStrictnessBoostAmount` - strictness boost
+  - `redCardRisk` - calculated red card risk
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
