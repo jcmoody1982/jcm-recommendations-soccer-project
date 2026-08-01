@@ -962,64 +962,83 @@ Under Detection:
 **Data Required:**
 - Clean sheet percentages (home/away, season + form)
 - Goals conceded averages
+- xGA (expected goals against) for defensive quality
 - Opponent failed to score percentage
-- Opponent goals scored averages
+- Opponent xG (expected goals) for attacking threat
 
 **Logic:**
 ```
+*Base Weights (when xG data IS available - total = 1.0):*
 Clean Sheet Score = weighted average of:
   - Team clean sheet % (season, home/away)        × 0.15
   - Team clean sheet % (last 5)                   × 0.15
   - Team goals conceded avg inverse (season)      × 0.10
   - Team goals conceded avg inverse (last 5)      × 0.10
-  - Team xGA (expected goals against) inverse     × 0.15
+  - Team xGA score                                × 0.15
   - Opponent failed to score % (season)           × 0.10
   - Opponent failed to score % (last 5)           × 0.10
-  - Opponent xG avg inverse                       × 0.15
+  - Opponent xG score                             × 0.15
+
+*Redistributed Weights (when xG data NOT available - total = 1.0):*
+Clean Sheet Score = weighted average of:
+  - Team clean sheet % (season, home/away)        × 0.20
+  - Team clean sheet % (last 5)                   × 0.20
+  - Team goals conceded avg inverse (season)      × 0.15
+  - Team goals conceded avg inverse (last 5)      × 0.15
+  - Opponent failed to score % (season)           × 0.15
+  - Opponent failed to score % (last 5)           × 0.15
 ```
-*(If xG/xGA unavailable from API, redistribute weight to goals conceded/scored)*
 
 **xG-Based Assessment:**
 ```
-Team Defensive xG Rating (xGA per game):
-  - <0.80 xGA = Elite defense (1.25)
-  - 0.80-1.10 xGA = Strong (1.10)
-  - 1.10-1.40 xGA = Average (1.0)
-  - >1.40 xGA = Leaky (0.80)
+Team Defensive xGA Rating (xGA per game):
+  - <0.80 xGA = Elite defense (score: 90)
+  - 0.80-1.10 xGA = Strong (score: 75)
+  - 1.10-1.40 xGA = Average (score: 50)
+  - >1.40 xGA = Leaky (score: 25)
 
 Opponent Attacking xG Rating (xG per game):
-  - <0.80 xG = Poor creators (1.25) - good for clean sheet
-  - 0.80-1.10 xG = Below average (1.10)
-  - 1.10-1.50 xG = Average (1.0)
-  - >1.50 xG = Strong creators (0.75) - bad for clean sheet
-
-xG Overperformance Flag:
-  - If opponent actual goals > xG by 20%+: regression likely (boost score × 1.10)
-  - If team actual conceded < xGA by 20%+: regression risk (reduce score × 0.90)
+  - <0.80 xG = Poor creators (score: 90) - good for clean sheet
+  - 0.80-1.10 xG = Below average (score: 75)
+  - 1.10-1.50 xG = Average (score: 50)
+  - >1.50 xG = Strong creators (score: 25) - bad for clean sheet
 ```
 
-**Defensive Strength Assessment:**
+**Defensive Strength Multiplier:**
 ```
 Goals Conceded Rating:
-  - <0.75 per game = Elite (1.2)
-  - 0.75-1.0 per game = Strong (1.1)
-  - 1.0-1.25 per game = Average (1.0)
-  - >1.25 per game = Weak (0.85)
+  - <0.75 per game = Elite (× 1.20)
+  - 0.75-1.00 per game = Strong (× 1.10)
+  - 1.00-1.25 per game = Average (× 1.00)
+  - >1.25 per game = Weak (× 0.85)
 ```
 
-**Opponent Attacking Weakness:**
+**Opponent Attacking Weakness Multiplier:**
 ```
 Failed to Score Rating:
-  - >40% failed to score = Poor attack (1.2)
-  - 30-40% = Below average (1.1)
-  - 20-30% = Average (1.0)
-  - <20% = Strong attack (0.8)
+  - >40% failed to score = Poor attack (× 1.20)
+  - 30-40% = Below average (× 1.10)
+  - 20-30% = Average (× 1.00)
+  - <20% = Strong attack (× 0.80)
 ```
 
-**Recent Form Adjustment:**
+**Hot Defensive Streak Bonus:**
 ```
-If last 3 matches all clean sheets: × 1.15 (hot defensive streak)
-If conceded in last 3 matches: × 0.90 (defensive concerns)
+If team has 3+ clean sheets in last 5 form matches: × 1.15
+```
+
+**Recent Conceded Penalty:**
+```
+If team conceded in all recent matches (0 CS in form): × 0.90
+```
+
+**xG Regression Adjustments:**
+```
+Team Regression Risk:
+  - If actual conceded < xGA by 20%+: × 0.90 (likely to regress)
+
+Opponent Overperformance:
+  - If opponent actual goals < xG by 20%+: × 1.10 (opponent likely to regress)
 ```
 
 **Thresholds:**
@@ -1027,18 +1046,24 @@ If conceded in last 3 matches: × 0.90 (defensive concerns)
 - **Moderate:** Clean Sheet Score 50-69%
 - **Weak:** Clean Sheet Score < 50%
 
-**Additional Factors:**
-1. **Home/Away Context:** Home teams keep more clean sheets typically
-2. **Head-to-Head:** If available, historical clean sheets vs this opponent
-3. **Key Defender Availability:** Flag if data suggests missing players
-4. **Opponent Motivation:** Teams with nothing to play for may lack attacking intent
-
 **Output:**
-- Ranked list of teams by clean sheet probability
+- Single best clean sheet candidate per fixture
 - Include: team defensive stats, opponent attacking stats, confidence level
-- Pair with opponent for fixture context
+- Factors tracked:
+  - `team` / `isHomeTeam` - candidate info
+  - `xgDataAvailable` - data availability flag
+  - `teamCleanSheetSeasonPct` / `teamCleanSheetFormPct` - CS percentages
+  - `teamXgaPerGame` / `teamXgaScore` / `teamDefensiveXgRating` - defensive xG
+  - `opponentFailedToScoreSeasonPct` / `opponentFailedToScoreFormPct` - opponent FTS
+  - `opponentXgPerGame` / `opponentXgScore` / `opponentAttackingXgRating` - opponent xG
+  - `defensiveRatingMultiplier` / `opponentWeaknessMultiplier` - rating adjustments
+  - `hotDefensiveStreak` - 3+ consecutive CS flag
+  - `concededInAllRecent` - no CS in form flag
+  - `xgRegressionRisk` - team conceding below xGA
+  - `opponentXgOverperformance` - opponent scoring below xG
+  - `riskFlags` / `positiveIndicators` - summary lists
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
