@@ -239,7 +239,7 @@ BTTS Score = weighted average of:
   - API btts_potential                  × 0.15
 ```
 
-**Goals Context Boost:**
+**Goals Context Boost (Prolific Scorers):**
 ```
 When both teams are prolific scorers, add +5% to final score:
   - Home team must average ≥ 1.5 goals/game at home
@@ -249,6 +249,20 @@ This addresses the limitation where two teams with the same BTTS %
 can have very different attacking profiles:
   - Team A: 65% BTTS, scores 2.1 goals/game → gets boost
   - Team B: 65% BTTS, scores 0.8 goals/game → no boost
+```
+
+**Defensive Leakiness Boost (Porous Defenses):**
+```
+When both teams have leaky defenses, add +4% to final score:
+  - Home team must concede ≥ 1.2 goals/game at home
+  - Away team must concede ≥ 1.0 goals/game away
+
+This complements the scoring boost - two leaky defenses means
+each team is likely to let the other score:
+  - Team A: Concedes 1.5/game at home → opposition likely to score
+  - Team B: Concedes 1.3/game away → opposition likely to score
+
+Both boosts can stack (max +9% combined).
 ```
 
 **Thresholds:**
@@ -265,8 +279,10 @@ can have very different attacking profiles:
 - Include: fixture details, both team stats, confidence level
 - Factors tracked:
   - `formDataAvailable` - whether form data was used
-  - `homeGoalsAvgHome` / `awayGoalsAvgAway` - goals context
-  - `goalsBoostApplied` / `goalsBoostAmount` - boost tracking
+  - `homeGoalsAvgHome` / `awayGoalsAvgAway` - attacking context
+  - `homeConcededAvgHome` / `awayConcededAvgAway` - defensive context
+  - `goalsBoostApplied` / `goalsBoostAmount` - prolific scorers boost
+  - `leakyDefenseBoostApplied` / `leakyDefenseBoostAmount` - leaky defense boost
 
 **Status:** `Implemented`
 

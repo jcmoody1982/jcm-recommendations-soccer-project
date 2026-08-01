@@ -270,6 +270,55 @@ class BttsRecommendationEngineTest {
         assertThat(result.get().getFactors()).containsKey("awayGoalsAvgAway");
     }
 
+    @Test
+    void analyze_withLeakyDefenses_appliesLeakyDefenseBoost() {
+        // Home team concedes 1.2+ at home, away team concedes 1.0+ away
+        FixtureContext context = createContextWithDefensiveData(75.0, 75.0, 14, 12);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("leakyDefenseBoostApplied")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("leakyDefenseBoostAmount")).isEqualTo(4.0);
+    }
+
+    @Test
+    void analyze_withSolidDefenses_noLeakyDefenseBoost() {
+        // Home team concedes less than 1.2 at home
+        FixtureContext context = createContextWithDefensiveData(75.0, 75.0, 8, 6);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("leakyDefenseBoostApplied")).isEqualTo(false);
+        assertThat(result.get().getFactors()).doesNotContainKey("leakyDefenseBoostAmount");
+    }
+
+    @Test
+    void analyze_tracksConcededAverages() {
+        FixtureContext context = createContextWithDefensiveData(75.0, 75.0, 12, 10);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors()).containsKey("homeConcededAvgHome");
+        assertThat(result.get().getFactors()).containsKey("awayConcededAvgAway");
+    }
+
+    @Test
+    void analyze_withBothBoosts_appliesBoth() {
+        // Both prolific scorers AND leaky defenses
+        FixtureContext context = createContextWithBothBoosts();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("goalsBoostApplied")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("leakyDefenseBoostApplied")).isEqualTo(true);
+        // Combined boost should result in higher score
+        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(80.0);
+    }
+
     private FixtureContext createContextWithGoalsData(double homeBtts, double awayBtts, 
                                                        int homeGoalsHome, int awayGoalsAway) {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
@@ -301,6 +350,82 @@ class BttsRecommendationEngineTest {
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
                 .potentials(createPotentials(70.0))
+                .build();
+    }
+
+    private FixtureContext createContextWithDefensiveData(double homeBtts, double awayBtts,
+                                                          int homeConcededHome, int awayConcededAway) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(homeBtts)
+                .seasonBttsPercentageAway(homeBtts - 5)
+                .seasonFailedToScoreOverall(3)
+                .seasonGoalsHome(12)
+                .seasonGoalsAway(10)
+                .seasonConcededHome(homeConcededHome)  // 10 home matches
+                .seasonConcededAway(8)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(awayBtts - 5)
+                .seasonBttsPercentageAway(awayBtts)
+                .seasonFailedToScoreOverall(4)
+                .seasonGoalsHome(12)
+                .seasonGoalsAway(10)
+                .seasonConcededHome(10)
+                .seasonConcededAway(awayConcededAway)  // 10 away matches
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .potentials(createPotentials(70.0))
+                .build();
+    }
+
+    private FixtureContext createContextWithBothBoosts() {
+        // High scoring AND leaky defenses
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(80.0)
+                .seasonBttsPercentageAway(75.0)
+                .seasonFailedToScoreOverall(2)
+                .seasonGoalsHome(18)      // 1.8 goals/home game (≥1.5 threshold)
+                .seasonGoalsAway(12)
+                .seasonConcededHome(14)   // 1.4 conceded/home game (≥1.2 threshold)
+                .seasonConcededAway(10)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(75.0)
+                .seasonBttsPercentageAway(80.0)
+                .seasonFailedToScoreOverall(2)
+                .seasonGoalsHome(14)
+                .seasonGoalsAway(12)      // 1.2 goals/away game (≥1.0 threshold)
+                .seasonConcededHome(10)
+                .seasonConcededAway(12)   // 1.2 conceded/away game (≥1.0 threshold)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .potentials(createPotentials(75.0))
                 .build();
     }
 

@@ -32,9 +32,14 @@ public class BttsRecommendationEngine implements RecommendationEngine {
     private static final double WEIGHT_API_POTENTIAL_NO_FORM = 0.15; // 0.10 → 0.15
 
     // Goals context boost for prolific scorers
-    private static final double GOALS_BOOST_HOME_THRESHOLD = 1.5;  // Goals per home game
-    private static final double GOALS_BOOST_AWAY_THRESHOLD = 1.0;  // Goals per away game
+    private static final double GOALS_BOOST_HOME_THRESHOLD = 1.5;  // Goals scored per home game
+    private static final double GOALS_BOOST_AWAY_THRESHOLD = 1.0;  // Goals scored per away game
     private static final double GOALS_BOOST_AMOUNT = 5.0;          // Bonus percentage points
+
+    // Defensive leakiness boost for porous defenses
+    private static final double LEAKY_DEFENSE_HOME_THRESHOLD = 1.2;  // Goals conceded per home game
+    private static final double LEAKY_DEFENSE_AWAY_THRESHOLD = 1.0;  // Goals conceded per away game
+    private static final double LEAKY_DEFENSE_BOOST_AMOUNT = 4.0;    // Bonus percentage points
 
     private static final double THRESHOLD_STRONG = 80.0;
     private static final double THRESHOLD_MODERATE = 65.0;
@@ -161,6 +166,13 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         }
         score += goalsBoost;
 
+        // Apply defensive leakiness boost for porous defenses
+        double leakyDefenseBoost = calculateLeakyDefenseBoost(homeStats, awayStats);
+        if (leakyDefenseBoost > 0) {
+            log.debug("Applying leaky defense boost of {} for fixture: {}", leakyDefenseBoost, context.getFixture().getId());
+        }
+        score += leakyDefenseBoost;
+
         return clampScore(score);
     }
     
@@ -190,6 +202,34 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         int awayMatches = stats.getMatchesPlayed() / 2;
         if (awayMatches == 0) return 0.0;
         return safeInt(stats.getSeasonGoalsAway()) / (double) awayMatches;
+    }
+    
+    private double calculateLeakyDefenseBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        double homeConcededAvg = calculateConcededAvgHome(homeStats);
+        double awayConcededAvg = calculateConcededAvgAway(awayStats);
+        
+        if (homeConcededAvg >= LEAKY_DEFENSE_HOME_THRESHOLD && awayConcededAvg >= LEAKY_DEFENSE_AWAY_THRESHOLD) {
+            return LEAKY_DEFENSE_BOOST_AMOUNT;
+        }
+        return 0.0;
+    }
+    
+    private double calculateConcededAvgHome(TeamSeasonStats stats) {
+        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+            return 0.0;
+        }
+        int homeMatches = stats.getMatchesPlayed() / 2;
+        if (homeMatches == 0) return 0.0;
+        return safeInt(stats.getSeasonConcededHome()) / (double) homeMatches;
+    }
+    
+    private double calculateConcededAvgAway(TeamSeasonStats stats) {
+        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+            return 0.0;
+        }
+        int awayMatches = stats.getMatchesPlayed() / 2;
+        if (awayMatches == 0) return 0.0;
+        return safeInt(stats.getSeasonConcededAway()) / (double) awayMatches;
     }
 
     private ConfidenceLevel determineConfidence(double score) {
@@ -238,6 +278,18 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         factors.put("goalsBoostApplied", goalsBoost > 0);
         if (goalsBoost > 0) {
             factors.put("goalsBoostAmount", goalsBoost);
+        }
+
+        // Track defensive leakiness
+        double homeConcededAvg = calculateConcededAvgHome(homeStats);
+        double awayConcededAvg = calculateConcededAvgAway(awayStats);
+        factors.put("homeConcededAvgHome", homeConcededAvg);
+        factors.put("awayConcededAvgAway", awayConcededAvg);
+        
+        double leakyDefenseBoost = calculateLeakyDefenseBoost(homeStats, awayStats);
+        factors.put("leakyDefenseBoostApplied", leakyDefenseBoost > 0);
+        if (leakyDefenseBoost > 0) {
+            factors.put("leakyDefenseBoostAmount", leakyDefenseBoost);
         }
 
         factors.put("calculatedScore", score);
