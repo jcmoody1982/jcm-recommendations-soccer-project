@@ -410,43 +410,107 @@ If xG data available:
 **User Story:** As a user, I want to see which matches are likely to have few goals so I can bet on under goals markets.
 
 **Data Required:**
-- Goals scored/conceded averages
-- Under 2.5/1.5 percentages
+- Goals scored/conceded averages (season + form)
+- Under 2.5/1.5 percentages (derived from Over percentages)
 - Clean sheet percentages
-- Defensive strength metrics
+- Failed to score percentages
+- xG for/against averages (when available)
 
 **Logic:**
+
+*Base Weights (when form data IS available - 13 factors, total = 1.0):*
 ```
 Under Goals Score = weighted average of:
-  - Home team goals scored avg (season) inverse      × 0.10
-  - Away team goals scored avg (season) inverse      × 0.10
-  - Home team goals conceded avg (season) inverse    × 0.10
-  - Away team goals conceded avg (season) inverse    × 0.10
-  - Home team goals scored avg (last 5) inverse      × 0.15
-  - Away team goals scored avg (last 5) inverse      × 0.15
-  - Home team clean sheet % (season)                 × 0.10
-  - Away team clean sheet % (season)                 × 0.10
-  - API u15_potential                                × 0.10
+  - Home team goals scored avg (season) inverse      × 0.07
+  - Away team goals scored avg (season) inverse      × 0.07
+  - Home team goals conceded avg (season) inverse    × 0.07
+  - Away team goals conceded avg (season) inverse    × 0.07
+  - Home team goals scored avg (form) inverse        × 0.10
+  - Away team goals scored avg (form) inverse        × 0.10
+  - Home team goals conceded avg (form) inverse      × 0.06
+  - Away team goals conceded avg (form) inverse      × 0.06
+  - Home team clean sheet % (season)                 × 0.08
+  - Away team clean sheet % (season)                 × 0.08
+  - Home team failed to score % (season)             × 0.06
+  - Away team failed to score % (season)             × 0.06
+  - API u15_potential                                × 0.12
 ```
 
-**Calculation:**
-- Inverse = lower goals = higher score
-- Factor in clean sheet rates and failed to score rates
+*Redistributed Weights (when form data is NOT available - 9 factors, total = 1.0):*
+```
+Under Goals Score = weighted average of:
+  - Home team goals scored avg (season) inverse      × 0.12
+  - Away team goals scored avg (season) inverse      × 0.12
+  - Home team goals conceded avg (season) inverse    × 0.10
+  - Away team goals conceded avg (season) inverse    × 0.10
+  - Home team clean sheet % (season)                 × 0.12
+  - Away team clean sheet % (season)                 × 0.12
+  - Home team failed to score % (season)             × 0.10
+  - Away team failed to score % (season)             × 0.10
+  - API u15_potential                                × 0.22
+```
+
+**Low-Scoring Context Boost:**
+```
+When combined goals average ≤ 2.0, add +5% to final score.
+Combined avg = (home scored + away scored + home conceded + away conceded) / 2
+```
+
+**Defensive Strength Boost:**
+```
+When both teams have clean sheet % ≥ 30%, add +4% to final score.
+Rewards matchups between defensively solid teams.
+```
+
+**xG Boost (Low Expected Goals):**
+```
+When combined xG (home xG + away xG) ≤ 2.2, add +4% to final score.
+xG data is blended into expected goals calculation (60% actual, 40% xG).
+```
+
+**Expected Goals Calculation:**
+```
+Actual Expected = (Home scored + Away scored + Home conceded + Away conceded) / 2
+
+If xG data available:
+  xG Expected = (Home xG for + Away xG for + Home xG against + Away xG against) / 2
+  Final Expected = (Actual Expected × 0.6) + (xG Expected × 0.4)
+```
 
 **Thresholds:**
 - **Strong:** Score ≥ 80%
 - **Moderate:** Score 65-79%
-- **Weak:** Score < 65%
+- **Weak:** Score < 65% (filtered out)
+
+**Market Selection:**
+- **Under 1.5 Goals:** Expected goals ≤ 1.5 AND score ≥ 80% AND avg Under 1.5% ≥ 25%
+- **Under 2.5 Goals:** Otherwise
 
 **Additional Filters:**
-- Combined goals average ≤ 2.5 per match
-- At least one team with Under 2.5 rate > 50%
+- Expected goals ≤ 2.5 per match
 
 **Output:**
 - Ranked list of fixtures by under goals score
 - Include: expected goals, defensive stats, confidence level
+- Factors tracked:
+  - `formDataAvailable` - whether form data was used
+  - `expectedGoals` - calculated expected goals for the match
+  - `homeGoalsScoredAvg` / `awayGoalsScoredAvg` - season scoring rates
+  - `homeGoalsConcededAvg` / `awayGoalsConcededAvg` - season conceding rates
+  - `combinedGoalsAvg` - combined average for boost calculation
+  - `homeCleanSheetPct` / `awayCleanSheetPct` - defensive strength
+  - `homeFailedToScorePct` / `awayFailedToScorePct` - scoring struggles
+  - `homeUnder15Pct` / `awayUnder15Pct` - Under 1.5 percentages
+  - `homeUnder25Pct` / `awayUnder25Pct` - Under 2.5 percentages
+  - `lowScoringBoostApplied` / `lowScoringBoostAmount` - low-scoring boost
+  - `defensiveStrengthBoostApplied` / `defensiveStrengthBoostAmount` - defensive boost
+  - `xgDataAvailable` - whether xG data is available
+  - `homeXgForAvgHome` / `awayXgForAvgAway` - expected goals scored
+  - `homeXgAgainstAvgHome` / `awayXgAgainstAvgAway` - expected goals conceded
+  - `xgBoostApplied` / `xgBoostAmount` / `combinedXg` - xG boost details
+  - Form data (when available): `homeScoredFormAvg`, `awayScoredFormAvg`, `homeConcededFormAvg`, `awayConcededFormAvg`
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
