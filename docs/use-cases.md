@@ -214,6 +214,7 @@ _Use cases for generating insights, recommendations, and predictions based on co
 - Goals scored/conceded averages
 - Failed to score percentage
 - BTTS potential from API
+- xG for/against averages (when available)
 
 **Logic:**
 
@@ -261,9 +262,22 @@ This complements the scoring boost - two leaky defenses means
 each team is likely to let the other score:
   - Team A: Concedes 1.5/game at home → opposition likely to score
   - Team B: Concedes 1.3/game away → opposition likely to score
-
-Both boosts can stack (max +9% combined).
 ```
+
+**xG (Expected Goals) Boost:**
+```
+When both teams generate high expected goals, add +3% to final score:
+  - Combined xG (home team xG at home + away team xG away) ≥ 2.5
+
+xG measures quality of chances created, providing insight beyond
+actual goals scored:
+  - Team with xG 1.5 but scoring 0.8 → unlucky but creating chances
+  - Team with xG 0.8 but scoring 1.5 → lucky but not sustainable
+  
+xG data is sourced from the FootyStats API team stats endpoint.
+```
+
+All three boosts can stack (max +12% combined).
 
 **Thresholds:**
 - **Strong:** BTTS Score ≥ 80%
@@ -283,6 +297,10 @@ Both boosts can stack (max +9% combined).
   - `homeConcededAvgHome` / `awayConcededAvgAway` - defensive context
   - `goalsBoostApplied` / `goalsBoostAmount` - prolific scorers boost
   - `leakyDefenseBoostApplied` / `leakyDefenseBoostAmount` - leaky defense boost
+  - `xgDataAvailable` - whether xG data is available
+  - `homeXgForAvgHome` / `awayXgForAvgAway` - expected goals scored
+  - `homeXgAgainstAvgHome` / `awayXgAgainstAvgAway` - expected goals conceded
+  - `xgBoostApplied` / `xgBoostAmount` / `combinedXg` - xG boost details
 
 **Status:** `Implemented`
 

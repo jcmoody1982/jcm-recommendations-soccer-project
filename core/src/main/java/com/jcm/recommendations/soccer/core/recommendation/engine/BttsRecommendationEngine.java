@@ -41,6 +41,10 @@ public class BttsRecommendationEngine implements RecommendationEngine {
     private static final double LEAKY_DEFENSE_AWAY_THRESHOLD = 1.0;  // Goals conceded per away game
     private static final double LEAKY_DEFENSE_BOOST_AMOUNT = 4.0;    // Bonus percentage points
 
+    // xG (Expected Goals) boost for high chance creation
+    private static final double XG_COMBINED_THRESHOLD = 2.5;         // Combined xG for (home xG + away xG)
+    private static final double XG_BOOST_AMOUNT = 3.0;               // Bonus percentage points
+
     private static final double THRESHOLD_STRONG = 80.0;
     private static final double THRESHOLD_MODERATE = 65.0;
     
@@ -173,6 +177,13 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         }
         score += leakyDefenseBoost;
 
+        // Apply xG boost for high chance creation
+        double xgBoost = calculateXgBoost(homeStats, awayStats);
+        if (xgBoost > 0) {
+            log.debug("Applying xG boost of {} for fixture: {}", xgBoost, context.getFixture().getId());
+        }
+        score += xgBoost;
+
         return clampScore(score);
     }
     
@@ -230,6 +241,22 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         int awayMatches = stats.getMatchesPlayed() / 2;
         if (awayMatches == 0) return 0.0;
         return safeInt(stats.getSeasonConcededAway()) / (double) awayMatches;
+    }
+    
+    private double calculateXgBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        Double homeXgFor = homeStats != null ? homeStats.getXgForAvgHome() : null;
+        Double awayXgFor = awayStats != null ? awayStats.getXgForAvgAway() : null;
+        
+        // Only apply boost if we have xG data for both teams
+        if (homeXgFor == null || awayXgFor == null) {
+            return 0.0;
+        }
+        
+        double combinedXg = homeXgFor + awayXgFor;
+        if (combinedXg >= XG_COMBINED_THRESHOLD) {
+            return XG_BOOST_AMOUNT;
+        }
+        return 0.0;
     }
 
     private ConfidenceLevel determineConfidence(double score) {
@@ -290,6 +317,33 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         factors.put("leakyDefenseBoostApplied", leakyDefenseBoost > 0);
         if (leakyDefenseBoost > 0) {
             factors.put("leakyDefenseBoostAmount", leakyDefenseBoost);
+        }
+
+        // Track xG data
+        Double homeXgFor = homeStats.getXgForAvgHome();
+        Double awayXgFor = awayStats.getXgForAvgAway();
+        Double homeXgAgainst = homeStats.getXgAgainstAvgHome();
+        Double awayXgAgainst = awayStats.getXgAgainstAvgAway();
+        
+        factors.put("xgDataAvailable", homeXgFor != null && awayXgFor != null);
+        if (homeXgFor != null) {
+            factors.put("homeXgForAvgHome", homeXgFor);
+        }
+        if (awayXgFor != null) {
+            factors.put("awayXgForAvgAway", awayXgFor);
+        }
+        if (homeXgAgainst != null) {
+            factors.put("homeXgAgainstAvgHome", homeXgAgainst);
+        }
+        if (awayXgAgainst != null) {
+            factors.put("awayXgAgainstAvgAway", awayXgAgainst);
+        }
+        
+        double xgBoost = calculateXgBoost(homeStats, awayStats);
+        factors.put("xgBoostApplied", xgBoost > 0);
+        if (xgBoost > 0) {
+            factors.put("xgBoostAmount", xgBoost);
+            factors.put("combinedXg", homeXgFor + awayXgFor);
         }
 
         factors.put("calculatedScore", score);

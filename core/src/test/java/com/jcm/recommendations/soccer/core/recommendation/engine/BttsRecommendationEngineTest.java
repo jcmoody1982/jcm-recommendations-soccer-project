@@ -319,6 +319,56 @@ class BttsRecommendationEngineTest {
         assertThat(result.get().getScore()).isGreaterThanOrEqualTo(80.0);
     }
 
+    @Test
+    void analyze_withHighXgTeams_appliesXgBoost() {
+        // Combined xG >= 2.5
+        FixtureContext context = createContextWithXgData(75.0, 75.0, 1.4, 1.2);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("xgBoostApplied")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("xgBoostAmount")).isEqualTo(3.0);
+    }
+
+    @Test
+    void analyze_withLowXgTeams_noXgBoost() {
+        // Combined xG < 2.5
+        FixtureContext context = createContextWithXgData(75.0, 75.0, 1.0, 1.0);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("xgBoostApplied")).isEqualTo(false);
+    }
+
+    @Test
+    void analyze_withoutXgData_noXgBoost() {
+        // No xG data available
+        FixtureContext context = createContextWithBttsStats(75.0, 75.0);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(false);
+        assertThat(result.get().getFactors().get("xgBoostApplied")).isEqualTo(false);
+    }
+
+    @Test
+    void analyze_tracksXgData() {
+        FixtureContext context = createContextWithXgData(75.0, 75.0, 1.5, 1.3);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors()).containsKey("homeXgForAvgHome");
+        assertThat(result.get().getFactors()).containsKey("awayXgForAvgAway");
+        assertThat(result.get().getFactors().get("homeXgForAvgHome")).isEqualTo(1.5);
+        assertThat(result.get().getFactors().get("awayXgForAvgAway")).isEqualTo(1.3);
+    }
+
     private FixtureContext createContextWithGoalsData(double homeBtts, double awayBtts, 
                                                        int homeGoalsHome, int awayGoalsAway) {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
@@ -379,6 +429,47 @@ class BttsRecommendationEngineTest {
                 .seasonGoalsAway(10)
                 .seasonConcededHome(10)
                 .seasonConcededAway(awayConcededAway)  // 10 away matches
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .potentials(createPotentials(70.0))
+                .build();
+    }
+
+    private FixtureContext createContextWithXgData(double homeBtts, double awayBtts, double homeXgFor, double awayXgFor) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(homeBtts)
+                .seasonBttsPercentageAway(homeBtts - 5)
+                .seasonFailedToScoreOverall(3)
+                .seasonFailedToScoreHome(1)
+                .seasonFailedToScoreAway(2)
+                .seasonGoalsHome(15)
+                .seasonConcededHome(12)
+                .xgForAvgHome(homeXgFor)
+                .xgAgainstAvgHome(1.0)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(awayBtts - 5)
+                .seasonBttsPercentageAway(awayBtts)
+                .seasonFailedToScoreOverall(4)
+                .seasonFailedToScoreHome(2)
+                .seasonFailedToScoreAway(2)
+                .seasonGoalsAway(12)
+                .seasonConcededAway(10)
+                .xgForAvgAway(awayXgFor)
+                .xgAgainstAvgAway(1.0)
                 .build();
 
         return FixtureContext.builder()
