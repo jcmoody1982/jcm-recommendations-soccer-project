@@ -316,39 +316,90 @@ All three boosts can stack (max +12% combined).
 - Goals scored/conceded averages (season + form)
 - Over 2.5/3.5 percentages
 - o25_potential, o35_potential from API
+- xG for/against averages (when available)
 
 **Logic:**
+
+*Base Weights (when form data IS available - 11 factors, total = 1.0):*
 ```
 Over Goals Score = weighted average of:
-  - Home team goals scored avg (season)      × 0.10
-  - Away team goals scored avg (season)      × 0.10
-  - Home team goals conceded avg (season)    × 0.10
-  - Away team goals conceded avg (season)    × 0.10
-  - Home team goals scored avg (last 5)      × 0.15
-  - Away team goals scored avg (last 5)      × 0.15
-  - Home team Over 2.5 % (season)            × 0.10
-  - Away team Over 2.5 % (season)            × 0.10
-  - API o25_potential                        × 0.10
+  - Home team goals scored avg (season)      × 0.08
+  - Away team goals scored avg (season)      × 0.08
+  - Home team goals conceded avg (season)    × 0.08
+  - Away team goals conceded avg (season)    × 0.08
+  - Home team goals scored avg (form)        × 0.12
+  - Away team goals scored avg (form)        × 0.12
+  - Home team goals conceded avg (form)      × 0.08
+  - Away team goals conceded avg (form)      × 0.08
+  - Home team Over 2.5 % (season)            × 0.08
+  - Away team Over 2.5 % (season)            × 0.08
+  - API o25_potential                        × 0.12
 ```
 
-**Calculation:**
-- Convert to expected goals: (Home scored + Away scored + Home conceded + Away conceded) / 2
-- Normalize to percentage based on historical O2.5 rates
+*Redistributed Weights (when form data is NOT available - 7 factors, total = 1.0):*
+```
+Over Goals Score = weighted average of:
+  - Home team goals scored avg (season)      × 0.15
+  - Away team goals scored avg (season)      × 0.15
+  - Home team goals conceded avg (season)    × 0.12
+  - Away team goals conceded avg (season)    × 0.12
+  - Home team Over 2.5 % (season)            × 0.12
+  - Away team Over 2.5 % (season)            × 0.12
+  - API o25_potential                        × 0.22
+```
+
+**High-Scoring Context Boost:**
+```
+When combined goals average ≥ 3.0, add +5% to final score.
+Combined avg = (home scored + away scored + home conceded + away conceded) / 2
+```
+
+**xG Boost:**
+```
+When combined xG (home xG + away xG) ≥ 2.8, add +4% to final score.
+xG data is blended into expected goals calculation (60% actual, 40% xG).
+```
+
+**Expected Goals Calculation:**
+```
+Actual Expected = (Home scored + Away scored + Home conceded + Away conceded) / 2
+
+If xG data available:
+  xG Expected = (Home xG for + Away xG for + Home xG against + Away xG against) / 2
+  Final Expected = (Actual Expected × 0.6) + (xG Expected × 0.4)
+```
 
 **Thresholds:**
 - **Strong:** Score ≥ 80%
 - **Moderate:** Score 65-79%
-- **Weak:** Score < 65%
+- **Weak:** Score < 65% (filtered out)
+
+**Market Selection:**
+- **Over 3.5 Goals:** Expected goals ≥ 3.5 AND score ≥ 80% AND avg Over 3.5% ≥ 40%
+- **Over 2.5 Goals:** Otherwise
 
 **Additional Filters:**
-- Combined goals average ≥ 2.5 per match
-- At least one team with Over 2.5 rate > 50%
+- Expected goals ≥ 2.5 per match
 
 **Output:**
 - Ranked list of fixtures by over goals score
 - Include: expected goals, team averages, confidence level
+- Factors tracked:
+  - `formDataAvailable` - whether form data was used
+  - `expectedGoals` - calculated expected goals for the match
+  - `homeGoalsScoredAvg` / `awayGoalsScoredAvg` - season scoring rates
+  - `homeGoalsConcededAvg` / `awayGoalsConcededAvg` - season conceding rates
+  - `homeOver25Pct` / `awayOver25Pct` - Over 2.5 percentages
+  - `homeOver35Pct` / `awayOver35Pct` - Over 3.5 percentages
+  - `combinedGoalsAvg` - combined average for boost calculation
+  - `highScoringBoostApplied` / `highScoringBoostAmount` - high-scoring boost
+  - `xgDataAvailable` - whether xG data is available
+  - `homeXgForAvgHome` / `awayXgForAvgAway` - expected goals scored
+  - `homeXgAgainstAvgHome` / `awayXgAgainstAvgAway` - expected goals conceded
+  - `xgBoostApplied` / `xgBoostAmount` / `combinedXg` - xG boost details
+  - Form data (when available): `homeScoredFormAvg`, `awayScoredFormAvg`, `homeConcededFormAvg`, `awayConcededFormAvg`
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
