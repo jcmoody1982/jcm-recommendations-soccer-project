@@ -2,14 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -68,16 +70,7 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
         Double odds = getOddsForMarket(context, market);
         Map<String, Object> factors = buildFactors(context, score, expectedGoals);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.OVER_GOALS)
                 .confidence(confidence)
                 .score(score)
@@ -85,7 +78,6 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
                 .odds(odds)
                 .description(buildDescription(context, confidence, expectedGoals, market))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Over Goals recommendation generated: fixtureId={}, expectedGoals={}, score={}, confidence={}, market={}", 
@@ -96,10 +88,10 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
     }
 
     private double calculateExpectedGoals(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeScoredAvg = calculateGoalsAverage(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed());
-        double awayScoredAvg = calculateGoalsAverage(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed());
-        double homeConcededAvg = calculateGoalsAverage(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed());
-        double awayConcededAvg = calculateGoalsAverage(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed());
+        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
+        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
+        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
 
         return (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
     }
@@ -108,16 +100,16 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeScoredSeason = normalizeGoals(calculateGoalsAverage(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed()));
-        double awayScoredSeason = normalizeGoals(calculateGoalsAverage(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed()));
-        double homeConcededSeason = normalizeGoals(calculateGoalsAverage(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed()));
-        double awayConcededSeason = normalizeGoals(calculateGoalsAverage(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed()));
+        double homeScoredSeason = normalizeGoals(calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0));
+        double awayScoredSeason = normalizeGoals(calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0));
+        double homeConcededSeason = normalizeGoals(calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0));
+        double awayConcededSeason = normalizeGoals(calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0));
 
         double homeScoredForm = 50.0;
         double awayScoredForm = 50.0;
         if (context.hasRecentForm()) {
-            homeScoredForm = normalizeGoals(safeDouble(context.getHomeTeamForm().getScoredAvgHome()));
-            awayScoredForm = normalizeGoals(safeDouble(context.getAwayTeamForm().getScoredAvgAway()));
+            homeScoredForm = normalizeGoals(safeDouble(context.getHomeTeamForm().getScoredAvgHome(), 1.0));
+            awayScoredForm = normalizeGoals(safeDouble(context.getAwayTeamForm().getScoredAvgAway(), 1.0));
         }
 
         double homeOver25 = safePercentage(homeStats.getSeasonOver25PercentageOverall());
@@ -138,7 +130,7 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
                 + (awayOver25 * WEIGHT_AWAY_OVER25_SEASON)
                 + (apiPotential * WEIGHT_API_POTENTIAL);
 
-        return Math.min(100.0, Math.max(0.0, score));
+        return clampScore(score);
     }
 
     private ConfidenceLevel determineConfidence(double score) {
@@ -164,8 +156,8 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
         factors.put("expectedGoals", expectedGoals);
-        factors.put("homeGoalsScoredAvg", calculateGoalsAverage(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed()));
-        factors.put("awayGoalsScoredAvg", calculateGoalsAverage(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed()));
+        factors.put("homeGoalsScoredAvg", calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0));
+        factors.put("awayGoalsScoredAvg", calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0));
         factors.put("homeOver25Pct", safePercentage(homeStats.getSeasonOver25PercentageOverall()));
         factors.put("awayOver25Pct", safePercentage(awayStats.getSeasonOver25PercentageOverall()));
 
@@ -179,31 +171,8 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
     }
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence, double expectedGoals, String market) {
-        return String.format("%s confidence %s recommendation (%.2f expected goals) - %s vs %s",
-                confidence.getDisplayName(),
-                market,
-                expectedGoals,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
-    }
-
-    private double calculateGoalsAverage(Integer goals, Integer matches) {
-        if (matches == null || matches == 0) {
-            return 1.0;
-        }
-        return (goals != null ? goals : 0) / (double) matches;
-    }
-
-    private double normalizeGoals(double goalsAvg) {
-        return Math.min(100.0, goalsAvg * 33.33);
-    }
-
-    private double safePercentage(Double value) {
-        return value != null ? value : 50.0;
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 1.0;
+        return RecommendationFactory.buildExpectedValueDescription(
+                confidence, market, expectedGoals, "expected goals", context);
     }
 
     private Double getOddsForMarket(FixtureContext context, String market) {

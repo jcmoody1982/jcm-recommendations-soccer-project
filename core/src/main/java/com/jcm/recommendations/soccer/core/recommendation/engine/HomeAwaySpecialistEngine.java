@@ -2,12 +2,14 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.*;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -56,35 +58,21 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(best, candidates);
 
-        // Determine the team to back based on the recommendation type
         String teamToBack;
         if (best.isHomeTeam || best.classification.equals("Poor Traveler")) {
-            // Home specialist, fortress, or poor traveler (back the home team)
             teamToBack = context.getHomeTeam().getName();
         } else {
-            // Away specialist
             teamToBack = context.getAwayTeam().getName();
         }
-        String market = teamToBack;
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.HOME_AWAY_SPECIALIST)
                 .confidence(best.confidence)
                 .score(best.disparityScore)
-                .market(market)
+                .market(teamToBack)
                 .odds(null)
                 .description(buildDescription(context, best))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Home/Away Specialist recommendation generated: fixtureId={}, classification={}, team={}, score={}, confidence={}", 
@@ -108,7 +96,6 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
 
         double homeWinPct = calculateWinPercentage(homeStats, true);
         double awayWinPct = calculateWinPercentage(homeStats, false);
-        double winPctDiff = homeWinPct - awayWinPct;
 
         double disparity = (ppgDiff / Math.max(0.1, homePpg)) * 100;
         ConfidenceLevel confidence = ppgDiff >= THRESHOLD_STRONG_HOME_SPECIALIST 
@@ -224,30 +211,6 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
         ));
     }
 
-    private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 33.3;
-        }
-        int wins = isHome ? safeInt(stats.getSeasonWinsHome()) : safeInt(stats.getSeasonWinsAway());
-        return (wins * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double calculateLossPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 33.3;
-        }
-        int losses = isHome ? safeInt(stats.getSeasonLossesHome()) : safeInt(stats.getSeasonLossesAway());
-        return (losses * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double calculateConcededAvg(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 1.0;
-        }
-        int conceded = isHome ? safeInt(stats.getSeasonConcededHome()) : safeInt(stats.getSeasonConcededAway());
-        return conceded / (double) stats.getMatchesPlayed();
-    }
-
     private Map<String, Object> buildFactors(SpecialistCandidate best, List<SpecialistCandidate> all) {
         Map<String, Object> factors = new HashMap<>();
         
@@ -273,14 +236,6 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
                 candidate.recommendation,
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 0.0;
     }
 
     private record SpecialistCandidate(

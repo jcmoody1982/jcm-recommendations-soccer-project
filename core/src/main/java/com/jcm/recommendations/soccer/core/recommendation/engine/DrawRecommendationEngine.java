@@ -2,15 +2,17 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.RefereeStats;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -55,16 +57,7 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         Double odds = context.hasOdds() ? context.getOdds().getOddsFtX() : null;
         Map<String, Object> factors = buildFactors(context, score);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.DRAW)
                 .confidence(confidence)
                 .score(score)
@@ -72,7 +65,6 @@ public class DrawRecommendationEngine implements RecommendationEngine {
                 .odds(odds)
                 .description(buildDescription(context, confidence, score))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Draw recommendation generated: fixtureId={}, score={}, confidence={}", 
@@ -91,8 +83,8 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         double homeDrawForm = homeDrawSeason;
         double awayDrawForm = awayDrawSeason;
         if (context.hasRecentForm()) {
-            homeDrawForm = (safeInt(context.getHomeTeamForm().getDrawsHome()) * 100.0) / 5.0;
-            awayDrawForm = (safeInt(context.getAwayTeamForm().getDrawsAway()) * 100.0) / 5.0;
+            homeDrawForm = calculateFormDrawPercentage(context.getHomeTeamForm().getDrawsHome());
+            awayDrawForm = calculateFormDrawPercentage(context.getAwayTeamForm().getDrawsAway());
         }
 
         double evenlyMatched = calculateEvenlyMatchedScore(homeStats, awayStats);
@@ -116,14 +108,6 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         score = applyMatchContextFactor(score, context);
 
         return score;
-    }
-
-    private double calculateDrawPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 25.0;
-        }
-        int draws = isHome ? safeInt(stats.getSeasonDrawsHome()) : safeInt(stats.getSeasonDrawsAway());
-        return (draws * 100.0) / stats.getMatchesPlayed();
     }
 
     private double calculateEvenlyMatchedScore(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
@@ -157,8 +141,8 @@ public class DrawRecommendationEngine implements RecommendationEngine {
     }
 
     private double calculateLowScoringScore(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed());
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed());
+        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
+        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
 
         double combinedAvg = (homeGoalsAvg + awayGoalsAvg) / 2.0;
 
@@ -220,13 +204,6 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         return score;
     }
 
-    private double calculateGoalsAvg(Integer goals, Integer matches) {
-        if (matches == null || matches == 0 || goals == null) {
-            return 1.0;
-        }
-        return goals / (double) matches;
-    }
-
     private ConfidenceLevel determineConfidence(double score, FixtureContext context) {
         boolean hasValueOdds = false;
         if (context.hasOdds() && context.getOdds().getOddsFtX() != null) {
@@ -281,13 +258,5 @@ public class DrawRecommendationEngine implements RecommendationEngine {
                 suffix,
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 0.0;
     }
 }

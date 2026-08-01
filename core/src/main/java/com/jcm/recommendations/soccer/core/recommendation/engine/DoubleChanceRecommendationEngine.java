@@ -2,14 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -19,7 +21,6 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
     private static final double THRESHOLD_MODERATE_1X = 60.0;
     private static final double THRESHOLD_STRONG_X2 = 65.0;
     private static final double THRESHOLD_MODERATE_X2 = 55.0;
-    private static final double VALUE_THRESHOLD = 5.0;
 
     @Override
     public RecommendationType getType() {
@@ -62,16 +63,7 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(homeWinProb, drawProb, awayWinProb, homeDrawProb, drawAwayProb);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.DOUBLE_CHANCE)
                 .confidence(confidence)
                 .score(bestProb)
@@ -79,7 +71,6 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
                 .odds(null)
                 .description(buildDescription(context, market, bestProb, confidence))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Double Chance recommendation: fixtureId={}, market={}, probability={}, confidence={}",
@@ -115,14 +106,6 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         return (homeDrawPct + awayDrawPct) / 2 + similarityBonus;
     }
 
-    private double calculateDrawPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 25.0;
-        }
-        int draws = isHome ? safeInt(stats.getSeasonDrawsHome()) : safeInt(stats.getSeasonDrawsAway());
-        return (draws * 100.0) / stats.getMatchesPlayed();
-    }
-
     private Map<String, Object> buildFactors(double homeWin, double draw, double awayWin,
                                               double homeDrawProb, double drawAwayProb) {
         Map<String, Object> factors = new HashMap<>();
@@ -136,19 +119,7 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, String market, double probability,
                                     ConfidenceLevel confidence) {
-        return String.format("%s confidence %s recommendation (%.1f%% combined probability) - %s vs %s",
-                confidence.getDisplayName(),
-                market,
-                probability,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 0.0;
+        return RecommendationFactory.buildStandardDescription(
+                confidence, market, probability, "combined probability", context);
     }
 }
