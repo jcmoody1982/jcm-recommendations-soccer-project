@@ -216,21 +216,45 @@ _Use cases for generating insights, recommendations, and predictions based on co
 - BTTS potential from API
 
 **Logic:**
+
+*Base Weights (when form data IS available):*
 ```
 BTTS Score = weighted average of:
-  - Home team BTTS % (season)           × 0.15
-  - Away team BTTS % (season)           × 0.15
-  - Home team BTTS % (last 5)           × 0.20
-  - Away team BTTS % (last 5)           × 0.20
+  - Home team BTTS % (season, home)     × 0.15
+  - Away team BTTS % (season, away)     × 0.15
+  - Home team BTTS % (last 5, home)     × 0.20
+  - Away team BTTS % (last 5, away)     × 0.20
   - Home team "failed to score" inverse × 0.10
   - Away team "failed to score" inverse × 0.10
   - API btts_potential                  × 0.10
 ```
 
+*Redistributed Weights (when form data is NOT available):*
+```
+BTTS Score = weighted average of:
+  - Home team BTTS % (season, home)     × 0.25
+  - Away team BTTS % (season, away)     × 0.25
+  - Home team "failed to score" inverse × 0.175
+  - Away team "failed to score" inverse × 0.175
+  - API btts_potential                  × 0.15
+```
+
+**Goals Context Boost:**
+```
+When both teams are prolific scorers, add +5% to final score:
+  - Home team must average ≥ 1.5 goals/game at home
+  - Away team must average ≥ 1.0 goals/game away
+
+This addresses the limitation where two teams with the same BTTS % 
+can have very different attacking profiles:
+  - Team A: 65% BTTS, scores 2.1 goals/game → gets boost
+  - Team B: 65% BTTS, scores 0.8 goals/game → no boost
+```
+
 **Thresholds:**
 - **Strong:** BTTS Score ≥ 80%
 - **Moderate:** BTTS Score 65-79%
-- **Weak:** BTTS Score < 65%
+- **Weak:** BTTS Score < 65% (filtered out)
 
 **Additional Filters:**
 - Both teams must have scored in 50%+ of their matches
@@ -239,8 +263,12 @@ BTTS Score = weighted average of:
 **Output:**
 - Ranked list of fixtures by BTTS score
 - Include: fixture details, both team stats, confidence level
+- Factors tracked:
+  - `formDataAvailable` - whether form data was used
+  - `homeGoalsAvgHome` / `awayGoalsAvgAway` - goals context
+  - `goalsBoostApplied` / `goalsBoostAmount` - boost tracking
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
