@@ -614,44 +614,94 @@ Position difference > 6: × 1.0 (normal)
 **User Story:** As a user, I want to find bets where the odds offer value compared to statistical probability.
 
 **Data Required:**
-- Calculated probabilities from other use cases
-- Bookmaker odds from API
-- Implied probability from odds
+- Calculated probabilities from other use cases (UC-005, UC-006, UC-007)
+- Bookmaker odds from API (all markets)
+- Team season statistics with xG data
+- Recent form data for enhanced match result probabilities
+
+**Markets Analyzed:**
+| Market | Odds Field | Probability Source |
+|--------|------------|-------------------|
+| BTTS Yes | `oddsBttsYes` | UC-005 BTTS Engine score |
+| BTTS No | `oddsBttsNo` | 100 - UC-005 score (inverse) |
+| Over 1.5 Goals | `oddsFtOver15` | UC-006 adjusted (+15%) |
+| Over 2.5 Goals | `oddsFtOver25` | UC-006 Over Goals Engine score |
+| Over 3.5 Goals | `oddsFtOver35` | UC-006 adjusted (-25%) |
+| Under 1.5 Goals | `oddsFtUnder15` | UC-007 adjusted (-15%) |
+| Under 2.5 Goals | `oddsFtUnder25` | UC-007 Under Goals Engine score |
+| Under 3.5 Goals | `oddsFtUnder35` | UC-007 adjusted (+25%) |
+| Home Win | `oddsFt1` | Enhanced probability calculation |
+| Draw | `oddsFtX` | Enhanced probability calculation |
+| Away Win | `oddsFt2` | Enhanced probability calculation |
 
 **Logic:**
 ```
-For each market (BTTS, Over 2.5, Match Result, etc.):
+For each market:
 
 1. Calculate implied probability from bookmaker odds:
    Implied % = 1 / decimal_odds × 100
 
 2. Get our calculated probability from relevant use case:
-   - BTTS: UC-005 score
-   - Over Goals: UC-006 score
-   - Under Goals: UC-007 score
-   - Match Result: UC-017 score
+   - BTTS Yes/No: UC-005 score (or inverse)
+   - Over Goals: UC-006 score (adjusted for market)
+   - Under Goals: UC-007 score (adjusted for market)
+   - Match Result: Enhanced calculation using form + xG
 
 3. Calculate value:
    Value % = Our Probability - Implied Probability
 
 4. Calculate expected value (EV):
    EV = (Our Probability × (odds - 1)) - (1 - Our Probability)
+
+5. Apply source confidence weight:
+   Weighted EV = EV × Source Weight
+   - Strong source: × 1.0
+   - Moderate source: × 0.8
+   - Weak source: × 0.5
+
+6. Calculate Kelly Criterion stake:
+   Kelly = ((odds - 1) × probability - (1 - probability)) / (odds - 1)
+   Suggested Stake = Kelly × 0.25 (quarter Kelly for safety)
+   Maximum stake capped at 10% of bankroll
+```
+
+**Match Result Enhanced Probability:**
+```
+1. Base probability from season win rates (home/away specific)
+2. Blend with recent form PPG (60% season, 40% form)
+3. Incorporate xG ratio if available (70% base, 30% xG)
+4. Normalize to ensure probabilities sum to 1
+5. Draw constrained to 15-35% range
 ```
 
 **Thresholds:**
 - **Strong Value:** Value % ≥ 15% AND EV ≥ 0.10
 - **Moderate Value:** Value % ≥ 10% AND EV ≥ 0.05
 - **No Value:** Value % < 10% OR EV < 0.05
+- **Odds Range:** 1.50 to 10.00 (avoids tiny margins and extreme longshots)
 
-**Additional Factors:**
-- Confidence weight from source use case (Strong/Moderate/Weak)
-- Minimum odds threshold (e.g., odds ≥ 1.50) to avoid tiny margins
+**Best Opportunity Selection:**
+- All qualifying opportunities ranked by weighted EV
+- Best opportunity returned as primary recommendation
+- All opportunities tracked in factors for transparency
 
 **Output:**
-- Ranked list by EV or Value %
-- Include: market, our probability, implied probability, odds, EV, confidence
+- Single best value bet recommendation
+- Ranked by weighted expected value
+- Include: market, our probability, implied probability, odds, EV, Kelly stake
+- Factors tracked:
+  - `market` - best market found
+  - `ourProbability` / `impliedProbability` - probability comparison
+  - `odds` - bookmaker odds
+  - `valuePercentage` - value edge found
+  - `expectedValue` / `weightedExpectedValue` - EV calculations
+  - `kellyStake` / `suggestedStakePct` - stake sizing
+  - `sourceConfidence` / `valueConfidence` - confidence levels
+  - `totalOpportunities` - count of all value found
+  - `allOpportunities` - list of all qualifying bets
+  - `bttsOpportunities` / `goalsOpportunities` / `matchResultOpportunities` - breakdown by type
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
