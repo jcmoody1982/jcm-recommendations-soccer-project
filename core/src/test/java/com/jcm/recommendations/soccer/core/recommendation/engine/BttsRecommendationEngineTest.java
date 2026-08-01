@@ -195,4 +195,160 @@ class BttsRecommendationEngineTest {
                 .bttsPotential(bttsPotential)
                 .build();
     }
+
+    @Test
+    void analyze_withProlificScorers_appliesGoalsBoost() {
+        // Home team scores 1.5+ at home, away team scores 1.0+ away
+        FixtureContext context = createContextWithGoalsData(75.0, 75.0, 18, 12);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("goalsBoostApplied")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("goalsBoostAmount")).isEqualTo(5.0);
+    }
+
+    @Test
+    void analyze_withLowScorers_noGoalsBoost() {
+        // Home team scores less than 1.5 at home
+        FixtureContext context = createContextWithGoalsData(75.0, 75.0, 10, 8);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("goalsBoostApplied")).isEqualTo(false);
+        assertThat(result.get().getFactors()).doesNotContainKey("goalsBoostAmount");
+    }
+
+    @Test
+    void analyze_withoutFormData_usesRedistributedWeights() {
+        // Create context without form data
+        FixtureContext context = createContextWithBttsStats(80.0, 80.0);
+        // This context doesn't have form data by default
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("formDataAvailable")).isEqualTo(false);
+    }
+
+    @Test
+    void analyze_withFormData_tracksFormDataAvailable() {
+        FixtureContext context = createContextWithFormData(80.0, 80.0, 85.0, 85.0);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("formDataAvailable")).isEqualTo(true);
+        assertThat(result.get().getFactors()).containsKey("homeBttsFormPct");
+        assertThat(result.get().getFactors()).containsKey("awayBttsFormPct");
+    }
+
+    @Test
+    void analyze_withFormData_producesHigherScore() {
+        // Same season stats, but one has supporting form data
+        FixtureContext contextWithForm = createContextWithFormData(75.0, 75.0, 85.0, 85.0);
+        FixtureContext contextWithoutForm = createContextWithBttsStats(75.0, 75.0);
+
+        Optional<Recommendation> resultWithForm = engine.analyze(contextWithForm);
+        Optional<Recommendation> resultWithoutForm = engine.analyze(contextWithoutForm);
+
+        assertThat(resultWithForm).isPresent();
+        assertThat(resultWithoutForm).isPresent();
+        // With strong form data (85%) supporting season data (75%), score should be higher
+        assertThat(resultWithForm.get().getScore()).isGreaterThan(resultWithoutForm.get().getScore());
+    }
+
+    @Test
+    void analyze_tracksGoalsAverages() {
+        FixtureContext context = createContextWithGoalsData(75.0, 75.0, 15, 10);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors()).containsKey("homeGoalsAvgHome");
+        assertThat(result.get().getFactors()).containsKey("awayGoalsAvgAway");
+    }
+
+    private FixtureContext createContextWithGoalsData(double homeBtts, double awayBtts, 
+                                                       int homeGoalsHome, int awayGoalsAway) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(homeBtts)
+                .seasonBttsPercentageAway(homeBtts - 5)
+                .seasonFailedToScoreOverall(3)
+                .seasonGoalsHome(homeGoalsHome)  // 10 home matches
+                .seasonGoalsAway(10)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(awayBtts - 5)
+                .seasonBttsPercentageAway(awayBtts)
+                .seasonFailedToScoreOverall(4)
+                .seasonGoalsHome(12)
+                .seasonGoalsAway(awayGoalsAway)  // 10 away matches
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .potentials(createPotentials(70.0))
+                .build();
+    }
+
+    private FixtureContext createContextWithFormData(double homeBttsSeason, double awayBttsSeason,
+                                                      double homeBttsForm, double awayBttsForm) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(homeBttsSeason)
+                .seasonBttsPercentageAway(homeBttsSeason - 5)
+                .seasonFailedToScoreOverall(3)
+                .seasonGoalsHome(15)
+                .seasonGoalsAway(10)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonBttsPercentageHome(awayBttsSeason - 5)
+                .seasonBttsPercentageAway(awayBttsSeason)
+                .seasonFailedToScoreOverall(4)
+                .seasonGoalsHome(12)
+                .seasonGoalsAway(10)
+                .build();
+
+        TeamRecentForm homeForm = TeamRecentForm.builder()
+                .teamId(1L)
+                .bttsPercentageHome(homeBttsForm)
+                .bttsPercentageAway(homeBttsForm - 10)
+                .build();
+
+        TeamRecentForm awayForm = TeamRecentForm.builder()
+                .teamId(2L)
+                .bttsPercentageHome(awayBttsForm - 10)
+                .bttsPercentageAway(awayBttsForm)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .homeTeamForm(homeForm)
+                .awayTeamForm(awayForm)
+                .potentials(createPotentials(70.0))
+                .build();
+    }
 }

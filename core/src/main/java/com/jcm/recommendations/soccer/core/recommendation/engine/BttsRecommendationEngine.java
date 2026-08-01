@@ -17,6 +17,7 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 @Slf4j
 public class BttsRecommendationEngine implements RecommendationEngine {
 
+    // Base weights when form data IS available (total = 1.0)
     private static final double WEIGHT_HOME_BTTS_SEASON = 0.15;
     private static final double WEIGHT_AWAY_BTTS_SEASON = 0.15;
     private static final double WEIGHT_HOME_BTTS_FORM = 0.20;
@@ -24,6 +25,16 @@ public class BttsRecommendationEngine implements RecommendationEngine {
     private static final double WEIGHT_HOME_FTS_INVERSE = 0.10;
     private static final double WEIGHT_AWAY_FTS_INVERSE = 0.10;
     private static final double WEIGHT_API_POTENTIAL = 0.10;
+
+    // Redistributed weights when form data is NOT available (total = 1.0)
+    private static final double WEIGHT_BTTS_SEASON_NO_FORM = 0.25;  // 0.15 → 0.25 each
+    private static final double WEIGHT_FTS_INVERSE_NO_FORM = 0.175; // 0.10 → 0.175 each
+    private static final double WEIGHT_API_POTENTIAL_NO_FORM = 0.15; // 0.10 → 0.15
+
+    // Goals context boost for prolific scorers
+    private static final double GOALS_BOOST_HOME_THRESHOLD = 1.5;  // Goals per home game
+    private static final double GOALS_BOOST_AWAY_THRESHOLD = 1.0;  // Goals per away game
+    private static final double GOALS_BOOST_AMOUNT = 5.0;          // Bonus percentage points
 
     private static final double THRESHOLD_STRONG = 80.0;
     private static final double THRESHOLD_MODERATE = 65.0;
@@ -109,13 +120,6 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         double homeBttsSeason = safePercentage(homeStats.getSeasonBttsPercentageHome());
         double awayBttsSeason = safePercentage(awayStats.getSeasonBttsPercentageAway());
 
-        double homeBttsForm = 50.0;
-        double awayBttsForm = 50.0;
-        if (context.hasRecentForm()) {
-            homeBttsForm = safePercentage(context.getHomeTeamForm().getBttsPercentageHome());
-            awayBttsForm = safePercentage(context.getAwayTeamForm().getBttsPercentageAway());
-        }
-
         double homeFtsInverse = 100.0 - calculateFailedToScorePercentageOverall(homeStats);
         double awayFtsInverse = 100.0 - calculateFailedToScorePercentageOverall(awayStats);
 
@@ -124,15 +128,68 @@ public class BttsRecommendationEngine implements RecommendationEngine {
             apiPotential = context.getPotentials().getBttsPotential();
         }
 
-        double score = (homeBttsSeason * WEIGHT_HOME_BTTS_SEASON)
-                + (awayBttsSeason * WEIGHT_AWAY_BTTS_SEASON)
-                + (homeBttsForm * WEIGHT_HOME_BTTS_FORM)
-                + (awayBttsForm * WEIGHT_AWAY_BTTS_FORM)
-                + (homeFtsInverse * WEIGHT_HOME_FTS_INVERSE)
-                + (awayFtsInverse * WEIGHT_AWAY_FTS_INVERSE)
-                + (apiPotential * WEIGHT_API_POTENTIAL);
+        double score;
+        
+        if (context.hasRecentForm()) {
+            // Full calculation with form data - use standard weights
+            double homeBttsForm = safePercentage(context.getHomeTeamForm().getBttsPercentageHome());
+            double awayBttsForm = safePercentage(context.getAwayTeamForm().getBttsPercentageAway());
+
+            score = (homeBttsSeason * WEIGHT_HOME_BTTS_SEASON)
+                    + (awayBttsSeason * WEIGHT_AWAY_BTTS_SEASON)
+                    + (homeBttsForm * WEIGHT_HOME_BTTS_FORM)
+                    + (awayBttsForm * WEIGHT_AWAY_BTTS_FORM)
+                    + (homeFtsInverse * WEIGHT_HOME_FTS_INVERSE)
+                    + (awayFtsInverse * WEIGHT_AWAY_FTS_INVERSE)
+                    + (apiPotential * WEIGHT_API_POTENTIAL);
+        } else {
+            // No form data - redistribute weights to available data
+            log.debug("No form data available, using redistributed weights for fixture: {}", 
+                    context.getFixture().getId());
+            
+            score = (homeBttsSeason * WEIGHT_BTTS_SEASON_NO_FORM)
+                    + (awayBttsSeason * WEIGHT_BTTS_SEASON_NO_FORM)
+                    + (homeFtsInverse * WEIGHT_FTS_INVERSE_NO_FORM)
+                    + (awayFtsInverse * WEIGHT_FTS_INVERSE_NO_FORM)
+                    + (apiPotential * WEIGHT_API_POTENTIAL_NO_FORM);
+        }
+
+        // Apply goals context boost for prolific scorers
+        double goalsBoost = calculateGoalsBoost(homeStats, awayStats);
+        if (goalsBoost > 0) {
+            log.debug("Applying goals boost of {} for fixture: {}", goalsBoost, context.getFixture().getId());
+        }
+        score += goalsBoost;
 
         return clampScore(score);
+    }
+    
+    private double calculateGoalsBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        double homeGoalsAvg = calculateGoalsAvgHome(homeStats);
+        double awayGoalsAvg = calculateGoalsAvgAway(awayStats);
+        
+        if (homeGoalsAvg >= GOALS_BOOST_HOME_THRESHOLD && awayGoalsAvg >= GOALS_BOOST_AWAY_THRESHOLD) {
+            return GOALS_BOOST_AMOUNT;
+        }
+        return 0.0;
+    }
+    
+    private double calculateGoalsAvgHome(TeamSeasonStats stats) {
+        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+            return 0.0;
+        }
+        int homeMatches = stats.getMatchesPlayed() / 2;
+        if (homeMatches == 0) return 0.0;
+        return safeInt(stats.getSeasonGoalsHome()) / (double) homeMatches;
+    }
+    
+    private double calculateGoalsAvgAway(TeamSeasonStats stats) {
+        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+            return 0.0;
+        }
+        int awayMatches = stats.getMatchesPlayed() / 2;
+        if (awayMatches == 0) return 0.0;
+        return safeInt(stats.getSeasonGoalsAway()) / (double) awayMatches;
     }
 
     private ConfidenceLevel determineConfidence(double score) {
@@ -150,18 +207,37 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
+        // Season BTTS percentages
         factors.put("homeBttsSeasonPct", safePercentage(homeStats.getSeasonBttsPercentageHome()));
         factors.put("awayBttsSeasonPct", safePercentage(awayStats.getSeasonBttsPercentageAway()));
+        
+        // Failed to score percentages
         factors.put("homeFailedToScorePct", calculateFailedToScorePercentageOverall(homeStats));
         factors.put("awayFailedToScorePct", calculateFailedToScorePercentageOverall(awayStats));
 
+        // Form data (if available)
+        factors.put("formDataAvailable", context.hasRecentForm());
         if (context.hasRecentForm()) {
             factors.put("homeBttsFormPct", safePercentage(context.getHomeTeamForm().getBttsPercentageHome()));
             factors.put("awayBttsFormPct", safePercentage(context.getAwayTeamForm().getBttsPercentageAway()));
         }
 
+        // API potential
         if (context.hasPotentials() && context.getPotentials().getBttsPotential() != null) {
             factors.put("apiPotential", context.getPotentials().getBttsPotential());
+        }
+
+        // Goals context (for boost calculation)
+        double homeGoalsAvg = calculateGoalsAvgHome(homeStats);
+        double awayGoalsAvg = calculateGoalsAvgAway(awayStats);
+        factors.put("homeGoalsAvgHome", homeGoalsAvg);
+        factors.put("awayGoalsAvgAway", awayGoalsAvg);
+        
+        // Track if goals boost was applied
+        double goalsBoost = calculateGoalsBoost(homeStats, awayStats);
+        factors.put("goalsBoostApplied", goalsBoost > 0);
+        if (goalsBoost > 0) {
+            factors.put("goalsBoostAmount", goalsBoost);
         }
 
         factors.put("calculatedScore", score);
