@@ -1075,86 +1075,101 @@ Opponent Overperformance:
 
 **Data Required:**
 - o05HT_potential, o15HT_potential from API
-- First half goals stats (if available)
+- First half goals stats (uses total goals × 0.45 as proxy)
 - Team goals scored/conceded timing patterns
-- BTTS HT percentage
+- BTTS HT percentage (season BTTS % as proxy)
+- xG data (when available)
 
-**Logic:**
+**Implementation:** `FirstHalfGoalsRecommendationEngine.java`
+
+**Logic (with xG data available):**
 ```
 First Half Goals Score = weighted average of:
   - API o05HT_potential                           × 0.15
   - API o15HT_potential                           × 0.10
-  - Home team 1H goals scored avg                 × 0.12
-  - Away team 1H goals scored avg                 × 0.12
-  - Home team 1H goals conceded avg               × 0.08
-  - Away team 1H goals conceded avg               × 0.08
-  - BTTS HT % (home team)                         × 0.05
-  - BTTS HT % (away team)                         × 0.05
+  - Home team 1H goals scored proxy (×0.45)       × 0.12
+  - Away team 1H goals scored proxy (×0.45)       × 0.12
+  - Home team 1H goals conceded proxy (×0.45)     × 0.08
+  - Away team 1H goals conceded proxy (×0.45)     × 0.08
+  - BTTS season % (home team)                     × 0.05
+  - BTTS season % (away team)                     × 0.05
   - Home team xG avg (× 0.45 for 1H proxy)        × 0.10
   - Away team xG avg (× 0.45 for 1H proxy)        × 0.10
   - Combined xGA factor                           × 0.05
 ```
-*(If 1H-specific stats unavailable, use total goals × 0.45 as proxy)*
-*(If xG unavailable, redistribute weight to goals scored/conceded)*
 
-**xG-Based Assessment:**
+**Dynamic Weights (when xG NOT available):**
 ```
-Team 1H xG Estimate = Total xG × 0.45 (typical 1H share)
+Redistributed weights (total = 1.0):
+  - API o05HT_potential                           × 0.20
+  - API o15HT_potential                           × 0.15
+  - Home team 1H goals scored proxy               × 0.15
+  - Away team 1H goals scored proxy               × 0.15
+  - Home team 1H goals conceded proxy             × 0.10
+  - Away team 1H goals conceded proxy             × 0.10
+  - BTTS season % (home team)                     × 0.075
+  - BTTS season % (away team)                     × 0.075
+```
 
+**xG-Based Assessment (multipliers applied sequentially):**
+```
 Combined xG Rating:
-  - Home xG + Away xG > 3.0 = High-scoring potential (1.20)
-  - 2.5-3.0 = Above average (1.10)
-  - 2.0-2.5 = Average (1.0)
-  - <2.0 = Low-scoring potential (0.85)
+  - Home xG + Away xG > 3.0 = High-scoring potential (× 1.20)
+  - 2.5-3.0 = Above average (× 1.10)
+  - 2.0-2.5 = Average (× 1.0)
+  - <2.0 = Low-scoring potential (× 0.85)
 
-xG vs Actual Goals:
-  - Both teams underperforming xG: regression = more goals likely (1.10)
-  - Both teams overperforming xG: regression = fewer goals (0.90)
+xG Regression Adjustment:
+  - Both teams underperforming xG (actual < xG × 0.85): (× 1.10)
+  - Both teams overperforming xG (actual > xG × 1.15): (× 0.90)
 ```
 
-**Fast Starter Assessment:**
+**Fast Starter Detection (via API potentials):**
 ```
-Team 1H Goals Ratio = 1H goals / Total goals
-  - >55% goals in 1H = Fast starter (1.20)
-  - 45-55% = Balanced (1.0)
-  - <45% = Slow starter (0.85)
+Implied Ratio = O05HT_potential / max(50, O25_potential)
+  - Ratio > 0.825 = Fast starters detected (× 1.20)
+  - Ratio < 0.45 = Slow starters detected (× 0.85)
 ```
 
 **Early Conceder Assessment:**
 ```
-Team 1H Conceded Ratio = 1H conceded / Total conceded
-  - >55% conceded in 1H = Vulnerable early (1.15)
-  - 45-55% = Balanced (1.0)
-  - <45% = Strong early defense (0.90)
+Combined Conceded Avg (home + away):
+  - > 2.5 per game = Both teams vulnerable defensively (× 1.15)
+  - < 1.5 per game = Strong combined defense (× 0.90)
 ```
 
-**Recent Form Adjustment:**
+**Recent Form Adjustment (using O1.5 as proxy):**
 ```
-If 1H goals in 4+ of last 5 matches: × 1.10
-If 1H goals in 2 or fewer of last 5: × 0.90
+Total O1.5 in form (out of 10 matches):
+  - ≥ 8 matches with O1.5 = Hot form (× 1.10)
+  - ≤ 4 matches with O1.5 = Cold form (× 0.90)
 ```
 
-**Thresholds (Over 0.5 HT):**
-- **Strong:** Score ≥ 80% OR o05HT_potential ≥ 75%
-- **Moderate:** Score 65-79%
-- **Weak:** Score < 65%
+**Thresholds:**
+- **Strong:** Score ≥ 75%
+- **Moderate:** Score 60-74%
+- **Weak (filtered):** Score < 60%
+- **Minimum filter:** Expected 1H goals ≥ 0.8
 
-**Thresholds (Over 1.5 HT):**
-- **Strong:** Score ≥ 70% AND o15HT_potential ≥ 60%
-- **Moderate:** Score 55-69%
-- **Weak:** Score < 55%
+**Market Selection:**
+- **Over 1.5 HT:** Expected 1H goals ≥ 1.3 AND score ≥ 75% AND O15HT potential ≥ 55%
+- **Over 0.5 HT:** Default market
 
-**Additional Factors:**
-1. **Match Tempo:** High-pressing teams tend to score/concede early
-2. **Stakes:** Must-win situations often see early aggression
-3. **Weather:** Extreme conditions may slow early play
+**Enhanced Factor Tracking:**
+- `expected1HGoals`, `expectedFullTimeGoals`, `firstHalfRatioUsed` (0.45)
+- `home1HScoredProxyAvg`, `away1HScoredProxyAvg`
+- `home1HConcededProxyAvg`, `away1HConcededProxyAvg`
+- `homeBttsSeasonPct`, `awayBttsSeasonPct`
+- `apiO05HtPotential`, `apiO15HtPotential`
+- `xgDataAvailable`, `homeXgForAvgHome`, `awayXgForAvgAway`
+- `combinedXg`, `home1HXgProxy`, `away1HXgProxy`
+- `xgRating`, `homeXgPerformance`, `awayXgPerformance`, `xgRegressionOutlook`
+- `fastStarterImpliedRatio`, `fastStarterStatus`
+- `combinedConcededAvg`, `earlyConcedeStatus`
+- `homeO15RecentForm`, `awayO15RecentForm`, `totalO15InForm`, `recentFormStatus`
+- `positiveIndicators`, `riskFlags`
 
-**Output:**
-- Ranked list of fixtures by 1H goals probability
-- Include: team 1H stats, API potentials, suggested market (O0.5 or O1.5 HT)
-- Flag: "Fast starters" when both teams score >50% goals in 1H
-
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -1165,92 +1180,113 @@ If 1H goals in 2 or fewer of last 5: × 0.90
 **User Story:** As a user, I want to see which matches are likely to have second half goals.
 
 **Data Required:**
-- Second half goals stats (if available)
+- Second half goals stats (uses total goals × 0.55 as proxy)
 - Team goals scored/conceded timing patterns
-- 2h_cards_total as proxy for late game intensity
-- xG data
+- Cards average as proxy for late game intensity
+- xG data (when available)
+- Draw percentages for match situation factor
 
-**Logic:**
+**Implementation:** `SecondHalfGoalsRecommendationEngine.java`
+
+**Logic (with xG data available):**
 ```
 Second Half Goals Score = weighted average of:
-  - Home team 2H goals scored avg                 × 0.12
-  - Away team 2H goals scored avg                 × 0.12
-  - Home team 2H goals conceded avg               × 0.08
-  - Away team 2H goals conceded avg               × 0.08
+  - Home team 2H goals scored proxy (×0.55)       × 0.12
+  - Away team 2H goals scored proxy (×0.55)       × 0.12
+  - Home team 2H goals conceded proxy (×0.55)     × 0.08
+  - Away team 2H goals conceded proxy (×0.55)     × 0.08
   - Home team xG avg (× 0.55 for 2H proxy)        × 0.10
   - Away team xG avg (× 0.55 for 2H proxy)        × 0.10
   - Combined xGA factor                           × 0.05
-  - Late game intensity factor                    × 0.10
+  - Late game intensity factor (cards)            × 0.10
+  - Fitness/stamina indicator (goal difference)   × 0.10
+  - Match situation factor (draw % + attacking)   × 0.15
+```
+
+**Dynamic Weights (when xG NOT available):**
+```
+Redistributed weights (total = 1.0):
+  - Home team 2H goals scored proxy               × 0.18
+  - Away team 2H goals scored proxy               × 0.18
+  - Home team 2H goals conceded proxy             × 0.12
+  - Away team 2H goals conceded proxy             × 0.12
+  - Late game intensity factor                    × 0.15
   - Fitness/stamina indicator                     × 0.10
   - Match situation factor                        × 0.15
 ```
-*(If 2H-specific stats unavailable, use total goals × 0.55 as proxy)*
-*(If xG unavailable, redistribute weight to goals scored/conceded)*
 
 **xG-Based Assessment:**
 ```
-Team 2H xG Estimate = Total xG × 0.55 (typical 2H share - slightly higher)
-
 Combined xG Rating:
-  - Home xG + Away xG > 3.0 = High-scoring potential (1.20)
-  - 2.5-3.0 = Above average (1.10)
-  - 2.0-2.5 = Average (1.0)
-  - <2.0 = Low-scoring potential (0.85)
+  - Home xG + Away xG > 3.0 = High-scoring potential (× 1.20)
+  - 2.5-3.0 = Above average (× 1.10)
+  - 2.0-2.5 = Average (× 1.0)
+  - <2.0 = Low-scoring potential (× 0.85)
 ```
 
-**Late Scorer Assessment:**
+**Late Goals Tendency (Strong Finisher Profile):**
 ```
-Team 2H Goals Ratio = 2H goals / Total goals
-  - >60% goals in 2H = Strong finisher (1.25)
-  - 50-60% = Balanced (1.05)
-  - <50% = Front-loaded (0.90)
+Based on combined goals avg + clean sheet %:
+  - Combined goals ≥ 3.0 AND avg CS% < 30% = Strong finisher (× 1.25)
+  - Combined goals ≥ 2.5 = Balanced (× 1.05)
+  - Combined goals < 2.0 = Front-loaded (× 0.90)
 ```
 
-**Late Conceder Assessment:**
+**Late Conceder Profile:**
 ```
-Team 2H Conceded Ratio = 2H conceded / Total conceded
-  - >60% conceded in 2H = Tires late (1.20)
-  - 50-60% = Balanced (1.05)
-  - <50% = Strong late defense (0.85)
+Based on combined conceded avg + clean sheet %:
+  - Combined conceded ≥ 2.5 AND avg CS% < 25% = Vulnerable late (× 1.20)
+  - Combined conceded < 1.5 AND avg CS% > 40% = Strong late defense (× 0.90)
 ```
 
 **Late Game Intensity Factor:**
 ```
-2H Cards Indicator:
-  - 2h_cards_total > 1H cards = Late intensity (1.15)
-  - Balanced = (1.0)
-  - 2h_cards_total < 1H cards = Early intensity (0.95)
+Combined Cards Average:
+  - ≥ 4.0 cards per game = High intensity matchup (× 1.10)
+  - < 2.5 cards per game = Low intensity (× 0.95)
+
+Intensity Score = min(100, (combinedCards / 6.0) × 100)
+```
+
+**Fitness/Stamina Indicator:**
+```
+Based on goal difference per game:
+  - Positive GD = better fitness/ability to push late
+  - Score = 50 + (avgGoalDiff × 25), clamped 0-100
 ```
 
 **Match Situation Factor:**
 ```
-Expected Game State:
-  - Evenly matched (close odds) = likely competitive 2H (1.15)
-  - Heavy favorite = may ease off OR push for more (1.0)
-  - Must-win for underdog = late push likely (1.20)
+Blend of draw likelihood (40%) and attacking intent (60%):
+  - High draw % + high goals avg = competitive 2H expected
+  - Combined goals indicator = min(100, (homeGoals + awayGoals) × 30)
 ```
 
-**Thresholds (Over 0.5 2H):**
-- **Strong:** Score ≥ 80%
-- **Moderate:** Score 65-79%
-- **Weak:** Score < 65%
+**Thresholds:**
+- **Strong:** Score ≥ 75%
+- **Moderate:** Score 60-74%
+- **Weak (filtered):** Score < 60%
+- **Minimum filter:** Expected 2H goals ≥ 0.9
 
-**Thresholds (Over 1.5 2H):**
-- **Strong:** Score ≥ 70%
-- **Moderate:** Score 55-69%
-- **Weak:** Score < 55%
+**Market Selection:**
+- **Over 1.5 2H:** Expected 2H goals ≥ 1.5 AND score ≥ 75%
+- **Over 0.5 2H:** Default market
 
-**Additional Factors:**
-1. **Substitution Impact:** Fresh legs typically increase 2H tempo
-2. **Historical 2H Patterns:** Some teams consistently score late
-3. **Tactical Adjustments:** Teams trailing often open up in 2H
+**Enhanced Factor Tracking:**
+- `expected2HGoals`, `expectedFullTimeGoals`, `secondHalfRatioUsed` (0.55)
+- `home2HScoredProxyAvg`, `away2HScoredProxyAvg`
+- `home2HConcededProxyAvg`, `away2HConcededProxyAvg`
+- `homeCardsAvg`, `awayCardsAvg`, `combinedCardsAvg`, `lateGameIntensityScore`
+- `homeGoalDifferencePerGame`, `awayGoalDifferencePerGame`, `fitnessIndicatorScore`
+- `homeDrawPct`, `awayDrawPct`, `matchSituationScore`
+- `xgDataAvailable`, `homeXgForAvgHome`, `awayXgForAvgAway`
+- `combinedXg`, `home2HXgProxy`, `away2HXgProxy`, `xgRating`
+- `combinedGoalsAvg`, `avgCleanSheetPct`, `finisherProfile`
+- `combinedConcededAvg`, `lateConcedeProfile`
+- `intensityProfile`
+- `positiveIndicators`, `riskFlags`
 
-**Output:**
-- Ranked list of fixtures by 2H goals probability
-- Include: team 2H stats, late game intensity, suggested market
-- Flag: "Strong finishers" when both teams score >55% goals in 2H
-
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
