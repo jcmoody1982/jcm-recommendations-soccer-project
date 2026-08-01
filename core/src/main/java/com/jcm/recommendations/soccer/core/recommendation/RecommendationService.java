@@ -1,10 +1,13 @@
 package com.jcm.recommendations.soccer.core.recommendation;
 
+import com.jcm.recommendations.soccer.core.config.CacheConfig;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.service.FixtureService;
 import com.jcm.recommendations.soccer.domain.Fixture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -25,6 +28,7 @@ public class RecommendationService {
         return generateAllRecommendations(7);
     }
 
+    @Cacheable(value = CacheConfig.RECOMMENDATIONS_CACHE, key = "#daysAhead")
     public List<Recommendation> generateAllRecommendations(double daysAhead) {
         log.info("Generating recommendations for fixtures: daysAhead={}", daysAhead);
         Instant startTime = Instant.now();
@@ -66,6 +70,7 @@ public class RecommendationService {
         return allRecommendations;
     }
 
+    @Cacheable(value = CacheConfig.FIXTURE_RECOMMENDATIONS_CACHE, key = "#fixtureId")
     public List<Recommendation> getRecommendationsForFixture(Long fixtureId) {
         log.info("Generating recommendations for fixture: fixtureId={}", fixtureId);
 
@@ -197,6 +202,7 @@ public class RecommendationService {
         return getSummary(7);
     }
 
+    @Cacheable(value = CacheConfig.RECOMMENDATION_SUMMARY_CACHE, key = "#daysAhead")
     public RecommendationSummary getSummary(double daysAhead) {
         log.info("Generating recommendation summary: daysAhead={}", daysAhead);
 
@@ -217,6 +223,15 @@ public class RecommendationService {
                 byType,
                 Instant.now()
         );
+    }
+
+    @CacheEvict(value = {
+            CacheConfig.RECOMMENDATIONS_CACHE,
+            CacheConfig.FIXTURE_RECOMMENDATIONS_CACHE,
+            CacheConfig.RECOMMENDATION_SUMMARY_CACHE
+    }, allEntries = true)
+    public void evictAllCaches() {
+        log.info("Evicting all recommendation caches");
     }
 
     public record RecommendationSummary(

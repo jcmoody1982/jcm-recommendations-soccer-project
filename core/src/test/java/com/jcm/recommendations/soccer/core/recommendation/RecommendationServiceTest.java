@@ -16,7 +16,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,7 +44,7 @@ class RecommendationServiceTest {
 
     @Test
     void generateAllRecommendations_withNoFixtures_returnsEmptyList() {
-        when(fixtureService.getUpcomingFixtures(anyInt())).thenReturn(Collections.emptyList());
+        when(fixtureService.getUpcomingFixtures(anyDouble())).thenReturn(Collections.emptyList());
 
         List<Recommendation> result = recommendationService.generateAllRecommendations();
 
@@ -57,7 +57,7 @@ class RecommendationServiceTest {
         FixtureContext context = createContext(fixture);
         Recommendation recommendation = createRecommendation(fixture);
 
-        when(fixtureService.getUpcomingFixtures(anyInt())).thenReturn(List.of(fixture));
+        when(fixtureService.getUpcomingFixtures(anyDouble())).thenReturn(List.of(fixture));
         when(contextBuilder.buildContextsForFixtures(any())).thenReturn(List.of(context));
         when(mockEngine.getType()).thenReturn(RecommendationType.BTTS);
         when(mockEngine.analyzeAll(any())).thenReturn(List.of(recommendation));
@@ -87,7 +87,7 @@ class RecommendationServiceTest {
                 .score(70.0)
                 .build();
 
-        when(fixtureService.getUpcomingFixtures(anyInt())).thenReturn(List.of(fixture));
+        when(fixtureService.getUpcomingFixtures(anyDouble())).thenReturn(List.of(fixture));
         when(contextBuilder.buildContextsForFixtures(any())).thenReturn(List.of(context));
         when(mockEngine.getType()).thenReturn(RecommendationType.BTTS);
         when(mockEngine.analyzeAll(any())).thenReturn(List.of(strongRec, moderateRec));
@@ -129,7 +129,7 @@ class RecommendationServiceTest {
         FixtureContext context = createContext(fixture);
         Recommendation recommendation = createRecommendation(fixture);
 
-        when(fixtureService.getUpcomingFixtures(anyInt())).thenReturn(List.of(fixture));
+        when(fixtureService.getUpcomingFixtures(anyDouble())).thenReturn(List.of(fixture));
         when(contextBuilder.buildContextsForFixtures(any())).thenReturn(List.of(context));
         when(mockEngine.getType()).thenReturn(RecommendationType.BTTS);
         when(mockEngine.analyzeAll(any())).thenReturn(List.of(recommendation));
@@ -146,7 +146,7 @@ class RecommendationServiceTest {
         FixtureContext context = createContext(fixture);
         Recommendation recommendation = createRecommendation(fixture);
 
-        when(fixtureService.getUpcomingFixtures(anyInt())).thenReturn(List.of(fixture));
+        when(fixtureService.getUpcomingFixtures(anyDouble())).thenReturn(List.of(fixture));
         when(contextBuilder.buildContextsForFixtures(any())).thenReturn(List.of(context));
         when(mockEngine.getType()).thenReturn(RecommendationType.BTTS);
         when(mockEngine.analyzeAll(any())).thenReturn(List.of(recommendation));
@@ -170,7 +170,7 @@ class RecommendationServiceTest {
                 .score(85.0)
                 .build();
 
-        when(fixtureService.getUpcomingFixtures(anyInt())).thenReturn(List.of(fixture));
+        when(fixtureService.getUpcomingFixtures(anyDouble())).thenReturn(List.of(fixture));
         when(contextBuilder.buildContextsForFixtures(any())).thenReturn(List.of(context));
         when(mockEngine.getType()).thenReturn(RecommendationType.BTTS);
         when(mockEngine.analyzeAll(any())).thenReturn(List.of(strongRec));
