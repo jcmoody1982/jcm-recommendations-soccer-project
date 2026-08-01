@@ -712,48 +712,64 @@ For each market:
 **User Story:** As a user, I want to spot teams on hot streaks that may be undervalued by the market.
 
 **Data Required:**
-- Season PPG, goals scored avg, win percentage, clean sheet %
-- Recent form (last 5) PPG, goals scored avg, win percentage, clean sheet %
+- Season PPG, goals scored avg, goals conceded avg, win percentage, clean sheet %
+- Recent form (last 5) PPG, goals scored avg, goals conceded avg, win percentage, clean sheet %
 - Home/away splits for both season and recent form
+- xG data for regression risk assessment
 - Upcoming fixture location (home/away)
 
 **Logic:**
 ```
 Winning Mismatch Score = weighted average of deltas:
-  - PPG delta: (Last 5 PPG - Season PPG) / Season PPG           × 0.30
-  - Goals delta: (Last 5 goals avg - Season goals avg)          × 0.25
-  - Wins delta: (Last 5 win % - Season win %)                   × 0.25
+  - PPG delta: (Last 5 PPG - Season PPG) / Season PPG           × 0.25
+  - Goals delta: (Last 5 goals avg - Season goals avg)          × 0.20
+  - Conceded delta: (Season conceded - Last 5 conceded) / Season × 0.15  (inverted - lower = better)
+  - Wins delta: (Last 5 win % - Season win %)                   × 0.20
   - Clean sheets delta: (Last 5 CS % - Season CS %)             × 0.20
 ```
 
-**Calculation:**
-- Positive delta = team performing BETTER recently
-- Normalize each delta to comparable scale (percentage improvement)
-- For upcoming home fixture: weight home splits at 1.25×
-- For upcoming away fixture: weight away splits at 1.25×
+**Home/Away Context Weighting:**
+```
+If team is playing at home (their strength venue):
+  Final Score = Base Score × 1.25
+```
+
+**Trend Bonuses:**
+```
+Scoring Trend Up: +3% if home scoring > overall scoring by 0.3 goals
+Defensive Trend Up: +2% if home conceding < overall conceding by 0.3 goals
+Winning Streak: +5% if team has won 3+ of last 5 matches
+```
+
+**xG Regression Risk:**
+```
+Flag as regression risk if:
+  Actual goals scored - xG for avg > 0.5 goals per game
+  (Team scoring significantly above expected - likely to regress)
+```
 
 **Thresholds:**
 - **Strong Mismatch:** Score ≥ 25% improvement
 - **Moderate Mismatch:** Score 15-24% improvement
 - **No Mismatch:** Score < 15% improvement
 
-**Additional Factors:**
-1. **Minimum Sample Size:** At least 5 matches in recent form window
-2. **Home/Away Context:** Apply location-based weighting for upcoming fixture
-3. **Streak Bonus:** Add +5% if team has won 3+ consecutive matches
-4. **Quality Opposition Indicator:** Flag if recent opponents were bottom-half teams (potential false signal)
-5. **Scoring Trend:** Note if goals per game increasing over last 5 (momentum indicator)
-6. **Defensive Trend:** Note if goals conceded decreasing over last 5 (solidity indicator)
-7. **Goals vs Performance:** Flag if actual goals significantly > expected from shots (regression risk)
-8. **Fixture Difficulty:** Compare average league position of recent opponents vs season average
-
 **Output:**
-- Ranked list of teams by mismatch score
-- Include: season stats, recent form stats, delta percentages
-- Include: win streak status, opponent quality flag
+- Single best mismatch recommendation per fixture
+- Positive score = Winning Form Mismatch (hot streak)
+- Include: all delta percentages, trend indicators, streak status
 - Flag: "Hot streak - potentially undervalued"
+- Factors tracked:
+  - `team` / `isHomeTeam` / `playingAtStrength` - team context
+  - `mismatchScore` - overall mismatch percentage
+  - `ppgDelta` / `goalsDelta` / `concededDelta` / `winsDelta` / `cleanSheetDelta` - individual deltas
+  - `hasWinningStreak` / `hasLosingStreak` - streak indicators
+  - `scoringTrendUp` / `defensiveTrendUp` - momentum indicators
+  - `xgRegressionRisk` - regression warning flag
+  - `homeAwayContextMultiplier` - context weighting applied
+  - `positiveMomentumIndicators` - count of positive signals
+  - `riskFlags` - list of risk warnings
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -764,49 +780,48 @@ Winning Mismatch Score = weighted average of deltas:
 **User Story:** As a user, I want to spot teams on cold streaks that may be overvalued by the market.
 
 **Data Required:**
-- Season PPG, goals scored avg, win percentage, clean sheet %
-- Recent form (last 5) PPG, goals scored avg, win percentage, clean sheet %
+- Season PPG, goals scored avg, goals conceded avg, win percentage, clean sheet %
+- Recent form (last 5) PPG, goals scored avg, goals conceded avg, win percentage, clean sheet %
 - Home/away splits for both season and recent form
 - Upcoming fixture location (home/away)
 
 **Logic:**
 ```
+Handled by FormMismatchRecommendationEngine (same as UC-010).
+Negative mismatch score indicates LOSING form mismatch.
+
 Losing Mismatch Score = weighted average of negative deltas:
-  - PPG delta: (Season PPG - Last 5 PPG) / Season PPG           × 0.30
-  - Goals delta: (Season goals avg - Last 5 goals avg)          × 0.25
-  - Wins delta: (Season win % - Last 5 win %)                   × 0.25
-  - Clean sheets delta: (Season CS % - Last 5 CS %)             × 0.20
+  - PPG delta: (Last 5 PPG - Season PPG) / Season PPG           × 0.25
+  - Goals delta: (Last 5 goals avg - Season goals avg)          × 0.20
+  - Conceded delta: (Season conceded - Last 5 conceded) / Season × 0.15
+  - Wins delta: (Last 5 win % - Season win %)                   × 0.20
+  - Clean sheets delta: (Last 5 CS % - Season CS %)             × 0.20
 ```
 
-**Calculation:**
-- Positive delta = team performing WORSE recently
-- Normalize each delta to comparable scale (percentage decline)
-- For upcoming home fixture: weight home splits at 1.25×
-- For upcoming away fixture: weight away splits at 1.25×
+**Home/Away Context Weighting:**
+```
+If team is playing at home (their strength venue):
+  Final Score = Base Score × 1.25
+```
+
+**Losing Streak Penalty:**
+```
+If team has lost 3+ of last 5: additional -5% (making negative score worse)
+```
 
 **Thresholds:**
-- **Strong Mismatch:** Score ≥ 25% decline
-- **Moderate Mismatch:** Score 15-24% decline
-- **No Mismatch:** Score < 15% decline
-
-**Additional Factors:**
-1. **Minimum Sample Size:** At least 5 matches in recent form window
-2. **Home/Away Context:** Apply location-based weighting for upcoming fixture
-3. **Losing Streak Indicator:** Add +5% if team has lost 3+ consecutive matches
-4. **Quality Opposition Indicator:** Flag if recent opponents were top-half teams (not necessarily a crisis)
-5. **Scoring Drought:** Note if goals per game decreasing over last 5 (attacking confidence issue)
-6. **Defensive Collapse:** Note if goals conceded increasing over last 5 (structural problem)
-7. **Key Metrics Divergence:** Flag if multiple metrics declining simultaneously (systemic issue)
-8. **Fixture Difficulty:** Compare average league position of recent opponents vs season average
-9. **Injury/Suspension Context:** Note if decline coincides with missing key players (temporary vs permanent)
+- **Strong Mismatch:** Score ≤ -25% decline
+- **Moderate Mismatch:** Score -15% to -24% decline
+- **No Mismatch:** Score > -15%
 
 **Output:**
-- Ranked list of teams by mismatch score
-- Include: season stats, recent form stats, delta percentages
-- Include: losing streak status, opponent quality flag
+- Single worst mismatch recommendation per fixture
+- Negative score = Losing Form Mismatch (cold streak)
+- Include: all delta percentages, losing streak indicator
 - Flag: "Cold streak - potentially overvalued"
+- Same factor tracking as UC-010
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
