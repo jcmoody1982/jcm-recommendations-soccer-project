@@ -833,70 +833,86 @@ If team has lost 3+ of last 5: additional -5% (making negative score worse)
 
 **Data Required:**
 - Team corners won averages (home/away, season + form)
-- Team corners conceded averages (home/away, season + form)
+- Team corners conceded averages (opponent's overall as proxy)
 - corners_potential, corners_o85_potential, corners_o95_potential, corners_o105_potential from API
+- Goals scored averages (for playing style assessment)
+- League positions (for match context)
 
 **Logic:**
 ```
-Over Corners Score = weighted average of:
-  - Home team corners won avg (home)              × 0.12
-  - Away team corners won avg (away)              × 0.12
-  - Home team corners conceded avg (home)         × 0.08
-  - Away team corners conceded avg (away)         × 0.08
-  - Home team corners won avg (last 5 home)       × 0.12
-  - Away team corners won avg (last 5 away)       × 0.12
-  - API corners_o95_potential                     × 0.08
-  - API corners_o105_potential                    × 0.08
-  - Playing style factor (home)                   × 0.05
-  - Playing style factor (away)                   × 0.05
-  - Defensive style factor (home)                 × 0.05
-  - Defensive style factor (away)                 × 0.05
+Expected Corners Calculation:
+
+1. Base Expected per Team:
+   - Home Expected = (home corners won avg + opponent conceded) / 2
+   - Away Expected = (away corners won avg + opponent conceded) / 2
+
+2. If form data available, blend:
+   - Home Expected = (season * 0.6) + (form * 0.4)
+   - Away Expected = (season * 0.6) + (form * 0.4)
+
+3. Base Expected = Home Expected + Away Expected
+
+4. API Potential Adjustment (20% influence):
+   - O95 contribution: 9.5 + ((O95% - 50) / 50) × 2
+   - O105 contribution: 10.5 + ((O105% - 50) / 50) × 2
+   - Final = (base × 0.80) + (apiAdjustment × 0.20)
+
+5. Apply Playing Style Multiplier:
+   - Home goals ≥ 2.0/game: +5%
+   - Home goals < 1.0/game: -5%
+   - Away goals ≥ 1.5/game: +5%
+   - Away goals < 0.8/game: -5%
+
+6. Apply Match Context Multiplier:
+   - Position diff ≤ 3: × 1.10 (close rivals)
+   - Position diff 4-6: × 1.05 (competitive)
+
+7. Apply Recent Trend Multiplier:
+   - Form avg > season avg by 15%+: × 1.10
+   - Form avg < season avg by 15%+: × 0.90
 ```
 
-**Playing Style Factor (per team):**
+**Confidence Determination:**
 ```
-Attacking Index = normalize(goals scored avg + shots on target avg)
-  - High attacking (top 25% in league) = 1.2
-  - Medium attacking = 1.0
-  - Low attacking (bottom 25%) = 0.8
+Strong Over:
+  - Expected corners ≥ 12 OR
+  - corners_o105_potential ≥ 70% (API confidence boost)
+
+Moderate Over:
+  - Expected corners 10-11.9 OR
+  - corners_o95_potential ≥ 65%
+
+Strong Under (handled by same engine):
+  - Expected corners ≤ 8 OR
+  - (O95 potential < 40% AND O105 potential < 25%)
+
+Moderate Under:
+  - Expected corners 8.1-9.5
 ```
 
-**Defensive Style Factor (per team):**
-```
-Deep Defense Index = normalize(goals conceded avg + opposition shots faced)
-  - Deep defending (high conceded corners) = 1.2
-  - Balanced = 1.0
-  - High pressing (low conceded corners) = 0.9
-```
-
-**Recent Trend Adjustment:**
-```
-If last 5 corners avg > season avg by 15%+: multiply final score × 1.10
-If last 5 corners avg < season avg by 15%+: multiply final score × 0.90
-```
-
-**Calculation:**
-- Expected corners = (Home won + Away won + Home conceded + Away conceded) / 2
-- Apply playing style and defensive style multipliers
-- Apply recent trend adjustment
-- Normalize to percentage based on Over 9.5 baseline
-
-**Thresholds:**
-- **Strong:** Expected corners ≥ 12 OR corners_o105_potential ≥ 70%
-- **Moderate:** Expected corners 10-11.9 OR corners_o95_potential ≥ 65%
-- **Weak:** Expected corners < 10
-
-**Additional Factors:**
-1. **Home/Away Split:** Home teams typically win more corners
-2. **Match Context:** Close league positions may lead to more competitive play
-3. **Weather/Pitch:** Note if data available (wet conditions = more corners typically)
+**Market Selection:**
+- **Over 10.5 Corners:** Strong confidence over
+- **Over 9.5 Corners:** Moderate confidence over
+- **Under 9.5 Corners:** Moderate confidence under
+- **Under 8.5 Corners:** Strong confidence under
 
 **Output:**
-- Ranked list of fixtures by expected corners
-- Include: team corner stats, API potentials, expected total
-- Suggested market: Over 9.5 or Over 10.5 based on expected value
+- Single recommendation per fixture (Over or Under)
+- Include: expected corners, market, confidence
+- Factors tracked:
+  - `expectedCorners` - final calculated expected
+  - `formDataAvailable` - data availability flag
+  - `homeCornersWonAvg` / `awayCornersWonAvg` - corners won
+  - `homeConcededAvg` / `awayConcededAvg` - corners conceded
+  - `homeFormCornersAvg` / `awayFormCornersAvg` - form data
+  - `apiCornersO85Potential` / `apiCornersO95Potential` / `apiCornersO105Potential` - API potentials
+  - `apiConfidenceBoostApplied` - whether API boosted confidence
+  - `playingStyleMultiplier` - attacking style adjustment
+  - `matchContextMultiplier` - position-based adjustment
+  - `trendMultiplier` / `trendDirection` - form trend adjustment
+  - `homePosition` / `awayPosition` / `positionDifference` - league standings
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -907,80 +923,33 @@ If last 5 corners avg < season avg by 15%+: multiply final score × 0.90
 **User Story:** As a user, I want to see which matches are likely to have few corners for under corners bets.
 
 **Data Required:**
-- Team corners won averages (home/away, season + form)
-- Team corners conceded averages (home/away, season + form)
-- corners_potential from API
+- Same as UC-012 (handled by same engine)
 
 **Logic:**
 ```
-Under Corners Score = weighted average of inverse metrics:
-  - Home team corners won avg (home) inverse      × 0.12
-  - Away team corners won avg (away) inverse      × 0.12
-  - Home team corners conceded avg (home) inverse × 0.08
-  - Away team corners conceded avg (away) inverse × 0.08
-  - Home team corners won avg (last 5) inverse    × 0.12
-  - Away team corners won avg (last 5) inverse    × 0.12
-  - API corners_potential inverse                 × 0.16
-  - Playing style factor (home) inverse           × 0.05
-  - Playing style factor (away) inverse           × 0.05
-  - Defensive style factor (home) inverse         × 0.05
-  - Defensive style factor (away) inverse         × 0.05
-```
+Handled by CornersRecommendationEngine (same as UC-012).
 
-**Playing Style Factor (inverse for under):**
-```
-  - Low attacking (bottom 25% in league) = 1.2 (good for under)
-  - Medium attacking = 1.0
-  - High attacking (top 25%) = 0.8 (bad for under)
-```
+The engine returns UNDER_CORNERS type when expected corners fall below thresholds.
 
-**Defensive Style Factor (inverse for under):**
+Under Detection:
+- Expected corners ≤ 9.5: triggers Under recommendation
+- Expected corners ≤ 8.0: Strong confidence Under 8.5
+- Low API potentials (O95 < 40% AND O105 < 25%): confidence boost
 ```
-  - High pressing (low conceded corners) = 1.2 (good for under)
-  - Balanced = 1.0
-  - Deep defending (high conceded corners) = 0.8 (bad for under)
-```
-
-**Recent Trend Adjustment:**
-```
-If last 5 corners avg < season avg by 15%+: multiply final score × 1.10
-If last 5 corners avg > season avg by 15%+: multiply final score × 0.90
-```
-
-**Match Context Factor:**
-```
-Stakes Assessment:
-  - Both teams mid-table (nothing to play for) = 1.15
-  - One team secured position = 1.10
-  - Title race / relegation battle = 0.85 (high intensity = more corners)
-  - Derby / rivalry match = 0.85
-
-League Position Proximity:
-  - Teams >10 places apart = 1.10 (likely one-sided, fewer corners)
-  - Teams within 3 places = 0.95 (competitive, more corners)
-```
-
-**Calculation:**
-- Expected corners = (Home won + Away won + Home conceded + Away conceded) / 2
-- Lower expected = higher under score
-- Apply inverse style factors
-- Apply match context factor
 
 **Thresholds:**
-- **Strong:** Expected corners ≤ 8 AND corners_potential ≤ 8.5
-- **Moderate:** Expected corners 8.1-9.5 OR corners_potential ≤ 9.5
-- **Weak:** Expected corners > 9.5
+- **Strong Under:** Expected corners ≤ 8.0 OR (O95 < 40% AND O105 < 25%)
+- **Moderate Under:** Expected corners 8.1-9.5
 
-**Additional Factors:**
-1. **Home/Away Split:** Consider typical corner patterns
-2. **Team Motivation:** End-of-season dead rubbers tend to have fewer corners
+**Market Selection:**
+- **Under 8.5 Corners:** Strong confidence under
+- **Under 9.5 Corners:** Moderate confidence under
 
 **Output:**
-- Ranked list of fixtures by under corners score
-- Include: team corner stats, expected total
-- Suggested market: Under 9.5 or Under 8.5 based on expected value
+- Returns UNDER_CORNERS recommendation type
+- Same factor tracking as UC-012
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
