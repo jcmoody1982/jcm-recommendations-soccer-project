@@ -2,12 +2,14 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.*;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -63,16 +65,7 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(best, candidates);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.CLEAN_SHEET)
                 .confidence(confidence)
                 .score(best.score)
@@ -80,7 +73,6 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
                 .odds(null)
                 .description(buildDescription(context, best, confidence))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Clean Sheet recommendation generated: fixtureId={}, team={}, score={}, confidence={}", 
@@ -98,7 +90,7 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        double teamCsSeason = calculateCleanSheetPct(teamStats, isHomeTeam);
+        double teamCsSeason = calculateCleanSheetPercentage(teamStats, isHomeTeam);
         double teamCsForm = teamCsSeason;
         if (context.hasRecentForm()) {
             var form = isHomeTeam ? context.getHomeTeamForm() : context.getAwayTeamForm();
@@ -120,7 +112,7 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
             }
         }
 
-        double opponentFtsSeason = calculateFailedToScorePct(opponentStats, !isHomeTeam);
+        double opponentFtsSeason = calculateFailedToScorePercentage(opponentStats, !isHomeTeam);
         double opponentFtsForm = opponentFtsSeason;
         if (context.hasRecentForm()) {
             var form = isHomeTeam ? context.getAwayTeamForm() : context.getHomeTeamForm();
@@ -169,30 +161,6 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
         return score;
     }
 
-    private double calculateCleanSheetPct(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 30.0;
-        }
-        int cs = isHome ? safeInt(stats.getSeasonCleanSheetsHome()) : safeInt(stats.getSeasonCleanSheetsAway());
-        return (cs * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double calculateFailedToScorePct(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 20.0;
-        }
-        int fts = isHome ? safeInt(stats.getSeasonFailedToScoreHome()) : safeInt(stats.getSeasonFailedToScoreAway());
-        return (fts * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double calculateConcededAvg(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 1.0;
-        }
-        int conceded = isHome ? safeInt(stats.getSeasonConcededHome()) : safeInt(stats.getSeasonConcededAway());
-        return conceded / (double) stats.getMatchesPlayed();
-    }
-
     private double calculateConcededRating(TeamSeasonStats stats, boolean isHome) {
         double avg = calculateConcededAvg(stats, isHome);
         return Math.min(100.0, avg * 40.0);
@@ -222,20 +190,8 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
     }
 
     private String buildDescription(FixtureContext context, CleanSheetCandidate candidate, ConfidenceLevel confidence) {
-        return String.format("%s confidence Clean Sheet for %s (%.1f%% probability) - %s vs %s",
-                confidence.getDisplayName(),
-                candidate.teamName,
-                candidate.score,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 0.0;
+        return RecommendationFactory.buildTeamDescription(
+                confidence, "Clean Sheet", candidate.teamName, candidate.score, context);
     }
 
     private record CleanSheetCandidate(

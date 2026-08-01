@@ -2,13 +2,15 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.*;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -68,16 +70,7 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(bestMismatch, mismatches);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(type)
                 .confidence(confidence)
                 .score(Math.abs(bestMismatch.mismatchScore))
@@ -85,7 +78,6 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
                 .odds(null)
                 .description(buildDescription(context, bestMismatch, type, confidence))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Form Mismatch recommendation generated: fixtureId={}, team={}, type={}, score={}, confidence={}", 
@@ -162,8 +154,8 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
 
     private double calculateGoalsDelta(TeamSeasonStats season, TeamRecentForm form, boolean isHome) {
         double seasonAvg = isHome 
-                ? calculateAverage(season.getSeasonGoalsHome(), season.getMatchesPlayed())
-                : calculateAverage(season.getSeasonGoalsAway(), season.getMatchesPlayed());
+                ? calculateGoalsAvg(season.getSeasonGoalsHome(), season.getMatchesPlayed())
+                : calculateGoalsAvg(season.getSeasonGoalsAway(), season.getMatchesPlayed());
         
         Double formAvg = isHome ? form.getScoredAvgHome() : form.getScoredAvgAway();
 
@@ -183,7 +175,7 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
         int formWins = safeInt(form.getWinsOverall());
 
         double seasonWinPct = (seasonWins * 100.0) / season.getMatchesPlayed();
-        double formWinPct = (formWins * 100.0) / 5.0;
+        double formWinPct = calculateFormWinPercentage(formWins);
 
         return formWinPct - seasonWinPct;
     }
@@ -208,13 +200,6 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
 
     private boolean checkLosingStreak(TeamRecentForm form) {
         return form.getLossesOverall() != null && form.getLossesOverall() >= 3;
-    }
-
-    private double calculateAverage(Integer total, Integer matches) {
-        if (matches == null || matches == 0 || total == null) {
-            return 0.0;
-        }
-        return total / (double) matches;
     }
 
     private ConfidenceLevel determineConfidence(double absoluteScore) {
@@ -257,10 +242,6 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
                 trend,
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
     }
 
     private record TeamMismatch(

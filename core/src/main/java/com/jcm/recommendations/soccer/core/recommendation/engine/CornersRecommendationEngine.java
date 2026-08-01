@@ -2,14 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -62,16 +64,7 @@ public class CornersRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(context, expectedCorners);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(type)
                 .confidence(confidence)
                 .score(expectedCorners)
@@ -79,7 +72,6 @@ public class CornersRecommendationEngine implements RecommendationEngine {
                 .odds(null)
                 .description(buildDescription(context, confidence, expectedCorners, market))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Corners recommendation generated: fixtureId={}, expectedCorners={}, type={}, confidence={}, market={}", 
@@ -99,28 +91,17 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeCornersAvg = safeDouble(homeStats.getCornersAvgHome());
-        double awayCornersAvg = safeDouble(awayStats.getCornersAvgAway());
+        double homeCornersAvg = safeDouble(homeStats.getCornersAvgHome(), 5.0);
+        double awayCornersAvg = safeDouble(awayStats.getCornersAvgAway(), 5.0);
 
         double homeFormCorners = homeCornersAvg;
         double awayFormCorners = awayCornersAvg;
         if (context.hasRecentForm()) {
-            homeFormCorners = safeDouble(context.getHomeTeamForm().getCornersAvgHome());
-            awayFormCorners = safeDouble(context.getAwayTeamForm().getCornersAvgAway());
-        }
-
-        double apiPotential = 9.5;
-        if (context.hasPotentials() && context.getPotentials().getCornersPotential() != null) {
-            apiPotential = context.getPotentials().getCornersPotential();
+            homeFormCorners = safeDouble(context.getHomeTeamForm().getCornersAvgHome(), 5.0);
+            awayFormCorners = safeDouble(context.getAwayTeamForm().getCornersAvgAway(), 5.0);
         }
 
         double playingStyleFactor = calculatePlayingStyleFactor(homeStats, awayStats);
-
-        double baseExpected = (homeCornersAvg * WEIGHT_HOME_CORNERS / 2)
-                + (awayCornersAvg * WEIGHT_AWAY_CORNERS / 2)
-                + (homeFormCorners * WEIGHT_HOME_FORM_CORNERS / 2)
-                + (awayFormCorners * WEIGHT_AWAY_FORM_CORNERS / 2)
-                + (apiPotential * WEIGHT_API_POTENTIAL);
 
         double weightedCorners = (homeCornersAvg + awayCornersAvg + homeFormCorners + awayFormCorners) / 2.0;
         
@@ -130,8 +111,8 @@ public class CornersRecommendationEngine implements RecommendationEngine {
     private double calculatePlayingStyleFactor(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
         double factor = 1.0;
 
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed());
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed());
+        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
+        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
 
         if (homeGoalsAvg > 1.8) factor += 0.05;
         if (awayGoalsAvg > 1.5) factor += 0.05;
@@ -146,13 +127,6 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         return factor;
     }
 
-    private double calculateGoalsAvg(Integer goals, Integer matches) {
-        if (matches == null || matches == 0 || goals == null) {
-            return 1.0;
-        }
-        return goals / (double) matches;
-    }
-
     private Map<String, Object> buildFactors(FixtureContext context, double expectedCorners) {
         Map<String, Object> factors = new HashMap<>();
         
@@ -160,8 +134,8 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
         factors.put("expectedCorners", expectedCorners);
-        factors.put("homeCornersAvg", safeDouble(homeStats.getCornersAvgHome()));
-        factors.put("awayCornersAvg", safeDouble(awayStats.getCornersAvgAway()));
+        factors.put("homeCornersAvg", safeDouble(homeStats.getCornersAvgHome(), 5.0));
+        factors.put("awayCornersAvg", safeDouble(awayStats.getCornersAvgAway(), 5.0));
         factors.put("playingStyleFactor", calculatePlayingStyleFactor(homeStats, awayStats));
 
         if (context.hasPotentials() && context.getPotentials().getCornersPotential() != null) {
@@ -169,8 +143,8 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         }
 
         if (context.hasRecentForm()) {
-            factors.put("homeFormCornersAvg", safeDouble(context.getHomeTeamForm().getCornersAvgHome()));
-            factors.put("awayFormCornersAvg", safeDouble(context.getAwayTeamForm().getCornersAvgAway()));
+            factors.put("homeFormCornersAvg", safeDouble(context.getHomeTeamForm().getCornersAvgHome(), 5.0));
+            factors.put("awayFormCornersAvg", safeDouble(context.getAwayTeamForm().getCornersAvgAway(), 5.0));
         }
 
         return factors;
@@ -183,9 +157,5 @@ public class CornersRecommendationEngine implements RecommendationEngine {
                 expectedCorners,
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 5.0;
     }
 }

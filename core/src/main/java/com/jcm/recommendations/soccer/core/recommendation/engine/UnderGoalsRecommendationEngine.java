@@ -2,14 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -68,16 +70,7 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
         Double odds = getOddsForMarket(context, market);
         Map<String, Object> factors = buildFactors(context, score, expectedGoals);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.UNDER_GOALS)
                 .confidence(confidence)
                 .score(score)
@@ -85,7 +78,6 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
                 .odds(odds)
                 .description(buildDescription(context, confidence, expectedGoals, market))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Under Goals recommendation generated: fixtureId={}, expectedGoals={}, score={}, confidence={}, market={}", 
@@ -96,10 +88,10 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
     }
 
     private double calculateExpectedGoals(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeScoredAvg = calculateGoalsAverage(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed());
-        double awayScoredAvg = calculateGoalsAverage(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed());
-        double homeConcededAvg = calculateGoalsAverage(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed());
-        double awayConcededAvg = calculateGoalsAverage(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed());
+        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
+        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
+        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
 
         return (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
     }
@@ -108,20 +100,20 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeScoredInverse = inverseNormalizeGoals(calculateGoalsAverage(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed()));
-        double awayScoredInverse = inverseNormalizeGoals(calculateGoalsAverage(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed()));
-        double homeConcededInverse = inverseNormalizeGoals(calculateGoalsAverage(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed()));
-        double awayConcededInverse = inverseNormalizeGoals(calculateGoalsAverage(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed()));
+        double homeScoredInverse = inverseNormalizeGoals(calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0));
+        double awayScoredInverse = inverseNormalizeGoals(calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0));
+        double homeConcededInverse = inverseNormalizeGoals(calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0));
+        double awayConcededInverse = inverseNormalizeGoals(calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0));
 
         double homeScoredFormInverse = 50.0;
         double awayScoredFormInverse = 50.0;
         if (context.hasRecentForm()) {
-            homeScoredFormInverse = inverseNormalizeGoals(safeDouble(context.getHomeTeamForm().getScoredAvgHome()));
-            awayScoredFormInverse = inverseNormalizeGoals(safeDouble(context.getAwayTeamForm().getScoredAvgAway()));
+            homeScoredFormInverse = inverseNormalizeGoals(safeDouble(context.getHomeTeamForm().getScoredAvgHome(), 1.0));
+            awayScoredFormInverse = inverseNormalizeGoals(safeDouble(context.getAwayTeamForm().getScoredAvgAway(), 1.0));
         }
 
-        double homeCleanSheet = calculateCleanSheetPercentage(homeStats);
-        double awayCleanSheet = calculateCleanSheetPercentage(awayStats);
+        double homeCleanSheet = calculateCleanSheetPercentageOverall(homeStats);
+        double awayCleanSheet = calculateCleanSheetPercentageOverall(awayStats);
 
         double apiPotential = 50.0;
         if (context.hasPotentials() && context.getPotentials().getU15Potential() != null) {
@@ -138,7 +130,7 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
                 + (awayCleanSheet * WEIGHT_AWAY_CLEANSHEET)
                 + (apiPotential * WEIGHT_API_POTENTIAL);
 
-        return Math.min(100.0, Math.max(0.0, score));
+        return clampScore(score);
     }
 
     private ConfidenceLevel determineConfidence(double score) {
@@ -164,10 +156,10 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
         factors.put("expectedGoals", expectedGoals);
-        factors.put("homeGoalsScoredAvg", calculateGoalsAverage(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed()));
-        factors.put("awayGoalsScoredAvg", calculateGoalsAverage(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed()));
-        factors.put("homeCleanSheetPct", calculateCleanSheetPercentage(homeStats));
-        factors.put("awayCleanSheetPct", calculateCleanSheetPercentage(awayStats));
+        factors.put("homeGoalsScoredAvg", calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0));
+        factors.put("awayGoalsScoredAvg", calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0));
+        factors.put("homeCleanSheetPct", calculateCleanSheetPercentageOverall(homeStats));
+        factors.put("awayCleanSheetPct", calculateCleanSheetPercentageOverall(awayStats));
 
         if (context.hasPotentials() && context.getPotentials().getU15Potential() != null) {
             factors.put("apiU15Potential", context.getPotentials().getU15Potential());
@@ -179,35 +171,8 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
     }
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence, double expectedGoals, String market) {
-        return String.format("%s confidence %s recommendation (%.2f expected goals) - %s vs %s",
-                confidence.getDisplayName(),
-                market,
-                expectedGoals,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
-    }
-
-    private double calculateGoalsAverage(Integer goals, Integer matches) {
-        if (matches == null || matches == 0) {
-            return 1.0;
-        }
-        return (goals != null ? goals : 0) / (double) matches;
-    }
-
-    private double inverseNormalizeGoals(double goalsAvg) {
-        return Math.max(0.0, 100.0 - (goalsAvg * 33.33));
-    }
-
-    private double calculateCleanSheetPercentage(TeamSeasonStats stats) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 50.0;
-        }
-        int cleanSheets = stats.getSeasonCleanSheetsOverall() != null ? stats.getSeasonCleanSheetsOverall() : 0;
-        return (cleanSheets * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 1.0;
+        return RecommendationFactory.buildExpectedValueDescription(
+                confidence, market, expectedGoals, "expected goals", context);
     }
 
     private Double getOddsForMarket(FixtureContext context, String market) {

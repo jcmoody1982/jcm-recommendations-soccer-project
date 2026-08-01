@@ -2,12 +2,14 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.*;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @RequiredArgsConstructor
@@ -56,16 +58,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(bestOpportunity, opportunities);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.VALUE_BET)
                 .confidence(bestOpportunity.confidence)
                 .score(bestOpportunity.valuePercentage)
@@ -73,7 +66,6 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
                 .odds(bestOpportunity.odds)
                 .description(buildDescription(context, bestOpportunity))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Value Bet recommendation generated: fixtureId={}, market={}, value={}%, EV={}, confidence={}", 
@@ -236,8 +228,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
         if (context.getHomeTeamStats() == null || context.getHomeTeamStats().getMatchesPlayed() == null) {
             return 0.33;
         }
-        int homeWins = context.getHomeTeamStats().getSeasonWinsHome() != null 
-                ? context.getHomeTeamStats().getSeasonWinsHome() : 0;
+        int homeWins = safeInt(context.getHomeTeamStats().getSeasonWinsHome());
         return homeWins / (double) context.getHomeTeamStats().getMatchesPlayed();
     }
 
@@ -245,8 +236,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
         if (context.getAwayTeamStats() == null || context.getAwayTeamStats().getMatchesPlayed() == null) {
             return 0.33;
         }
-        int awayWins = context.getAwayTeamStats().getSeasonWinsAway() != null 
-                ? context.getAwayTeamStats().getSeasonWinsAway() : 0;
+        int awayWins = safeInt(context.getAwayTeamStats().getSeasonWinsAway());
         return awayWins / (double) context.getAwayTeamStats().getMatchesPlayed();
     }
 

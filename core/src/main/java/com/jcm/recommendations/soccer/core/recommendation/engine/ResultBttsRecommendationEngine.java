@@ -2,14 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -63,16 +65,7 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(homeWinProb, drawProb, awayWinProb, bttsProb, best);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.RESULT_BTTS)
                 .confidence(confidence)
                 .score(best.combinedProb)
@@ -80,7 +73,6 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
                 .odds(null)
                 .description(buildDescription(context, best, confidence))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Result + BTTS recommendation: fixtureId={}, market={}, combined={}, confidence={}",
@@ -130,30 +122,14 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         return (homeDrawPct + awayDrawPct) / 2;
     }
 
-    private double calculateDrawPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 25.0;
-        }
-        int draws = isHome ? safeInt(stats.getSeasonDrawsHome()) : safeInt(stats.getSeasonDrawsAway());
-        return (draws * 100.0) / stats.getMatchesPlayed();
-    }
-
     private boolean hasHighCleanSheetRate(FixtureContext context) {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeCleanSheetPct = calculateCleanSheetPct(homeStats, true);
-        double awayCleanSheetPct = calculateCleanSheetPct(awayStats, false);
+        double homeCleanSheetPct = calculateCleanSheetPercentage(homeStats, true);
+        double awayCleanSheetPct = calculateCleanSheetPercentage(awayStats, false);
 
         return homeCleanSheetPct > 40.0 || awayCleanSheetPct > 40.0;
-    }
-
-    private double calculateCleanSheetPct(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 0.0;
-        }
-        int cleanSheets = isHome ? safeInt(stats.getSeasonCleanSheetsHome()) : safeInt(stats.getSeasonCleanSheetsAway());
-        return (cleanSheets * 100.0) / stats.getMatchesPlayed();
     }
 
     private ResultBttsCandidate findBestCandidate(FixtureContext context, double homeWinProb, 
@@ -201,20 +177,8 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
     }
 
     private String buildDescription(FixtureContext context, ResultBttsCandidate best, ConfidenceLevel confidence) {
-        return String.format("%s confidence %s recommendation (%.1f%% combined) - %s vs %s",
-                confidence.getDisplayName(),
-                best.market,
-                best.combinedProb,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 0.0;
+        return RecommendationFactory.buildStandardDescription(
+                confidence, best.market, best.combinedProb, "combined", context);
     }
 
     private record ResultBttsCandidate(String market, String resultType, double resultProb, 

@@ -2,15 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
-import com.jcm.recommendations.soccer.domain.TeamRecentForm;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -62,19 +63,9 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         }
 
         Map<String, Object> factors = buildFactors(context, score);
-
         Double odds = context.hasOdds() ? context.getOdds().getOddsBttsYes() : null;
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.BTTS)
                 .confidence(confidence)
                 .score(score)
@@ -82,7 +73,6 @@ public class BttsRecommendationEngine implements RecommendationEngine {
                 .odds(odds)
                 .description(buildDescription(context, confidence, score))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("BTTS recommendation generated: fixtureId={}, score={}, confidence={}", 
@@ -106,8 +96,8 @@ public class BttsRecommendationEngine implements RecommendationEngine {
             return false;
         }
 
-        double homeFtsPct = calculateFailedToScorePercentage(homeStats);
-        double awayFtsPct = calculateFailedToScorePercentage(awayStats);
+        double homeFtsPct = calculateFailedToScorePercentageOverall(homeStats);
+        double awayFtsPct = calculateFailedToScorePercentageOverall(awayStats);
 
         return homeFtsPct <= FILTER_MAX_FTS_PERCENTAGE && awayFtsPct <= FILTER_MAX_FTS_PERCENTAGE;
     }
@@ -126,8 +116,8 @@ public class BttsRecommendationEngine implements RecommendationEngine {
             awayBttsForm = safePercentage(context.getAwayTeamForm().getBttsPercentageAway());
         }
 
-        double homeFtsInverse = 100.0 - calculateFailedToScorePercentage(homeStats);
-        double awayFtsInverse = 100.0 - calculateFailedToScorePercentage(awayStats);
+        double homeFtsInverse = 100.0 - calculateFailedToScorePercentageOverall(homeStats);
+        double awayFtsInverse = 100.0 - calculateFailedToScorePercentageOverall(awayStats);
 
         double apiPotential = 50.0;
         if (context.hasPotentials() && context.getPotentials().getBttsPotential() != null) {
@@ -142,7 +132,7 @@ public class BttsRecommendationEngine implements RecommendationEngine {
                 + (awayFtsInverse * WEIGHT_AWAY_FTS_INVERSE)
                 + (apiPotential * WEIGHT_API_POTENTIAL);
 
-        return Math.min(100.0, Math.max(0.0, score));
+        return clampScore(score);
     }
 
     private ConfidenceLevel determineConfidence(double score) {
@@ -162,8 +152,8 @@ public class BttsRecommendationEngine implements RecommendationEngine {
 
         factors.put("homeBttsSeasonPct", safePercentage(homeStats.getSeasonBttsPercentageHome()));
         factors.put("awayBttsSeasonPct", safePercentage(awayStats.getSeasonBttsPercentageAway()));
-        factors.put("homeFailedToScorePct", calculateFailedToScorePercentage(homeStats));
-        factors.put("awayFailedToScorePct", calculateFailedToScorePercentage(awayStats));
+        factors.put("homeFailedToScorePct", calculateFailedToScorePercentageOverall(homeStats));
+        factors.put("awayFailedToScorePct", calculateFailedToScorePercentageOverall(awayStats));
 
         if (context.hasRecentForm()) {
             factors.put("homeBttsFormPct", safePercentage(context.getHomeTeamForm().getBttsPercentageHome()));
@@ -180,33 +170,7 @@ public class BttsRecommendationEngine implements RecommendationEngine {
     }
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence, double score) {
-        return String.format("%s confidence BTTS recommendation (%.1f%%) - %s vs %s",
-                confidence.getDisplayName(),
-                score,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
-    }
-
-    private double calculateScoredPercentage(TeamSeasonStats stats) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 50.0;
-        }
-        int scored = stats.getMatchesPlayed() - safeInt(stats.getSeasonFailedToScoreOverall());
-        return (scored * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double calculateFailedToScorePercentage(TeamSeasonStats stats) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 0.0;
-        }
-        return (safeInt(stats.getSeasonFailedToScoreOverall()) * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double safePercentage(Double value) {
-        return value != null ? value : 50.0;
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
+        return RecommendationFactory.buildStandardDescription(
+                confidence, "BTTS", score, "score", context);
     }
 }

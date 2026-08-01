@@ -2,15 +2,17 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.RefereeStats;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -57,16 +59,7 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(context, expectedBookingPoints);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.BOOKING_POINTS)
                 .confidence(confidence)
                 .score(expectedBookingPoints)
@@ -74,7 +67,6 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
                 .odds(null)
                 .description(buildDescription(context, confidence, expectedBookingPoints, market))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Booking Points recommendation generated: fixtureId={}, expectedPoints={}, confidence={}, market={}", 
@@ -213,9 +205,5 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
                 expectedPoints,
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 0.0;
     }
 }

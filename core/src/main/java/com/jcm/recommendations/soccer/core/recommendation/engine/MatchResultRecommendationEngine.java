@@ -2,14 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -55,8 +57,8 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         awayWinProb = (awayWinProb / total) * 100;
         drawProb = (drawProb / total) * 100;
 
-        String outcomeType; // HOME, DRAW, or AWAY - used for odds lookup
-        String recommendedOutcome; // Display name with team name
+        String outcomeType;
+        String recommendedOutcome;
         double bestProb;
         double valueVsOdds = 0.0;
 
@@ -95,16 +97,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         Double odds = getOddsForOutcome(context, outcomeType);
         Map<String, Object> factors = buildFactors(context, homeWinProb, drawProb, awayWinProb, valueVsOdds);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.MATCH_RESULT)
                 .confidence(confidence)
                 .score(bestProb)
@@ -112,7 +105,6 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
                 .odds(odds)
                 .description(buildDescription(context, recommendedOutcome, bestProb, confidence, valueVsOdds))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Match Result recommendation generated: fixtureId={}, outcome={}, probability={}, value={}, confidence={}", 
@@ -132,8 +124,8 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         double homeWinPctForm = homeWinPctSeason;
         double awayLossPctForm = awayLossPctSeason;
         if (context.hasRecentForm()) {
-            homeWinPctForm = calculateFormWinPct(context.getHomeTeamForm().getWinsHome());
-            awayLossPctForm = calculateFormLossPct(context.getAwayTeamForm().getLossesAway());
+            homeWinPctForm = calculateFormWinPercentage(context.getHomeTeamForm().getWinsHome());
+            awayLossPctForm = calculateFormLossPercentage(context.getAwayTeamForm().getLossesAway());
         }
 
         double homePpgNorm = normalizePpg(safeDouble(homeStats.getPpgHome()));
@@ -163,8 +155,8 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         double awayWinPctForm = awayWinPctSeason;
         double homeLossPctForm = homeLossPctSeason;
         if (context.hasRecentForm()) {
-            awayWinPctForm = calculateFormWinPct(context.getAwayTeamForm().getWinsAway());
-            homeLossPctForm = calculateFormLossPct(context.getHomeTeamForm().getLossesHome());
+            awayWinPctForm = calculateFormWinPercentage(context.getAwayTeamForm().getWinsAway());
+            homeLossPctForm = calculateFormLossPercentage(context.getHomeTeamForm().getLossesHome());
         }
 
         double awayPpgNorm = normalizePpg(safeDouble(awayStats.getPpgAway()));
@@ -225,40 +217,12 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         return prob;
     }
 
-    private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 33.3;
-        }
-        int wins = isHome ? safeInt(stats.getSeasonWinsHome()) : safeInt(stats.getSeasonWinsAway());
-        return (wins * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double calculateLossPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 33.3;
-        }
-        int losses = isHome ? safeInt(stats.getSeasonLossesHome()) : safeInt(stats.getSeasonLossesAway());
-        return (losses * 100.0) / stats.getMatchesPlayed();
-    }
-
-    private double calculateFormWinPct(Integer wins) {
-        return (safeInt(wins) * 100.0) / 5.0;
-    }
-
-    private double calculateFormLossPct(Integer losses) {
-        return (safeInt(losses) * 100.0) / 5.0;
-    }
-
-    private double normalizePpg(double ppg) {
-        return Math.min(100.0, ppg * 33.33);
-    }
-
     private double calculateGoalDiffFactor(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
         int homeGd = safeInt(homeStats.getSeasonGoalDifference());
         int awayGd = safeInt(awayStats.getSeasonGoalDifference());
 
         int diff = homeGd - awayGd;
-        return Math.min(100.0, Math.max(0.0, 50.0 + (diff * 2)));
+        return clampScore(50.0 + (diff * 2));
     }
 
     private ConfidenceLevel determineConfidence(double probability, double valueVsOdds) {
@@ -301,14 +265,6 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
                 valueStr,
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 0.0;
     }
 
     private Double getOddsForOutcome(FixtureContext context, String outcomeType) {
