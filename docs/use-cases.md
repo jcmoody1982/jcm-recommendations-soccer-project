@@ -1302,11 +1302,12 @@ Blend of draw likelihood (40%) and attacking intent (60%):
 - Goals scored/conceded
 - xG and xGA
 - odds_ft_1, odds_ft_x, odds_ft_2
+- League positions
 
-**Logic:**
+**Implementation:** `MatchResultRecommendationEngine.java`
+
+**Logic (with xG data available):**
 ```
-For each outcome (Home Win, Draw, Away Win), calculate probability:
-
 Home Win Probability = weighted average of:
   - Home team home win % (season)                 × 0.15
   - Home team home win % (last 5)                 × 0.15
@@ -1318,45 +1319,49 @@ Home Win Probability = weighted average of:
   - Goal difference comparison                    × 0.10
   - Implied probability from odds_ft_1 (sanity)   × 0.05
 
-Away Win Probability = weighted average of:
-  - Away team away win % (season)                 × 0.15
-  - Away team away win % (last 5)                 × 0.15
-  - Home team home loss % (season)                × 0.10
-  - Home team home loss % (last 5)                × 0.10
-  - Away team away PPG normalized                 × 0.10
-  - Home team home PPG inverse normalized         × 0.10
-  - Away team xG vs Home team xGA comparison      × 0.15
-  - Goal difference comparison                    × 0.10
-  - Implied probability from odds_ft_2 (sanity)   × 0.05
+Away Win Probability = (same structure inverted)
 
 Draw Probability = 100% - Home Win % - Away Win %
-  (with floor/ceiling adjustments, see UC-019)
+  (bounded to 15-35% range)
 ```
 
-**xG Comparison Factor:**
+**Dynamic Weights (when xG NOT available):**
+```
+Redistributed weights (total = 1.0):
+  - Home team home win % (season)                 × 0.18
+  - Home team home win % (last 5)                 × 0.18
+  - Away team away loss % (season)                × 0.12
+  - Away team away loss % (last 5)                × 0.12
+  - Home team home PPG normalized                 × 0.12
+  - Away team away PPG inverse normalized         × 0.10
+  - Goal difference comparison                    × 0.12
+  - Implied probability from odds                 × 0.06
+```
+
+**xG Comparison Factor (multiplier applied to probabilities):**
 ```
 xG Dominance = Team xG - Opponent xGA
-  - Dominance > 0.5 = Strong advantage (1.25)
-  - Dominance 0.2-0.5 = Moderate advantage (1.10)
-  - Dominance -0.2 to 0.2 = Even (1.0)
-  - Dominance < -0.2 = Disadvantage (0.85)
+  - Dominance > 0.5 = Strong advantage (× 1.25)
+  - Dominance 0.2-0.5 = Moderate advantage (× 1.10)
+  - Dominance -0.2 to 0.2 = Even (× 1.0)
+  - Dominance < -0.2 = Disadvantage (× 0.85)
 ```
 
-**Form Momentum Factor:**
+**Form Momentum Factor (multiplier):**
 ```
-Last 5 Results Trend:
-  - W-W-W-W-W or W-W-W-W-D = Hot streak (1.20)
-  - 3+ wins in last 5 = Good form (1.10)
-  - Mixed results = Neutral (1.0)
-  - 3+ losses in last 5 = Poor form (0.85)
-  - L-L-L-L-L = Crisis (0.70)
+Based on home/away wins and losses in last 5:
+  - 5 wins OR (4 wins + 1 draw) = Hot streak (× 1.20)
+  - 3+ wins = Good form (× 1.10)
+  - Mixed results = Neutral (× 1.0)
+  - 3+ losses = Poor form (× 0.85)
+  - 5 losses = Crisis (× 0.70)
 ```
 
 **Home Advantage Factor:**
 ```
-League Home Win Rate Baseline:
-  - Apply league-specific home advantage multiplier
-  - Typical: Home +8-12% probability boost
+Flat 8% probability boost to home team win probability
+Home team: +8%
+Away team: -4%
 ```
 
 **League Position Gap Factor:**
@@ -1366,72 +1371,41 @@ Position Difference = |Home position - Away position|
   - Gap 6-9 places: Favor higher team × 1.10
   - Gap 3-5 places: Slight favor × 1.05
   - Gap 0-2 places: No adjustment (1.0)
-
-Apply to:
-  - Higher-placed team's win probability
-  - Reduce lower-placed team's win probability proportionally
 ```
 
 **Motivation Factor:**
 ```
-Team Situation Assessment:
-  Title Race (top 2, within 6 pts of leader):
-    - Win probability × 1.15
-  
-  Champions League Race (3rd-5th, within 3 pts):
-    - Win probability × 1.10
-  
-  Relegation Battle (bottom 4, within 4 pts of safety):
-    - Win probability × 1.15 (desperate = determined)
-  
-  Mid-table (nothing to play for):
-    - Win probability × 0.95
-  
-  Position Secured (mathematically safe/qualified):
-    - Win probability × 0.90 (may rotate/relax)
-```
-
-**Fixture Congestion Factor:**
-```
-Games in Last 14 Days:
-  - 5+ matches: Fatigue risk × 0.90
-  - 4 matches: Slight fatigue × 0.95
-  - 3 or fewer: Fresh × 1.0
-
-Comparative Advantage:
-  - If opponent has 2+ more games in period: × 1.10
-  - If team has 2+ more games than opponent: × 0.90
-```
-
-**Key Player Availability Factor:**
-```
-(When data available - flag for manual check if not)
-  - Top scorer missing: Attack × 0.85
-  - Starting goalkeeper missing: Defense × 0.85
-  - Captain/key midfielder missing: Overall × 0.90
-  - 3+ regular starters missing: Overall × 0.80
-  - Full strength: No adjustment (1.0)
-```
-
-**Confidence Assessment:**
-```
-High Confidence: Calculated probability ≥ 60%
-Medium Confidence: Calculated probability 45-59%
-Low Confidence: Calculated probability < 45%
+Position 1-2 (Title race): × 1.15
+Position 3-5 (European qualification): × 1.10
+Position ≥ 17 (Relegation battle): × 1.15
+Other positions: × 1.0
 ```
 
 **Thresholds:**
-- **Strong Recommendation:** Probability ≥ 55% AND value vs odds ≥ 5%
-- **Moderate Recommendation:** Probability ≥ 45%
-- **No Clear Recommendation:** All outcomes < 45%
+- **Strong:** Probability ≥ 55% AND value vs odds ≥ 5%
+- **Moderate:** Probability ≥ 45%
+- **Weak (filtered):** Probability < 45%
 
-**Output:**
-- All three outcome probabilities for each fixture
-- Recommended outcome (highest probability)
-- Confidence level and value assessment vs odds
-- Flag mismatches where our probability differs significantly from market
+**Enhanced Factor Tracking:**
+- `homeWinProbability`, `drawProbability`, `awayWinProbability`
+- `valueVsOdds`
+- `oddsFt1`, `oddsFtX`, `oddsFt2`
+- `impliedHomeWinPct`, `impliedDrawPct`, `impliedAwayWinPct`
+- `homePosition`, `awayPosition`, `positionGap`
+- `xgDataAvailable`
+- `homeXgForAvg`, `awayXgForAvg`, `homeXgAgainstAvg`, `awayXgAgainstAvg`
+- `homeXgDominance`, `awayXgDominance`
+- `homeXgDominanceMultiplier`, `awayXgDominanceMultiplier`
+- `homeFormMomentumMultiplier`, `awayFormMomentumMultiplier`
+- `homeFormStatus`, `awayFormStatus` (Hot streak/Good form/Neutral/Poor form/Crisis)
+- `homeFormWins`, `homeFormDraws`, `homeFormLosses` (same for away)
+- `homeAdvantageApplied` (8%)
+- `homeMotivation`, `awayMotivation` (Title race/European qualification/Relegation battle)
+- `homePpgHome`, `awayPpgAway`
+- `homeGoalDifference`, `awayGoalDifference`
+- `positiveIndicators`, `riskFlags`
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
