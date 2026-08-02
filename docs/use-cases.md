@@ -1673,17 +1673,46 @@ Fixture Timing:
 - **Moderate:** Draw Score 28-34%
 - **Weak:** Draw Score < 28%
 
-**Additional Factors:**
-1. **Historical H2H:** High draw rate in previous meetings
-2. **Weather Conditions:** Poor weather can lead to cagey games
+**Factors Tracked:**
+```
+- drawScore - overall draw probability score
+- homeDrawPctSeason / awayDrawPctSeason - season draw percentages
+- homeDrawsLast5 / awayDrawsLast5 - recent draw counts
+- ppgDifference / evenlyMatchedScore - team similarity
+- homePosition / awayPosition / positionDifference - league positions
+- homeGoalsAvg / awayGoalsAvg / lowScoringScore - attacking data
+- homeConcededAvg / awayConcededAvg / defensiveStrengthScore - defensive data
+- xgDataAvailable / homeXgAvg / awayXgAvg / xgDifference / xgSimilarityScore - xG metrics
+- drawSpecialistMultiplier / recentDrawFormMultiplier - team multipliers
+- refereeCardsMultiplier / matchContextMultiplier - context multipliers
+- refereeDrawPct / refereeAppearances / refereeCardsPerMatch - referee data
+- drawOdds / impliedProbability / valueVsOdds - betting data
+- positiveIndicators / riskFlags - analysis summary
+```
+
+**Positive Indicators Tracked:**
+- Very evenly matched teams (PPG diff < 0.3)
+- Draw specialist team(s) involved (draw % > 35%)
+- Very similar xG profiles (diff < 0.2)
+- Both teams defensively strong (concede < 1.0/game)
+- Recent draw-heavy form (2+ draws in last 5)
+- Draw-friendly referee (draw % > 30%)
+
+**Risk Flags Tracked:**
+- No xG data available for validation
+- Both teams high-scoring - goals more likely than draw
+- Both teams defensively weak - goals likely
+- Neither team has drawn recently (decisive form)
+- Mismatch in stakes - one team desperate
 
 **Output:**
 - Ranked list of fixtures by draw probability
 - Include: both team draw %, similarity scores, xG comparison
 - Value flag: Compare our probability vs implied odds probability
 - Flag: "Draw specialists meeting" when both teams draw > 30%
+- Dynamic weight redistribution when xG data unavailable
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
