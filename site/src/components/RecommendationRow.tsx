@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Recommendation } from '../types';
 import { useShortlist } from '../contexts/ShortlistContext';
+import { formatKickoffDisplay } from '../utils/kickoff';
 import styles from './RecommendationRow.module.css';
 
 interface Props {
@@ -48,20 +49,9 @@ export function RecommendationRow({
     e.stopPropagation();
     toggleShortlist(recommendation.fixtureId, recommendation.type);
   };
-  const matchDate = new Date(recommendation.matchDateUnix * 1000);
   const fixtureLabel = `${recommendation.homeTeamName} vs ${recommendation.awayTeamName}`;
   const fixturePath = `/fixtures/${recommendation.fixtureId}`;
-  
-  const formattedDate = matchDate.toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-  
-  const formattedTime = matchDate.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const kickoff = formatKickoffDisplay(recommendation.matchDateUnix);
 
   const score = Number(recommendation.score || 0).toFixed(0);
   const isBookingPoints = recommendation.type === 'BOOKING_POINTS';
@@ -90,9 +80,12 @@ export function RecommendationRow({
             <span className={styles.leaguePlaceholder}>⚽</span>
           )}
         </span>
-        <span className={styles.datetime}>
-          <span className={styles.date}>{formattedDate}</span>
-          <span className={styles.time}>{formattedTime}</span>
+        <span
+          className={`${styles.datetime} ${styles[`urgency_${kickoff.urgency}`] || ''}`}
+          title={kickoff.title}
+        >
+          <span className={styles.date}>{kickoff.primaryLabel}</span>
+          <span className={styles.time}>{kickoff.timeLabel}</span>
         </span>
         {linkToFixture ? (
           <Link to={fixturePath} className={styles.fixtureLink}>
@@ -150,7 +143,12 @@ export function RecommendationRow({
         <div className={styles.mobileCardBody}>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>When</span>
-            <span className={styles.mobileValue}>{formattedDate} {formattedTime}</span>
+            <span
+              className={`${styles.mobileValue} ${styles[`urgency_${kickoff.urgency}`] || ''}`}
+              title={kickoff.title}
+            >
+              {kickoff.primaryLabel} {kickoff.timeLabel}
+            </span>
           </div>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>Selection</span>
