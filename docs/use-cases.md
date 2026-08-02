@@ -1905,36 +1905,100 @@ Example:
    - Evenly matched (PPG difference < 0.4)
 ```
 
-**Key Exclusion Criteria:**
+**Key Exclusion Criteria (applied per market, not globally):**
 ```
-Do NOT recommend when:
-  - Winning team has high clean sheet % (> 40%)
-  - Winning team's opponent has high failed to score % (> 35%)
-  - One team is extremely dominant (likely win to nil)
+Do NOT recommend a market when:
+  - The backed winner keeps clean sheets in > 40% of matches (win to nil likely)
+  - The winner's opponent fails to score in > 35% of matches
+  - The winner's own goals requirements are not met (see Markets above)
+
+Exclusions are evaluated per candidate market, so a strong Away + BTTS
+candidate is not discarded because the home side keeps clean sheets.
+```
+
+**BTTS Probability Calculation:**
+```
+Inputs blended by availability:
+
+API potential + xG:  home BTTS 0.28 + away BTTS 0.28 + api 0.24 + xG 0.20
+API potential only:  home BTTS 0.35 + away BTTS 0.35 + api 0.30
+xG only:             home BTTS 0.40 + away BTTS 0.40 + xG 0.20
+Neither:             average of home and away season BTTS %
+```
+
+**xG BTTS Indicator:**
+```
+homeExpected = (home xG for + away xG against) / 2
+awayExpected = (away xG for + home xG against) / 2
+
+Both teams must threaten, so the limiting side governs:
+  indicator = clamp((min(homeExpected, awayExpected) / 1.2) x 100)
+```
+
+**xG Dominance (applied to win probability):**
+```
+Win probability is blended 85% base / 15% xG dominance when xG is available.
+
+dominance = clamp(50 + ((team xG for - opponent xG for) x 40))
 ```
 
 **Confidence Calculation:**
 ```
 Combined Score = Result Probability × BTTS Probability
 
-Adjustments:
-  + 10% if both teams scored in last 3 meetings
-  + 5% if both teams concede regularly (< 25% clean sheet rate)
-  - 10% if either team has > 35% clean sheet rate
-  - 5% if either team fails to score > 30% of games
+Adjustments (multiplicative):
+  x 1.10 if both teams are BTTS-heavy in recent form (>= 60% each)
+  x 1.05 if both teams concede regularly (< 25% clean sheet rate)
+  x 0.90 if either team has > 35% clean sheet rate
+  x 0.95 if either team fails to score > 30% of games
 ```
 
+> **Deviation from spec:** the spec's "+10% if both teams scored in last 3
+> meetings" requires head-to-head history, which is not present in
+> `FixtureContext`. Recent-form BTTS percentage (last 5, home/away split) is
+> used as a proxy. Adding true H2H support would require a new data source and
+> entity, so it is tracked separately rather than approximated silently.
+
 **Thresholds:**
-- **Strong:** Combined probability ≥ 35% AND both individual probs meet thresholds
-- **Moderate:** Combined probability ≥ 28%
-- **Weak:** Combined probability < 28% (filter out)
+- **Strong:** Adjusted probability ≥ 35%
+- **Moderate:** Adjusted probability ≥ 28%
+- **Weak:** Adjusted probability < 28% (filter out)
+
+**Factors Tracked:**
+```
+- homeWinProbability / drawProbability / awayWinProbability
+- bttsProbability / resultProbability
+- combinedProbability / adjustedProbability / selectedResultType
+- homeScoredAvg / awayScoredAvg / homeConcededAvg / awayConcededAvg
+- homeCleanSheetPct / awayCleanSheetPct
+- homeFailedToScorePct / awayFailedToScorePct
+- homeBttsPctSeason / awayBttsPctSeason / apiBttsPotential
+- homeBttsPctForm / awayBttsPctForm
+- xgDataAvailable / homeXgFor / homeXgAgainst / awayXgFor / awayXgAgainst
+- xgBttsIndicator
+- confidenceAdjustmentMultiplier / adjustmentsApplied
+- positiveIndicators / riskFlags
+```
+
+**Positive Indicators Tracked:**
+- Strong BTTS probability (≥ 65%)
+- Neither team keeps many clean sheets
+- Both teams score at a healthy rate
+- xG profiles support both teams scoring
+- Net positive confidence adjustment
+
+**Risk Flags Tracked:**
+- No xG data available for validation
+- A team keeps clean sheets often - win to nil risk
+- A team fails to score often - BTTS at risk
+- No recent form data - head-to-head proxy unavailable
 
 **Output:**
-- Market: "Home Win + BTTS", "Away Win + BTTS", or "Draw + BTTS"
-- Combined probability percentage
+- Market: "{Home Team} + BTTS", "{Away Team} + BTTS", or "Draw + BTTS"
+- Combined and adjusted probability percentages
 - Individual breakdown (Result %, BTTS %)
-- Key supporting stats (goals avg, clean sheet %, etc.)
-- Expected odds range indication
+- Applied confidence adjustments listed in the description
+- Key supporting stats (goals avg, clean sheet %, failed to score %, xG)
 
 **Status:** `Implemented`
 
