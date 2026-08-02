@@ -1,5 +1,6 @@
 package com.jcm.recommendations.soccer.web.controller;
 
+import com.jcm.recommendations.soccer.core.recommendation.RecommendationService;
 import com.jcm.recommendations.soccer.core.repository.FixtureOddsRepository;
 import com.jcm.recommendations.soccer.core.repository.FixtureRepository;
 import com.jcm.recommendations.soccer.core.service.DataSyncService;
@@ -26,6 +27,7 @@ public class AdminController {
     private final FixtureService fixtureService;
     private final FixtureRepository fixtureRepository;
     private final FixtureOddsRepository fixtureOddsRepository;
+    private final RecommendationService recommendationService;
 
     @PostMapping("/sync")
     public ResponseEntity<DataSyncService.SyncSummary> triggerSync(
@@ -33,9 +35,10 @@ public class AdminController {
 
         log.info("Manual sync triggered: seasonId={}", seasonId);
 
+        DataSyncService.SyncSummary summary;
         if (seasonId != null) {
             FixtureService.SyncResult result = fixtureService.syncFixturesForSeason(seasonId, "Manual");
-            return ResponseEntity.ok(new DataSyncService.SyncSummary(
+            summary = new DataSyncService.SyncSummary(
                     0,
                     0,
                     result.newCount() + result.updatedCount(),
@@ -43,11 +46,25 @@ public class AdminController {
                     0,
                     0,
                     true
-            ));
+            );
+        } else {
+            summary = dataSyncService.runFullSync();
         }
-
-        DataSyncService.SyncSummary summary = dataSyncService.runFullSync();
+        
+        recommendationService.evictAllCaches();
+        log.info("Recommendation caches evicted after manual sync");
+        
         return ResponseEntity.ok(summary);
+    }
+    
+    @PostMapping("/cache/evict")
+    public ResponseEntity<Map<String, String>> evictCaches() {
+        log.info("Manual cache eviction triggered");
+        recommendationService.evictAllCaches();
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "All recommendation caches evicted"
+        ));
     }
 
     @GetMapping("/diagnostics/odds")

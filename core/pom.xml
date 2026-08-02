@@ -53,6 +53,16 @@
             <scope>provided</scope>
         </dependency>
         
+        <!-- Caching with Caffeine -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        
         <!-- H2 Database (runtime) -->
         <dependency>
             <groupId>com.h2database</groupId>

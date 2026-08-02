@@ -1,5 +1,6 @@
 package com.jcm.recommendations.soccer.core.scheduler;
 
+import com.jcm.recommendations.soccer.core.recommendation.RecommendationService;
 import com.jcm.recommendations.soccer.core.service.DataSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class DataSyncScheduler {
 
     private final DataSyncService dataSyncService;
+    private final RecommendationService recommendationService;
 
     @Scheduled(cron = "${scheduler.cron:0 0 4 * * ?}")
     public void scheduledSync() {
@@ -22,6 +24,9 @@ public class DataSyncScheduler {
             DataSyncService.SyncSummary summary = dataSyncService.runFullSync();
             log.info("Scheduled sync completed: success={}, duration={}s", 
                     summary.success(), summary.durationSeconds());
+            
+            recommendationService.evictAllCaches();
+            log.info("Recommendation caches evicted after sync");
         } catch (Exception e) {
             log.error("Scheduled sync failed: error={}", e.getMessage(), e);
         }

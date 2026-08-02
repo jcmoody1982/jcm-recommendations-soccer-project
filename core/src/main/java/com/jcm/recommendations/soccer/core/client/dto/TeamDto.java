@@ -208,4 +208,29 @@ public class TeamDto {
     public Double getCardsAvgAway() {
         return stats != null ? stats.getCardsAvgAway() : null;
     }
+
+    // xG (Expected Goals) getters
+    public Double getXgForAvgOverall() {
+        return stats != null ? stats.getXgForAvgOverall() : null;
+    }
+
+    public Double getXgForAvgHome() {
+        return stats != null ? stats.getXgForAvgHome() : null;
+    }
+
+    public Double getXgForAvgAway() {
+        return stats != null ? stats.getXgForAvgAway() : null;
+    }
+
+    public Double getXgAgainstAvgOverall() {
+        return stats != null ? stats.getXgAgainstAvgOverall() : null;
+    }
+
+    public Double getXgAgainstAvgHome() {
+        return stats != null ? stats.getXgAgainstAvgHome() : null;
+    }
+
+    public Double getXgAgainstAvgAway() {
+        return stats != null ? stats.getXgAgainstAvgAway() : null;
+    }
 }

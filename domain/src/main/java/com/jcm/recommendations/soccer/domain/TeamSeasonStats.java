@@ -84,4 +84,13 @@ public class TeamSeasonStats {
     private Double cardsAvgOverall;
     private Double cardsAvgHome;
     private Double cardsAvgAway;
+
+    // Expected Goals (xG) data
+    private Double xgForAvgOverall;
+    private Double xgForAvgHome;
+    private Double xgForAvgAway;
+
+    private Double xgAgainstAvgOverall;
+    private Double xgAgainstAvgHome;
+    private Double xgAgainstAvgAway;
 }
