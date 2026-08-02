@@ -1794,12 +1794,64 @@ Recommend when Value ≥ 5%
 - **Moderate:** Combined probability ≥ 60%
 - **Weak:** Combined probability < 60% (filter out)
 
+**xG Integration:**
+```
+xG Score = (Team xG for avg + Opponent xG against avg) / 2
+Normalized to 0-100 scale
+
+Weight: 15% of probability when xG available
+Redistributed to other factors when not available
+```
+
+**Weights:**
+```
+With xG:
+  - Win % component: 35%
+  - PPG component: 20%
+  - Position component: 15%
+  - Form component: 15%
+  - xG component: 15%
+
+Without xG:
+  - Win % component: 40%
+  - PPG component: 25%
+  - Position component: 18%
+  - Form component: 17%
+```
+
+**Factors Tracked:**
+```
+- homeWinProbability / drawProbability / awayWinProbability
+- homeDrawCombined / drawAwayCombined
+- implied1X / value1X / impliedX2 / valueX2
+- homeFortress / awayPoorTraveler / awayRoadWarrior / homeWeakAtHome
+- homePosition / awayPosition / positionGap
+- homeWinRateHome / homeLossRateHome / awayWinRateAway / awayLossRateAway
+- homeLast5Wins / homeLast5Losses / awayLast5Wins / awayLast5Losses
+- xgDataAvailable / homeXgFor / awayXgFor / homeXgAgainst / awayXgAgainst
+- positiveIndicators / riskFlags
+```
+
+**Positive Indicators Tracked:**
+- Home team is a fortress (rarely loses at home)
+- Away team struggles on the road
+- Away team is a road warrior (strong away record)
+- Home team weak at home
+- 1X/X2 offers value vs odds
+- Home/away team significantly higher ranked
+
+**Risk Flags Tracked:**
+- No xG data available for validation
+- High probability but negative value vs odds
+- Both teams have strong home/away characteristics
+
 **Output:**
 - Market: "Home/Draw (1X)" or "Draw/Away (X2)"
-- Combined probability percentage
+- Combined probability percentage with value vs odds
 - Individual probabilities breakdown (Home %, Draw %, Away %)
-- Value vs odds indicator
-- Key factor highlights
+- Team characteristics (fortress, road warrior, poor traveler)
+- Calculated double chance odds from individual markets
+- Positive indicators and risk flags
 
 **Status:** `Implemented`
 
