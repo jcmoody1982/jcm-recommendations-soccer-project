@@ -22,8 +22,12 @@ export function FixtureCard({ fixture }: Props) {
         <span className={styles.team}>{fixture.awayTeamName}</span>
       </div>
       <div className={styles.meta}>
-        {fixture.stadium && <span className={styles.stadium}>{fixture.stadium}</span>}
-        {fixture.gameWeek && <span className={styles.gameweek}>GW{fixture.gameWeek}</span>}
+        {(fixture.stadiumName || fixture.stadium) && (
+          <span className={styles.stadium}>{fixture.stadiumName || fixture.stadium}</span>
+        )}
+        {fixture.gameWeek != null && (
+          <span className={styles.gameweek}>GW{fixture.gameWeek}</span>
+        )}
       </div>
     </Link>
   );

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { Recommendation } from '../types';
 import { useShortlist } from '../contexts/ShortlistContext';
 import styles from './RecommendationRow.module.css';
@@ -5,6 +6,8 @@ import styles from './RecommendationRow.module.css';
 interface Props {
   recommendation: Recommendation;
   showPrice?: boolean;
+  /** When false, fixture names are plain text (e.g. already on the fixture page). */
+  linkToFixture?: boolean;
 }
 
 const ConfidenceIcon = ({ level }: { level: string }) => {
@@ -33,7 +36,11 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
   );
 };
 
-export function RecommendationRow({ recommendation, showPrice = true }: Props) {
+export function RecommendationRow({
+  recommendation,
+  showPrice = true,
+  linkToFixture = true,
+}: Props) {
   const { isShortlisted, toggleShortlist } = useShortlist();
   const isInShortlist = isShortlisted(recommendation.fixtureId, recommendation.type);
 
@@ -42,6 +49,8 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
     toggleShortlist(recommendation.fixtureId, recommendation.type);
   };
   const matchDate = new Date(recommendation.matchDateUnix * 1000);
+  const fixtureLabel = `${recommendation.homeTeamName} vs ${recommendation.awayTeamName}`;
+  const fixturePath = `/fixtures/${recommendation.fixtureId}`;
   
   const formattedDate = matchDate.toLocaleDateString('en-GB', {
     weekday: 'short',
@@ -85,9 +94,13 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
           <span className={styles.date}>{formattedDate}</span>
           <span className={styles.time}>{formattedTime}</span>
         </span>
-        <span className={styles.fixture}>
-          {recommendation.homeTeamName} vs {recommendation.awayTeamName}
-        </span>
+        {linkToFixture ? (
+          <Link to={fixturePath} className={styles.fixtureLink}>
+            {fixtureLabel}
+          </Link>
+        ) : (
+          <span className={styles.fixture}>{fixtureLabel}</span>
+        )}
         <span className={styles.market}>{recommendation.market}</span>
         {showPrice && (
           <span className={styles.price}>
@@ -119,9 +132,13 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
           ) : (
             <span className={styles.mobileLeaguePlaceholder}>⚽</span>
           )}
-          <span className={styles.mobileFixture}>
-            {recommendation.homeTeamName} vs {recommendation.awayTeamName}
-          </span>
+          {linkToFixture ? (
+            <Link to={fixturePath} className={styles.mobileFixtureLink}>
+              {fixtureLabel}
+            </Link>
+          ) : (
+            <span className={styles.mobileFixture}>{fixtureLabel}</span>
+          )}
           <button 
             className={`${styles.mobileStarButton} ${isInShortlist ? styles.starred : ''}`}
             onClick={handleToggleShortlist}

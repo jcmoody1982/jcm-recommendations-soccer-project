@@ -40,10 +40,9 @@ public class RecommendationController {
     public ResponseEntity<List<Recommendation>> getRecommendationsForFixture(
             @PathVariable Long fixtureId) {
         log.info("GET /api/recommendations/fixture/{} requested", fixtureId);
+        // Empty list is a valid response (fixture exists but no engines fired).
+        // Missing fixtures are handled by GET /api/fixtures/{id}.
         List<Recommendation> recommendations = recommendationService.getRecommendationsForFixture(fixtureId);
-        if (recommendations.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
         return ResponseEntity.ok(recommendations);
     }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Competition } from '../types';
 import styles from './CompetitionCard.module.css';
 
@@ -50,12 +51,17 @@ export function CompetitionCard({ competition }: CompetitionCardProps) {
         <div className={styles.fixtureList}>
           {competition.fixtures.length > 0 ? (
             competition.fixtures.map((fixture) => (
-              <div key={fixture.fixtureId} className={styles.fixture}>
+              <Link
+                key={fixture.fixtureId}
+                to={`/fixtures/${fixture.fixtureId}`}
+                className={styles.fixture}
+              >
                 <span className={styles.teams}>
                   {fixture.homeTeam} <span className={styles.vs}>vs</span> {fixture.awayTeam}
                 </span>
                 <span className={styles.date}>{formatDate(fixture.matchDate)}</span>
-              </div>
+                <span className={styles.fixtureCue} aria-hidden="true">→</span>
+              </Link>
             ))
           ) : (
             <p className={styles.noFixtures}>No upcoming fixtures</p>

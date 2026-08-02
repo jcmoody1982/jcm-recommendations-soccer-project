@@ -2155,9 +2155,18 @@ _Use cases for the web application interface._
    - Expanded section shows:
      - List of upcoming fixtures for that competition
      - Each fixture displays: home team vs away team, date/time
-     - Clicking again collapses the section
+     - Each fixture links to `/fixtures/{fixtureId}` (fixture detail + recommendations)
+     - Clicking the competition header again collapses the section
 
-4. **Empty State**
+4. **Fixture Detail Page** (`/fixtures/{fixtureId}`)
+   - Match header: home vs away, kickoff, stadium, gameweek
+   - Recommendations for that fixture from `GET /api/recommendations/fixture/{id}`
+   - Grouped by recommendation type; shortlist star works as elsewhere
+   - Empty state when no engines produce a pick
+   - Back link to `/fixtures`
+   - Reverse bridge: recommendation rows on other pages link fixture names to this page
+
+5. **Empty State**
    - Message when no upcoming fixtures available
    - "No upcoming fixtures" or similar
 
@@ -2234,6 +2243,8 @@ GET /api/leagues/overview
 - [x] Clicking a competition expands to show fixtures
 - [x] Clicking again collapses the fixture list
 - [x] Expanded fixtures show home vs away and date/time
+- [x] Clicking a fixture opens fixture detail with its recommendations
+- [x] Recommendation rows link fixture names to fixture detail
 - [ ] Page loads within 500ms (cached data)
 - [x] Responsive layout works on mobile and desktop
 
