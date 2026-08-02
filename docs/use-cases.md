@@ -1500,19 +1500,45 @@ Last 5 Home/Away Form:
 - **Moderate Specialist:** Disparity Score 25-39%
 - **Balanced:** Disparity Score < 25%
 
-**Additional Factors:**
-1. **Stadium Factor:** Some stadiums have notable home advantage
-2. **Travel Distance:** Long away trips may affect performance
-3. **Altitude/Climate:** Significant for some leagues
-4. **Fan Attendance:** Correlation with home performance
+**Form Divergence Detection:**
+```
+Form diverges from season if PPG difference > 0.3:
+  - If formPpg > seasonPpg: "Improving"
+  - If formPpg < seasonPpg: "Declining"
+```
+
+**Factors Tracked:**
+```
+- team / isHomeTeam / classification / recommendation
+- overallDisparityScore
+- homePpg / awayPpg / ppgDisparity
+- homeWinPct / awayWinPct / winDisparity
+- homeGoalsAvg / awayGoalsAvg / goalsDisparity
+- homeConcededAvg / awayConcededAvg / concededDisparity
+- xgDataAvailable / xgDisparity / homeXgAvg / awayXgAvg
+- formDataAvailable / formPpgDivergence / formGoalsDivergence
+- formDivergesFromSeason / formStatus
+- candidatesFound / allCandidates (list with team/classification/score/confidence)
+- positiveIndicators / riskFlags
+```
+
+**Positive Indicators Tracked:**
+- Strong disparity score (≥ 40%)
+- Home fortress classification
+- Opponent is poor traveler
+- xG data confirms disparity
+
+**Risk Flags Tracked:**
+- Recent form declining from season pattern
+- No xG data available for validation
 
 **Output:**
-- Ranked list of teams by home/away disparity
-- Classification: Home Specialist, Away Specialist, Poor Traveler, Fortress, Balanced
-- Upcoming fixture context (playing home or away)
-- Recommendation: Back/Fade based on location
+- Best candidate recommendation per fixture
+- Classification: Strong/Moderate Home Specialist, Strong/Consistent Away Performer, Strong/Moderate Poor Traveler, Home Fortress
+- All candidates found listed in factors
+- Recommendation: Back Home Win, Back Away Win, Fade Away based on classification
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
