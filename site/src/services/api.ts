@@ -26,8 +26,16 @@ export const recommendationService = {
   },
 
   getByFixture: async (fixtureId: number): Promise<Recommendation[]> => {
-    const response = await api.get<Recommendation[]>(`/recommendations/fixture/${fixtureId}`);
-    return response.data;
+    try {
+      const response = await api.get<Recommendation[]>(`/recommendations/fixture/${fixtureId}`);
+      return response.data;
+    } catch (error) {
+      // Older API versions returned 404 when a fixture had no picks.
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   },
 
   getByType: async (type: RecommendationType, daysAhead = 7): Promise<Recommendation[]> => {

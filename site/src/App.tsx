@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ShortlistProvider } from './contexts/ShortlistContext';
 import MainLayout from './layouts/MainLayout';
-import { Dashboard, Recommendations, Shortlist } from './pages';
+import { Dashboard, FixtureDetail, Recommendations, Shortlist } from './pages';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +25,7 @@ function App() {
                 <Route index element={<Recommendations />} />
                 <Route path="shortlist" element={<Shortlist />} />
                 <Route path="fixtures" element={<Dashboard />} />
+                <Route path="fixtures/:fixtureId" element={<FixtureDetail />} />
               </Route>
             </Routes>
           </BrowserRouter>

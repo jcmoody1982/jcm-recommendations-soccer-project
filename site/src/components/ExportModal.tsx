@@ -11,27 +11,6 @@ interface ExportModalProps {
 
 type ExportFormat = 'image' | 'text';
 
-const SECTION_TITLES: Record<string, string> = {
-  BTTS: 'BTTS',
-  OVER_GOALS: 'Over Goals',
-  UNDER_GOALS: 'Under Goals',
-  BOOKING_POINTS: 'Booking Points',
-  VALUE_BET: 'Value Bet',
-  WINNING_FORM_MISMATCH: 'Form Mismatch',
-  LOSING_FORM_MISMATCH: 'Form Mismatch',
-  OVER_CORNERS: 'Over Corners',
-  UNDER_CORNERS: 'Under Corners',
-  CLEAN_SHEET: 'Clean Sheet',
-  FIRST_HALF_GOALS: '1st Half Goals',
-  SECOND_HALF_GOALS: '2nd Half Goals',
-  MATCH_RESULT: 'Match Result',
-  HOME_AWAY_SPECIALIST: 'Specialist',
-  DRAW: 'Draw',
-  DOUBLE_CHANCE: 'Double Chance',
-  RESULT_BTTS: 'Result + BTTS',
-  TOP_VS_BOTTOM: 'Top vs Bottom',
-};
-
 function formatDate(unix: number): string {
   const date = new Date(unix * 1000);
   return date.toLocaleDateString('en-GB', {
