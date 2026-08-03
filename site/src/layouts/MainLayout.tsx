@@ -57,7 +57,7 @@ export default function MainLayout() {
         <div className={styles.logo}>
           <Link to="/">
             <img src="/logo.png" alt="AccaBaccaGlory" className={styles.logoImage} />
-            <span className={styles.logoText}>AccaBaccaGlory</span>
+            <span className={`${styles.logoText} brand-display`}>AccaBaccaGlory</span>
           </Link>
         </div>
         
