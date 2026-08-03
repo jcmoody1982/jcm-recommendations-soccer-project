@@ -8,6 +8,7 @@ import styles from './MainLayout.module.css';
 const navItems = [
   { path: '/', label: 'Recommendations' },
   { path: '/shortlist', label: 'Shortlist', showBadge: true },
+  { path: '/results', label: 'Results' },
   { path: '/fixtures', label: 'Fixtures' },
 ];
 

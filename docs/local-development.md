@@ -88,7 +88,7 @@ curl -X POST http://localhost:8080/api/admin/sync?seasonId=17146
 
 ### Inspect Data via H2 Console
 
-Spring Boot 4 requires `spring-boot-starter-h2-console` (already in `web/pom.xml`) and `spring.h2.console.enabled=true`.
+Spring Boot 4 requires `spring-boot-h2console` (already in `web/pom.xml`) and `spring.h2.console.enabled=true`.
 
 1. Restart the app after pulling dependency changes
 2. Open browser: `http://localhost:8080/h2-console`

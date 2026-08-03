@@ -2958,35 +2958,47 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 
 **Data Required:**
 - Recommendation snapshots with outcomes and match result summary
-- Filters: date, type, confidence, outcome
+- Filters: date, outcome (type/confidence deferred to v1.1)
+
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Default date | Latest `snapshotDate` ≤ today (brand timezone) |
+| List shape | Group by fixture |
+| v1 filters | Date + outcome |
+| Day hit rate | `wins / (wins + losses)`; exclude VOID / PENDING / UNSUPPORTED |
+| UNSUPPORTED on UI | Show, muted; not counted in hit rate |
+| Nav position | After Shortlist, before Fixtures |
+| Type/confidence filters | Defer to v1.1 |
+| UC-035 entry | Not required on v1 page |
 
 **Website:**
 - New nav item: **Results**
-- Route: `/results` (exact UI composition later)
-- Default view: most recent snapshot day with settled/pending picks (typically “yesterday” once the morning job has run)
+- Route: `/results`
+- Default view: most recent snapshot day with settled/pending picks
 
 **Minimum content (v1 page contract):**
-- Pick list for a selected calendar day (`Europe/London`)
-- Per pick: fixture (home vs away), kickoff, league, type, market, confidence, outcome badge (Win / Loss / Void / Pending), FT scoreline when available
+- Pick list for a selected calendar day (`Europe/London`), grouped by fixture
+- Per pick: type, market, confidence, outcome badge (Win / Loss / Void / Pending / Unsupported)
+- Per fixture: home vs away, kickoff, league, FT scoreline when available
 - Empty states: no snapshot for day; snapshot exists but all pending
-- Optional summary strip for the selected day: wins / losses / voids / pending / hit rate among resolved
+- Day summary strip: wins / losses / voids / pending / unsupported / hit rate
 
-**API Endpoints (suggested):**
-- `GET /api/results?date=YYYY-MM-DD` — snapshots for that brand-local day
-- `GET /api/results/summary?date=YYYY-MM-DD` — day-level counts / hit rate
-- `GET /api/results/dates` — dates that have snapshots (for day picker)
+**API Endpoints:**
+- `GET /api/results/dates` — dates that have snapshots (descending)
+- `GET /api/results?date=YYYY-MM-DD&outcome=` — day board (outcome optional); omit date → latest ≤ today
 
 **Out of scope for this UC:** charts, ROI, long-window analytics (see UC-035).
 
 **Acceptance Criteria:**
-- [ ] Results appears in site navigation
-- [ ] User can view picks for a snapshot date
-- [ ] Win / Loss / Void / Pending are clearly identifiable
-- [ ] Scoreline shown for settled (and completed pending) fixtures
-- [ ] Timezone for “day” is `Europe/London`
-- [ ] Page remains usable when some picks are still PENDING
+- [x] Results appears in site navigation
+- [x] User can view picks for a snapshot date
+- [x] Win / Loss / Void / Pending / Unsupported are clearly identifiable
+- [x] Scoreline shown when completed match data exists
+- [x] Timezone for “day” is `Europe/London`
+- [x] Page remains usable when some picks are still PENDING
 
-**Status:** Pending review
+**Status:** Implemented
 
 ---
 

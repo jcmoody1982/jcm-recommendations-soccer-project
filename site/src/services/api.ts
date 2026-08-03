@@ -1,5 +1,14 @@
 import axios from 'axios';
-import type { Recommendation, RecommendationSummary, RecommendationType, Fixture, League, LeagueOverviewResponse } from '../types';
+import type {
+  Recommendation,
+  RecommendationSummary,
+  RecommendationType,
+  Fixture,
+  League,
+  LeagueOverviewResponse,
+  DayResults,
+  PickOutcome,
+} from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -102,6 +111,23 @@ export const leagueService = {
 
   getOverview: async (): Promise<LeagueOverviewResponse> => {
     const response = await api.get<LeagueOverviewResponse>('/leagues/overview');
+    return response.data;
+  },
+};
+
+export const resultsService = {
+  getDates: async (): Promise<string[]> => {
+    const response = await api.get<string[]>('/results/dates');
+    return response.data;
+  },
+
+  getDay: async (date?: string, outcome?: PickOutcome | 'ALL'): Promise<DayResults> => {
+    const response = await api.get<DayResults>('/results', {
+      params: {
+        ...(date ? { date } : {}),
+        ...(outcome && outcome !== 'ALL' ? { outcome } : {}),
+      },
+    });
     return response.data;
   },
 };
