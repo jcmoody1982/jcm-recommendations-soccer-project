@@ -28,7 +28,7 @@
   top: calc(100% + 8px);
   right: 0;
   min-width: 200px;
-  background: var(--bg-dropdown, #1a1a2e);
+  background: var(--bg-dropdown);
   border: 1px solid var(--border-color, #333);
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -86,8 +86,8 @@
 }
 
 .themeOption.active {
-  border-color: var(--accent-color, #6366f1);
-  background: var(--bg-option-active, rgba(99, 102, 241, 0.15));
+  border-color: var(--accent-color);
+  background: var(--bg-option-active);
 }
 
 .themeIcon {

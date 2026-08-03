@@ -5,50 +5,69 @@
 }
 
 :root {
-  /* Light theme (default) */
-  --bg-primary: #f5f5f7;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #e8e8ed;
+  /* Floodlight — daylight companion (light theme) */
+  --bg-primary: #eef3f8;
+  --bg-secondary: #f7fafc;
+  --bg-tertiary: #dfe7f0;
   --bg-card: #ffffff;
   --bg-dropdown: #ffffff;
-  --bg-option: rgba(0, 0, 0, 0.03);
-  --bg-option-hover: rgba(0, 0, 0, 0.06);
-  --bg-option-active: rgba(99, 102, 241, 0.1);
-  --text-primary: #1a1a2e;
-  --text-secondary: #666666;
-  --text-muted: #999999;
-  --border-color: #e0e0e0;
-  --accent-color: #6366f1;
-  --accent-hover: #4f46e5;
-  --header-gradient-start: #ffffff;
-  --header-gradient-end: #f0f0f5;
-  --scrollbar-track: #f0f0f0;
-  --scrollbar-thumb: #cccccc;
-  --scrollbar-thumb-hover: #bbbbbb;
-  --shadow-color: rgba(0, 0, 0, 0.1);
+  --bg-option: rgba(7, 17, 31, 0.04);
+  --bg-option-hover: rgba(7, 17, 31, 0.07);
+  --bg-option-active: rgba(26, 74, 122, 0.12);
+  --text-primary: #07111f;
+  --text-secondary: #4a5d73;
+  --text-muted: #7a8ea3;
+  --border-color: #c9d5e3;
+  --accent-color: #1a4a7a;
+  --accent-hover: #12365c;
+  --accent-soft: rgba(26, 74, 122, 0.12);
+  --accent-contrast: #ffffff;
+  --header-gradient-start: #f7fafc;
+  --header-gradient-end: #e4edf6;
+  --page-glow: radial-gradient(1200px 480px at 50% -10%, rgba(100, 160, 210, 0.18), transparent 60%);
+  --scrollbar-track: #e4edf6;
+  --scrollbar-thumb: #b7c6d6;
+  --scrollbar-thumb-hover: #9aadc2;
+  --shadow-color: rgba(7, 17, 31, 0.08);
+  --urgency-soon: #0b6e99;
+  --urgency-soon-strong: #085578;
+  --urgency-today: #1a4a7a;
+  --confidence-strong: #1f8a5b;
+  --confidence-moderate: #c9851a;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
 }
 
 [data-theme="dark"] {
-  --bg-primary: #0f0f1a;
-  --bg-secondary: #1a1a2e;
-  --bg-tertiary: #16213e;
-  --bg-card: #1e1e32;
-  --bg-dropdown: #1a1a2e;
-  --bg-option: rgba(255, 255, 255, 0.05);
-  --bg-option-hover: rgba(255, 255, 255, 0.1);
-  --bg-option-active: rgba(99, 102, 241, 0.15);
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --text-muted: #666666;
-  --border-color: #333333;
-  --accent-color: #6366f1;
-  --accent-hover: #818cf8;
-  --header-gradient-start: #1a1a2e;
-  --header-gradient-end: #16213e;
-  --scrollbar-track: #1a1a2e;
-  --scrollbar-thumb: #333333;
-  --scrollbar-thumb-hover: #444444;
-  --shadow-color: rgba(0, 0, 0, 0.3);
+  /* Floodlight night — primary brand expression */
+  --bg-primary: #07111f;
+  --bg-secondary: #0c1829;
+  --bg-tertiary: #122238;
+  --bg-card: #101d30;
+  --bg-dropdown: #0c1829;
+  --bg-option: rgba(168, 216, 255, 0.04);
+  --bg-option-hover: rgba(168, 216, 255, 0.08);
+  --bg-option-active: rgba(168, 216, 255, 0.14);
+  --text-primary: #f2f6fa;
+  --text-secondary: #9aa8b8;
+  --text-muted: #6b7c90;
+  --border-color: rgba(168, 216, 255, 0.14);
+  --accent-color: #a8d8ff;
+  --accent-hover: #c5e5ff;
+  --accent-soft: rgba(168, 216, 255, 0.12);
+  --accent-contrast: #07111f;
+  --header-gradient-start: #0a1626;
+  --header-gradient-end: #07111f;
+  --page-glow: radial-gradient(1000px 420px at 50% -8%, rgba(168, 216, 255, 0.14), transparent 55%);
+  --scrollbar-track: #0c1829;
+  --scrollbar-thumb: #24364d;
+  --scrollbar-thumb-hover: #314963;
+  --shadow-color: rgba(0, 0, 0, 0.45);
+  --urgency-soon: #a8d8ff;
+  --urgency-soon-strong: #d4ecff;
+  --urgency-today: #8eb6d6;
+  --confidence-strong: #3dba7e;
+  --confidence-moderate: #e0a84a;
 }
 
 html {
@@ -56,13 +75,21 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: var(--bg-primary);
+  font-family: var(--font-body);
+  background-color: var(--bg-primary);
+  background-image: var(--page-glow);
+  background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+h1, h2, h3, .brand-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  font-weight: 600;
 }
 
 a {

@@ -32,6 +32,11 @@
 }
 
 .logoText {
+  font-family: var(--font-display);
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text-primary);
 }
 
@@ -58,8 +63,8 @@
 }
 
 .navLink.active {
-  color: var(--text-primary);
-  background: rgba(99, 102, 241, 0.3);
+  color: var(--accent-color);
+  background: var(--accent-soft);
 }
 
 .badge {
@@ -71,7 +76,7 @@
   padding: 0 6px;
   border-radius: 10px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-contrast);
   font-size: 0.75rem;
   font-weight: 600;
   margin-left: 6px;
@@ -200,8 +205,8 @@
 }
 
 .mobileNavLink.active {
-  color: var(--text-primary);
-  background: rgba(99, 102, 241, 0.3);
+  color: var(--accent-color);
+  background: var(--accent-soft);
 }
 
 .mobileSettings {
@@ -252,8 +257,10 @@
 .main {
   flex: 1;
   padding: 2rem;
-  background: var(--bg-primary);
-  transition: background 0.3s ease;
+  background-color: var(--bg-primary);
+  background-image: var(--page-glow);
+  background-attachment: fixed;
+  transition: background-color 0.3s ease;
 }
 
 .footer {
