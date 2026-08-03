@@ -2618,7 +2618,7 @@ RecommendationHistory:
 - [ ] Stats update automatically after matches complete
 - [ ] Minimum sample size indicator (e.g., "Not enough data" if < 10 picks)
 
-**Status:** Draft
+**Status:** Superseded — see **Results** section (UC-031–UC-035). Performance hit-rate analytics live under UC-035.
 
 ---
 
@@ -2709,6 +2709,317 @@ RecommendationHistory:
 
 ---
 
+### Results
+
+_Use cases for freezing daily picks, fetching completed match outcomes, settling win/loss, and presenting Results on the AccaBaccaGlory site._
+
+**Product decisions (locked):**
+
+| Decision | Choice |
+|----------|--------|
+| Snapshot scope | All **STRONG** and **MODERATE** picks (actionable; exclude WEAK) |
+| Snapshot window | Fixtures **kicking off today** in brand timezone |
+| Snapshot timing | Immediately **after** the daily FootyStats sync completes |
+| Settlement v1 | Scoreline markets only (see UC-033); corners/cards deferred |
+| Timezone | Brand timezone: `Europe/London` (AccaBaccaGlory) |
+| Pending matches | Re-settlement retries until resolved or VOID |
+
+**Daily rhythm (brand timezone):**
+
+```text
+Day N   scheduled sync (existing)     → refresh fixtures/odds/stats
+Day N   then snapshot job             → freeze STRONG+MODERATE picks for kickoffs today
+Day N+1 scheduled results job         → fetch completed results → settle → retry PENDING
+        Results page                  → shows settled / pending picks by day
+```
+
+Exact cron times remain configurable; order is fixed: **sync → snapshot**, then next day **ingest → settle**.
+
+---
+
+#### UC-031: Daily Recommendation Snapshot
+
+**Goal:** Persist a durable, immutable daily record of published picks so they can be graded after matches finish. Live recommendations are ephemeral (on-demand + short cache); without a snapshot, yesterday’s board cannot be graded fairly.
+
+**User Story:** As the system, I want to freeze all Strong and Moderate picks for fixtures kicking off today after the daily sync so that we have a stable pick history to settle against results.
+
+**Data Required:**
+- Live recommendation engine output (production `Recommendation` model)
+- Fixture kickoff (`matchDateUnix`) for “today” filtering
+- Brand calendar day in `Europe/London`
+
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Sync gate | Snapshot only when `SyncSummary.success` is true (`failedSeasons == 0`); otherwise skip |
+| Same-day re-run | Upsert only rows that are still `PENDING` **and** whose kickoff is still in the future; never rewrite post-kickoff or settled rows |
+| Types snapshotted | All actionable types (including corners/cards); settlement scope is UC-033 |
+| Generation window | Generate for fixtures through end of London today (prefer `daysAhead` covering today only, not full 7-day board), then filter |
+| Manual admin sync | On successful `POST /api/admin/sync`, chain the same snapshot job |
+| factorsJson | Persist for debugging/transparency; not required on Results v1 UI |
+| Timezone | Configurable property defaulting to `Europe/London` |
+
+**Snapshot rules:**
+- Trigger: after successful daily sync (scheduler pipeline) and after successful manual admin sync
+- Include: confidence `STRONG` or `MODERATE` only
+- Include: picks whose fixture kickoff falls on **today** in brand timezone
+- Exclude: `WEAK` picks; fixtures kicking off on other calendar days
+- Unique key: `(snapshotDate, fixtureId, type)` — type from the recommendation record
+- Store denormalized display fields (team names, league, market, odds, score, description) so Results UI does not depend on live fixture rows that may later age out of the upcoming window
+
+**Persisted fields (minimum):**
+```
+RecommendationSnapshot:
+  - id
+  - snapshotDate          (LocalDate, brand timezone)
+  - fixtureId
+  - homeTeamId / awayTeamId
+  - homeTeamName / awayTeamName
+  - matchDateUnix         (kickoff)
+  - leagueId / leagueName / leagueImage
+  - type                  (RecommendationType)
+  - market                (selection string, e.g. "BTTS Yes", "Over 2.5")
+  - confidence            (STRONG | MODERATE)
+  - score
+  - odds                  (nullable)
+  - description
+  - factorsJson           (optional; transparency)
+  - generatedAt
+  - outcome               (PENDING initially)
+  - resolvedAt            (null until settled)
+  - matchResultJson       (null until settled; relevant scoreline/stats)
+```
+
+**API Source(s):** Internal — `RecommendationService` after sync; no extra FootyStats call beyond the sync that just ran.
+
+**Behavior:**
+1. Confirm daily (or admin) sync completed successfully
+2. Evict recommendation caches (existing post-sync step), then generate recommendations for today’s window
+3. Filter to STRONG/MODERATE + kickoff date == today (brand timezone)
+4. Upsert into snapshot storage per re-run policy above
+5. Leave new/updated outcomes as `PENDING`
+
+**Acceptance Criteria:**
+- [ ] Snapshot runs only when sync reports success
+- [ ] Only STRONG and MODERATE picks are stored
+- [ ] Only brand-timezone-today kickoffs are stored
+- [ ] Unique on `(snapshotDate, fixtureId, type)` — no duplicates
+- [ ] Re-run does not alter post-kickoff or already-settled rows
+- [ ] Snapshots survive cache eviction and recommendation regeneration
+- [ ] Picks remain queryable by `snapshotDate`
+- [ ] All new outcomes start as `PENDING`
+- [ ] Manual admin sync chains snapshot on success
+
+**Status:** Implemented
+
+---
+
+#### UC-032: Completed Match Result Ingest
+
+**Goal:** Fetch final (or updated) match results for snapshotted fixtures so picks can be settled. Current sync keeps upcoming incomplete fixtures only and does not refresh completed scores.
+
+**User Story:** As the system, I want to pull completed match data for yesterday’s snapshotted fixtures so that each pick can be marked win or loss.
+
+**Data Required:**
+- Snapshot rows still `PENDING` (or all snapshots for a target date)
+- Match status + scoreline (FT goals; HT / 2H goals for half-goal markets)
+- Corners/cards stored when present (for later settlement; not graded in UC-033 v1)
+
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Fetch strategy | Bulk `GET /todays-matches?date=&timezone=` (paginated) per target date; `GET /match?match_id=` fallback for fixtureIds still missing or incomplete |
+| Target dates | London **yesterday**, plus any `snapshotDate` with PENDING rows in the last **7 days** |
+| Storage | Persist **`CompletedMatch`** keyed by `fixtureId` (status, scoreline, stats, `fetchedAt`); snapshot `matchResultJson` filled at settle time (UC-033) |
+| HT / 2H | Store whenever the API provides them |
+| Scheduling | Separate morning cron (configurable brand timezone); **not** chained to sync→snapshot |
+| Manual trigger | Admin endpoint to ingest by date and/or all PENDING in lookback |
+| After lookback | Stop automatic retries; remaining PENDING handled by UC-033 expiry/VOID policy |
+
+**API Source(s):** FootyStats `/todays-matches`, `/match`; map via `MatchStatus`, `Scoreline`, `MatchStats` (existing WIP mapper).
+
+**Behavior:**
+1. Scheduled results job runs (default: morning Day N+1, brand timezone)
+2. Resolve target dates (yesterday + PENDING lookback)
+3. For each date: fetch all pages of todays-matches; upsert `CompletedMatch`
+4. For PENDING snapshot fixtureIds still absent or `INCOMPLETE`: selective `getMatch` fallback
+5. Hand off fixtures with fresh data to settlement (UC-033) — same scheduler run is fine; use-case boundary remains ingest
+6. Incomplete matches remain eligible until lookback expires
+
+**Edge cases:**
+- Match postponed / still incomplete → upsert status; leave snapshots PENDING for retry
+- Suspended / canceled → upsert status for VOID in UC-033
+- Partial data (FT in, HT missing) → store what is available; half-goal settle stays PENDING until data arrives or UC-033 policy applies
+- API partial failure → do not wipe existing good `CompletedMatch` rows
+
+**Acceptance Criteria:**
+- [ ] Job can load results for fixtures no longer in the upcoming 7-day sync window
+- [ ] Completed matches yield FT scoreline on `CompletedMatch`
+- [ ] HT/2H stored when present
+- [ ] Incomplete matches do not force LOSS; snapshots stay PENDING and retry within 7 days
+- [ ] Canceled/suspended status is captured for VOID handling
+- [ ] Job is safe to re-run (idempotent upserts)
+- [ ] Admin can trigger ingest manually
+- [ ] Automatic retries stop after 7-day lookback
+
+**Status:** Implemented
+
+---
+
+#### UC-033: Pick Settlement (Win / Loss / Void)
+
+**Goal:** Mark each snapshotted pick as a winner or loser (or void/pending/unsupported) using market-specific rules against ingested results.
+
+**User Story:** As the system, I want to resolve each frozen pick against the match result so that the Results page can show which tips landed.
+
+**Outcomes:**
+| Outcome | Meaning |
+|---------|---------|
+| `PENDING` | Result not available yet, or required stats missing; will retry |
+| `WIN` | Pick correct |
+| `LOSS` | Pick incorrect |
+| `VOID` | Match canceled/suspended, or unresolved after lookback expiry |
+| `UNSUPPORTED` | Type/selection not graded in v1 (e.g. corners, cards) — not a failed tip |
+
+(`PUSH` reserved if needed later for refunded lines; not required for v1.)
+
+Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
+
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Deferred markets | Mark `UNSUPPORTED` immediately (do not leave as forever-PENDING) |
+| Team-to-win + draw | **LOSS** |
+| Past 7-day lookback still unresolved | **VOID** (expired) |
+| Half-goal markets in v1 | **Yes**; stay PENDING until HT/2H available |
+| VALUE_BET | Settle when `market` parses as a scoreline shape; else UNSUPPORTED |
+| Re-settle terminal rows | **No** in v1 (do not flip WIN/LOSS/VOID/UNSUPPORTED) |
+| Selection encoding | v1 parses `type` + `market` with unit tests; structured selection is a follow-up |
+
+**Gate order (every PENDING row):**
+1. Already terminal → skip
+2. No `CompletedMatch` → PENDING
+3. Status `INCOMPLETE` / `UNKNOWN` → PENDING
+4. Status `CANCELED` / `SUSPENDED` → VOID
+5. Status `COMPLETE` → run type grader
+6. `snapshotDate` older than lookback and still unresolved → VOID
+
+**Settlement scope v1 (scoreline) — grade using actual engine market strings:**
+
+| RecommendationType | WIN when | Data |
+|--------------------|----------|------|
+| `BTTS` | `BTTS Yes` → both teams scored | FT |
+| `OVER_GOALS` / `UNDER_GOALS` | FT total vs line in market (`Over/Under 1.5/2.5/3.5 Goals`) | FT |
+| `MATCH_RESULT` | market is home name → home win; away name → away win; `Draw` → draw | FT |
+| `DRAW` | FT draw (`market` = `Draw`) | FT |
+| `DOUBLE_CHANCE` | `Home/Draw (1X)` → home or draw; `Draw/Away (X2)` → draw or away | FT |
+| `RESULT_BTTS` | result leg and BTTS both true (`{Team} + BTTS` or `Draw + BTTS`) | FT |
+| `CLEAN_SHEET` | named team (`{Team} Clean Sheet`) conceded 0 | FT |
+| `TOP_VS_BOTTOM`, form mismatch, `HOME_AWAY_SPECIALIST` | named team won (draw = LOSS) | FT |
+| `FIRST_HALF_GOALS` | HT total vs line (`Over 0.5/1.5 HT Goals` or `… First Half Goals`) | HT |
+| `SECOND_HALF_GOALS` | 2H total vs line (prefer API 2H; else FT−HT) | HT+FT or 2H |
+| `VALUE_BET` | Dispatch by market: `BTTS Yes/No`, O/U goals, `Home Win` / `Away Win` / `Draw` | FT |
+
+**Deferred → `UNSUPPORTED` (v1):**
+- `OVER_CORNERS` / `UNDER_CORNERS`
+- `BOOKING_POINTS`
+- `VALUE_BET` when market is not a scoreline shape above
+
+**Settlement rules:**
+- Prefer `type` + parsed `market`; match team names against denormalized snapshot home/away names
+- Insufficient stats for that market → PENDING (retry), never LOSS
+- On resolve: set `outcome`, `resolvedAt`, copy slim status/scoreline into `matchResultJson`
+
+**Behavior:**
+1. For each eligible PENDING snapshot with `CompletedMatch` (or expiry check)
+2. Apply gate order, then type-specific grader
+3. Persist outcome fields
+4. Mark UNSUPPORTED for out-of-scope types without waiting on the match
+
+**Acceptance Criteria:**
+- [ ] All v1 types have explicit grader rules and unit tests against real market strings
+- [ ] BTTS / O-U / match-result / draw / double chance / result+BTTS / clean sheet / team-win settle from FT
+- [ ] Half-goal markets use HT (and 2H) correctly; missing HT → PENDING then VOID after lookback
+- [ ] Canceled/suspended → VOID
+- [ ] Incomplete → PENDING and retried within lookback
+- [ ] Corners/cards → UNSUPPORTED (not LOSS, not forever PENDING)
+- [ ] Settlement is idempotent for already-resolved rows
+- [ ] `matchResultJson` populated on resolve
+
+**Status:** Implemented
+
+---
+
+#### UC-034: Results Page - Settled Picks Board
+
+**Goal:** Add a **Results** section to the AccaBaccaGlory website that shows snapshotted picks and whether they won or lost. Layout/visual design TBD; this use case defines the product contract.
+
+**User Story:** As a user, I want to open Results and see how yesterday’s (and prior days’) Strong/Moderate picks performed so that I can judge the tips over time.
+
+**Data Required:**
+- Recommendation snapshots with outcomes and match result summary
+- Filters: date, type, confidence, outcome
+
+**Website:**
+- New nav item: **Results**
+- Route: `/results` (exact UI composition later)
+- Default view: most recent snapshot day with settled/pending picks (typically “yesterday” once the morning job has run)
+
+**Minimum content (v1 page contract):**
+- Pick list for a selected calendar day (`Europe/London`)
+- Per pick: fixture (home vs away), kickoff, league, type, market, confidence, outcome badge (Win / Loss / Void / Pending), FT scoreline when available
+- Empty states: no snapshot for day; snapshot exists but all pending
+- Optional summary strip for the selected day: wins / losses / voids / pending / hit rate among resolved
+
+**API Endpoints (suggested):**
+- `GET /api/results?date=YYYY-MM-DD` — snapshots for that brand-local day
+- `GET /api/results/summary?date=YYYY-MM-DD` — day-level counts / hit rate
+- `GET /api/results/dates` — dates that have snapshots (for day picker)
+
+**Out of scope for this UC:** charts, ROI, long-window analytics (see UC-035).
+
+**Acceptance Criteria:**
+- [ ] Results appears in site navigation
+- [ ] User can view picks for a snapshot date
+- [ ] Win / Loss / Void / Pending are clearly identifiable
+- [ ] Scoreline shown for settled (and completed pending) fixtures
+- [ ] Timezone for “day” is `Europe/London`
+- [ ] Page remains usable when some picks are still PENDING
+
+**Status:** Pending review
+
+---
+
+#### UC-035: Results Performance Analytics
+
+**Goal:** Aggregate historical settled picks into hit rates by type and confidence (the analytics intent formerly drafted as UC-028).
+
+**User Story:** As a user, I want to see how accurate each recommendation type has been over recent periods so that I know which markets are most reliable.
+
+**Depends on:** UC-031–UC-033 (and preferably UC-034 as the host surface).
+
+**Statistics:**
+- Hit rate % per recommendation type (7d / 30d / 90d / all)
+- Hit rate by confidence (Strong vs Moderate)
+- Sample size per bucket
+- Optional later: ROI % from stored odds, streaks
+
+**UI (later):** tab or sub-view under Results, or dedicated `/results/performance` — design TBD.
+
+**API Endpoints (suggested):**
+- `GET /api/results/performance/summary`
+- `GET /api/results/performance/by-type`
+
+**Acceptance Criteria:**
+- [ ] Stats computed only from terminal outcomes (`WIN`/`LOSS`; policy for VOID exclusion documented)
+- [ ] Time period filters work
+- [ ] Minimum sample size messaging when data is sparse
+- [ ] Updates as new days settle (no manual rebuild required)
+
+**Status:** Pending review
+
+---
+
 ### iOS Native App
 
 _Use cases for the iOS mobile application._
@@ -2746,6 +3057,8 @@ _As use cases are defined, summarize the domain entities needed here._
 | Referee | id, full_name, first_name, last_name, known_as, seasonId | API `/league-referees` | UC-003 |
 | RefereeStats | refereeId, seasonId, appearances, outcomes, goals, btts, penalties, cards (all fields) | API `/league-referees` | UC-003 |
 | TeamRecentForm | teamId, results, goals, btts, over/under, corners, cards, fouls, cleanSheets (last 5 matches) | API `/lastx` | UC-004 |
+| RecommendationSnapshot | snapshotDate, fixtureId, type, market, confidence, score, odds, outcome, matchResultJson, denormalized fixture/league labels | Internal engines + FootyStats results | UC-031–UC-035 |
+| CompletedMatch | fixtureId, status, FT/HT/2H goals, corners/cards, fetchedAt | FootyStats `/todays-matches`, `/match` | UC-032–UC-033 |
 
 ---
 
