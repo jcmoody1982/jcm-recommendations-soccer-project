@@ -2266,15 +2266,23 @@ GET /api/leagues/overview
 
 1. **Page Header**
    - Title: "Recommendations"
-   - Days ahead filter (1, 3, 7, 14 days)
+   - Days ahead filter (12 hours, 24 hours, 3 days, 7 days)
 
-2. **Recommendation Sections**
+2. **Kickoff urgency**
+   - Filter chips: All kickoffs / Soon (next 3 hours) / Today / Tomorrow
+   - Chip labels show fixture counts for Soon / Today / Tomorrow
+   - Sort control: Best score (default) or Soonest kickoff
+   - Selecting Soon/Today/Tomorrow switches sort to soonest kickoff
+   - Rows show relative kickoff labels (`in 45m`, `Today`, `Tomorrow`) with urgency colouring
+   - Footer hint when picks are starting within 3 hours
+
+3. **Recommendation Sections**
    - One section per recommendation type
    - Section title with icon/badge
    - Shows top 5 recommendations for that type
    - Each recommendation card shows:
      - Home vs Away teams
-     - Match date/time
+     - Match date/time (relative when soon/today/tomorrow)
      - Confidence level (Strong/Moderate)
      - Score/probability
      - Key factors

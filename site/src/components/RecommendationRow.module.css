@@ -90,6 +90,48 @@
   color: var(--text-primary);
 }
 
+.urgency_soon .date,
+.urgency_soon.mobileValue {
+  color: #c2410c;
+  font-weight: 700;
+}
+
+.urgency_soon .time {
+  color: #ea580c;
+}
+
+.urgency_today .date,
+.urgency_today.mobileValue {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.urgency_tomorrow .date,
+.urgency_tomorrow.mobileValue {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.urgency_started .date,
+.urgency_started.mobileValue {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+[data-theme="dark"] .urgency_soon .date,
+[data-theme="dark"] .urgency_soon.mobileValue {
+  color: #fb923c;
+}
+
+[data-theme="dark"] .urgency_soon .time {
+  color: #fdba74;
+}
+
+[data-theme="dark"] .urgency_today .date,
+[data-theme="dark"] .urgency_today.mobileValue {
+  color: #fbbf24;
+}
+
 .fixture,
 .fixtureLink {
   font-weight: 500;
