@@ -35,7 +35,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         return stored;
       }
     }
-    return 'light';
+    // Floodlight is a night-first brand; default new visitors to dark.
+    return 'dark';
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(theme));

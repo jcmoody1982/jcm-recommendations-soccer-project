@@ -2,19 +2,21 @@
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  background: #1a1a2e;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   padding: 1rem 1.5rem;
   border-radius: 10px;
   text-decoration: none;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .card:hover {
-  background: #252542;
+  background: var(--bg-option-hover);
+  border-color: var(--accent-color);
 }
 
 .time {
-  color: #fff;
+  color: var(--accent-color);
   font-weight: 600;
   font-size: 1rem;
   min-width: 50px;
@@ -28,12 +30,12 @@
 }
 
 .team {
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
 .vs {
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
 }
@@ -41,7 +43,7 @@
 .meta {
   display: flex;
   gap: 1rem;
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.75rem;
 }
 
@@ -53,7 +55,7 @@
 }
 
 .gameweek {
-  background: #252542;
+  background: var(--bg-option);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
 }
