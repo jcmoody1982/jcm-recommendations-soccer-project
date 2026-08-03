@@ -1,27 +1,29 @@
 .card {
-  background: #1a1a2e;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 1.5rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.3s ease;
 }
 
 .card:hover {
   transform: translateY(-2px);
+  border-color: var(--accent-color);
 }
 
 .highlight {
-  background: linear-gradient(135deg, #1a1a2e 0%, #252542 100%);
-  border: 1px solid #6366f1;
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--accent-color);
 }
 
 .icon {
   font-size: 2rem;
   width: 60px;
   height: 60px;
-  background: #252542;
+  background: var(--bg-option);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -29,7 +31,7 @@
 }
 
 .highlight .icon {
-  background: rgba(99, 102, 241, 0.2);
+  background: var(--accent-soft);
 }
 
 .content {
@@ -37,14 +39,16 @@
 }
 
 .value {
+  font-family: var(--font-display);
   font-size: 2rem;
   font-weight: 700;
-  color: #fff;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
   line-height: 1;
   margin-bottom: 0.25rem;
 }
 
 .title {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }

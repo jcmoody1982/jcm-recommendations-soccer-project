@@ -15,7 +15,7 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
   if (level === 'STRONG') {
     return (
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="9" fill="#22c55e" stroke="#16a34a" strokeWidth="1"/>
+        <circle cx="10" cy="10" r="9" fill="var(--confidence-strong)" stroke="var(--confidence-strong)" strokeWidth="1"/>
         <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     );
@@ -23,7 +23,7 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
   if (level === 'MODERATE') {
     return (
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="9" fill="#f59e0b" stroke="#d97706" strokeWidth="1"/>
+        <circle cx="10" cy="10" r="9" fill="var(--confidence-moderate)" stroke="var(--confidence-moderate)" strokeWidth="1"/>
         <path d="M10 6V10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
         <circle cx="10" cy="13" r="1" fill="white"/>
       </svg>
