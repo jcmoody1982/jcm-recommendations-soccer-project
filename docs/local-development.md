@@ -88,16 +88,27 @@ curl -X POST http://localhost:8080/api/admin/sync?seasonId=17146
 
 ### Inspect Data via H2 Console
 
-1. Open browser: `http://localhost:8080/h2-console`
-2. JDBC URL: `jdbc:h2:file:./data/soccer-recommendations`
-3. Username: `sa`
-4. Password: (leave blank)
-5. Click Connect
+Spring Boot 4 requires `spring-boot-starter-h2-console` (already in `web/pom.xml`) and `spring.h2.console.enabled=true`.
+
+1. Restart the app after pulling dependency changes
+2. Open browser: `http://localhost:8080/h2-console`
+3. JDBC URL:
+   - **local profile** (file DB): `jdbc:h2:file:./data/soccer-recommendations`
+   - **default profile** (in-memory): `jdbc:h2:mem:soccer-recommendations`
+4. Username: `sa`
+5. Password: (leave blank)
+6. Click Connect
 
 **Useful queries:**
 ```sql
 -- Check leagues
 SELECT * FROM league;
+
+-- Today's recommendation snapshots
+SELECT * FROM recommendation_snapshot ORDER BY match_date_unix, type;
+
+-- Completed match results
+SELECT * FROM completed_match;
 
 -- Check fixtures for next 7 days
 SELECT * FROM fixture WHERE date_unix > UNIX_TIMESTAMP() AND date_unix < UNIX_TIMESTAMP() + (7 * 86400);

@@ -41,11 +41,15 @@
             <scope>provided</scope>
         </dependency>
         
-        <!-- H2 Database (local development) -->
+        <!-- H2 Database + console (local development; Boot 4 needs the console starter) -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-h2-console</artifactId>
         </dependency>
         
         <!-- PostgreSQL (production) -->
