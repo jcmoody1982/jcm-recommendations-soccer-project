@@ -40,12 +40,12 @@
 }
 
 .starButton:hover {
-  color: #f59e0b;
+  color: var(--accent-color);
   transform: scale(1.1);
 }
 
 .starButton.starred {
-  color: #f59e0b;
+  color: var(--accent-color);
 }
 
 .sentiment {
@@ -92,17 +92,17 @@
 
 .urgency_soon .date,
 .urgency_soon.mobileValue {
-  color: #c2410c;
+  color: var(--urgency-soon-strong);
   font-weight: 700;
 }
 
 .urgency_soon .time {
-  color: #ea580c;
+  color: var(--urgency-soon);
 }
 
 .urgency_today .date,
 .urgency_today.mobileValue {
-  color: #b45309;
+  color: var(--urgency-today);
   font-weight: 600;
 }
 
@@ -116,20 +116,6 @@
 .urgency_started.mobileValue {
   color: var(--text-muted);
   font-style: italic;
-}
-
-[data-theme="dark"] .urgency_soon .date,
-[data-theme="dark"] .urgency_soon.mobileValue {
-  color: #fb923c;
-}
-
-[data-theme="dark"] .urgency_soon .time {
-  color: #fdba74;
-}
-
-[data-theme="dark"] .urgency_today .date,
-[data-theme="dark"] .urgency_today.mobileValue {
-  color: #fbbf24;
 }
 
 .fixture,
@@ -214,7 +200,7 @@
   }
 
   .mobileStarButton.starred {
-    color: #f59e0b;
+    color: var(--accent-color);
   }
 
   .mobileSentiment {

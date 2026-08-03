@@ -12,12 +12,15 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'accabaccaglory-theme';
+const BRAND_KEY = 'accabaccaglory-brand';
+/** Bump when the brand identity changes so returning users see the new default once. */
+const BRAND_VERSION = 'floodlight-1';
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window !== 'undefined' && window.matchMedia) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
-  return 'light';
+  return 'dark';
 }
 
 function resolveTheme(theme: Theme): ResolvedTheme {
@@ -27,16 +30,29 @@ function resolveTheme(theme: Theme): ResolvedTheme {
   return theme;
 }
 
+function readInitialTheme(): Theme {
+  if (typeof window === 'undefined') {
+    return 'dark';
+  }
+
+  const brand = localStorage.getItem(BRAND_KEY);
+  if (brand !== BRAND_VERSION) {
+    // One-time migration onto Floodlight night for anyone who still has an old preference.
+    localStorage.setItem(BRAND_KEY, BRAND_VERSION);
+    localStorage.setItem(STORAGE_KEY, 'dark');
+    return 'dark';
+  }
+
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark' || stored === 'system') {
+    return stored;
+  }
+
+  return 'dark';
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        return stored;
-      }
-    }
-    return 'light';
-  });
+  const [theme, setThemeState] = useState<Theme>(() => readInitialTheme());
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(theme));
 

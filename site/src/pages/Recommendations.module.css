@@ -16,8 +16,12 @@
 }
 
 .title {
+  font-family: var(--font-display);
   color: var(--text-primary);
-  font-size: 1.75rem;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   margin: 0;
 }
 
@@ -186,7 +190,7 @@
   background: var(--accent-color);
   border: none;
   border-radius: 8px;
-  color: white;
+  color: var(--accent-contrast);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -194,7 +198,7 @@
 }
 
 .clearFiltersAlt:hover {
-  background: var(--accent-color-hover, #5558e6);
+  background: var(--accent-hover);
 }
 
 @media (max-width: 640px) {
@@ -267,7 +271,7 @@
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-contrast);
   border: none;
   border-radius: 8px;
   font-size: 0.95rem;
@@ -277,7 +281,7 @@
 }
 
 .retryButton:hover {
-  background: var(--accent-color-hover, #5558e6);
+  background: var(--accent-hover);
 }
 
 .retryButton:active {
@@ -307,10 +311,10 @@
 
 .soonHint {
   padding: 0.35rem 0.75rem;
-  border: 1px solid #fdba74;
+  border: 1px solid var(--accent-color);
   border-radius: 6px;
-  background: rgba(234, 88, 12, 0.08);
-  color: #c2410c;
+  background: var(--accent-soft);
+  color: var(--urgency-soon-strong);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -318,11 +322,5 @@
 }
 
 .soonHint:hover {
-  background: rgba(234, 88, 12, 0.14);
-}
-
-[data-theme="dark"] .soonHint {
-  color: #fb923c;
-  border-color: #ea580c;
-  background: rgba(234, 88, 12, 0.12);
+  background: var(--bg-option-active);
 }
