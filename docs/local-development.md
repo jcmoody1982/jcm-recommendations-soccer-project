@@ -76,15 +76,21 @@ curl http://localhost:8080/health
 
 ### Manual Data Sync
 
-Instead of waiting for the scheduler, trigger sync manually via REST endpoint:
+Admin routes require the **admin** beta password (default local: `admin`). Login first to get a session cookie:
 
 ```bash
+curl -c /tmp/abg-cookies -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"admin"}'
+
 # Trigger full sync
-curl -X POST http://localhost:8080/api/admin/sync
+curl -b /tmp/abg-cookies -X POST http://localhost:8080/api/admin/sync
 
 # Sync specific league only
-curl -X POST http://localhost:8080/api/admin/sync?seasonId=17146
+curl -b /tmp/abg-cookies -X POST "http://localhost:8080/api/admin/sync?seasonId=17146"
 ```
+
+Site password (default local: `beta`) unlocks the UI and `/api/**` but not `/api/admin/**`.
 
 ### Inspect Data via H2 Console
 
@@ -245,8 +251,10 @@ Before deploying to AWS, verify locally:
 # 1. Start the app
 cd web && mvn spring-boot:run -Dspring-boot.run.profiles=local
 
-# 2. In another terminal, trigger sync
-curl -X POST http://localhost:8080/api/admin/sync
+# 2. In another terminal, login as admin then trigger sync
+curl -c /tmp/abg-cookies -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' -d '{"password":"admin"}'
+curl -b /tmp/abg-cookies -X POST http://localhost:8080/api/admin/sync
 
 # 3. Watch logs for progress
 # INFO [DataSyncJob] Starting daily data sync job

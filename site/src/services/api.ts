@@ -17,7 +17,38 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
+
+export type AuthMe = {
+  authenticated: boolean;
+  role?: string;
+  authEnabled?: boolean;
+  error?: string;
+};
+
+export const authService = {
+  login: async (password: string): Promise<AuthMe> => {
+    try {
+      const response = await api.post<AuthMe>('/auth/login', { password });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        return (error.response.data as AuthMe) ?? { authenticated: false, error: 'Invalid password' };
+      }
+      throw error;
+    }
+  },
+
+  logout: async (): Promise<void> => {
+    await api.post('/auth/logout');
+  },
+
+  me: async (): Promise<AuthMe> => {
+    const response = await api.get<AuthMe>('/auth/me');
+    return response.data;
+  },
+};
 
 export const recommendationService = {
   getAll: async (daysAhead = 7): Promise<Recommendation[]> => {
