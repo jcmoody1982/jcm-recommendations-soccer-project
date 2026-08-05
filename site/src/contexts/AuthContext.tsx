@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(async (password: string) => {
-    const result = await authService.login(password);
+    const result = await authService.login(password.trim());
     if (!result.authenticated) {
       throw new Error(result.error || 'Invalid password');
     }

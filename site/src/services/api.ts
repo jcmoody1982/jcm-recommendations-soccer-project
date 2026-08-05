@@ -36,6 +36,9 @@ export const authService = {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         return (error.response.data as AuthMe) ?? { authenticated: false, error: 'Invalid password' };
       }
+      if (axios.isAxiosError(error) && !error.response) {
+        throw new Error('Cannot reach the API');
+      }
       throw error;
     }
   },

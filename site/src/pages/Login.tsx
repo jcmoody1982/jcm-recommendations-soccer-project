@@ -24,8 +24,13 @@ export default function Login() {
     try {
       await login(password);
       navigate(from, { replace: true });
-    } catch {
-      setError('That password does not unlock the beta. Try again.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (message === 'Invalid password' || message.toLowerCase().includes('invalid')) {
+        setError('That password does not unlock the beta. Try again.');
+      } else {
+        setError('Cannot reach the API. Is the backend running on port 8080?');
+      }
       setPassword('');
     } finally {
       setSubmitting(false);

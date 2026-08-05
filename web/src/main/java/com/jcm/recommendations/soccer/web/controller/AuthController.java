@@ -48,7 +48,7 @@ public class AuthController {
                     "authEnabled", false));
         }
 
-        String password = request.password() == null ? "" : request.password();
+        String password = request.password() == null ? "" : request.password().trim();
         String role = resolveRole(password);
         if (role == null) {
             return ResponseEntity.status(401).body(Map.of(
