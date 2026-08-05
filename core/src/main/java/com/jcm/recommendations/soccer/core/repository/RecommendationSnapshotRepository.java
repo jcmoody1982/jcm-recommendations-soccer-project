@@ -26,6 +26,12 @@ public interface RecommendationSnapshotRepository extends JpaRepository<Recommen
             PickOutcome outcome, LocalDate minSnapshotDate);
 
     @Query("SELECT DISTINCT s.fixtureId FROM RecommendationSnapshot s "
+            + "WHERE s.outcome = :outcome AND s.snapshotDate = :date")
+    List<Long> findDistinctFixtureIdsByOutcomeAndSnapshotDate(
+            @Param("outcome") PickOutcome outcome,
+            @Param("date") LocalDate date);
+
+    @Query("SELECT DISTINCT s.fixtureId FROM RecommendationSnapshot s "
             + "WHERE s.outcome = :outcome AND s.snapshotDate >= :minDate")
     List<Long> findDistinctFixtureIdsByOutcomeAndSnapshotDateGreaterThanEqual(
             @Param("outcome") PickOutcome outcome,

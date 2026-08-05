@@ -53,6 +53,7 @@ class SettlementServiceTest {
         LocalDate today = LocalDate.now(properties.zoneId());
         RecommendationSnapshot snap = pending(today, "BTTS", "BTTS Yes");
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of(snap));
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
         when(completedMatchRepository.findById(1L)).thenReturn(Optional.of(
                 CompletedMatch.builder().fixtureId(1L).status("canceled").homeGoals(0).awayGoals(0).build()));
         when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -66,10 +67,20 @@ class SettlementServiceTest {
     }
 
     @Test
-    void marksCornersUnsupported() {
+    void settlesCornersWhenComplete() {
         LocalDate today = LocalDate.now(properties.zoneId());
         RecommendationSnapshot snap = pending(today, "OVER_CORNERS", "Over 9.5 Corners");
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of(snap));
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
+        when(completedMatchRepository.findById(1L)).thenReturn(Optional.of(
+                CompletedMatch.builder()
+                        .fixtureId(1L)
+                        .status("complete")
+                        .homeGoals(1)
+                        .awayGoals(0)
+                        .homeCorners(6)
+                        .awayCorners(5)
+                        .build()));
         when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         SettlementService.SettlementSummary summary = service.settlePending();
@@ -77,7 +88,45 @@ class SettlementServiceTest {
         assertThat(summary.resolved()).isEqualTo(1);
         ArgumentCaptor<RecommendationSnapshot> captor = ArgumentCaptor.forClass(RecommendationSnapshot.class);
         verify(snapshotRepository).save(captor.capture());
-        assertThat(captor.getValue().getOutcome()).isEqualTo(PickOutcome.UNSUPPORTED);
+        assertThat(captor.getValue().getOutcome()).isEqualTo(PickOutcome.WIN);
+        assertThat(captor.getValue().getMatchResultJson()).contains("\"homeCorners\":6");
+    }
+
+    @Test
+    void regradesPreviouslyUnsupportedBookingPoints() {
+        LocalDate today = LocalDate.now(properties.zoneId());
+        RecommendationSnapshot snap = RecommendationSnapshot.builder()
+                .id(10L)
+                .snapshotDate(today)
+                .fixtureId(1L)
+                .type("BOOKING_POINTS")
+                .market("Under 30 Booking Points")
+                .homeTeamName("Arsenal")
+                .awayTeamName("Chelsea")
+                .outcome(PickOutcome.UNSUPPORTED)
+                .build();
+        when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of());
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of(snap));
+        when(completedMatchRepository.findById(1L)).thenReturn(Optional.of(
+                CompletedMatch.builder()
+                        .fixtureId(1L)
+                        .status("complete")
+                        .homeGoals(1)
+                        .awayGoals(0)
+                        .homeYellowCards(1)
+                        .awayYellowCards(1)
+                        .homeRedCards(0)
+                        .awayRedCards(0)
+                        .build()));
+        when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SettlementService.SettlementSummary summary = service.settlePending();
+
+        assertThat(summary.resolved()).isEqualTo(1);
+        ArgumentCaptor<RecommendationSnapshot> captor = ArgumentCaptor.forClass(RecommendationSnapshot.class);
+        verify(snapshotRepository).save(captor.capture());
+        // 20 points < 30 → Under 30 wins
+        assertThat(captor.getValue().getOutcome()).isEqualTo(PickOutcome.WIN);
     }
 
     @Test
@@ -85,6 +134,7 @@ class SettlementServiceTest {
         LocalDate old = LocalDate.now(properties.zoneId()).minusDays(10);
         RecommendationSnapshot snap = pending(old, "BTTS", "BTTS Yes");
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of(snap));
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
         when(completedMatchRepository.findById(1L)).thenReturn(Optional.empty());
         when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -101,6 +151,7 @@ class SettlementServiceTest {
         LocalDate today = LocalDate.now(properties.zoneId());
         RecommendationSnapshot snap = pending(today, "BTTS", "BTTS Yes");
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of(snap));
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
         when(completedMatchRepository.findById(1L)).thenReturn(Optional.of(
                 CompletedMatch.builder()
                         .fixtureId(1L)
@@ -129,6 +180,7 @@ class SettlementServiceTest {
         LocalDate today = LocalDate.now(properties.zoneId());
         RecommendationSnapshot snap = pending(today, "OVER_GOALS", "Over 2.5 Goals");
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of(snap));
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
         when(completedMatchRepository.findById(1L)).thenReturn(Optional.of(
                 CompletedMatch.builder().fixtureId(1L).status("complete").homeGoals(1).awayGoals(0).build()));
         when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -145,6 +197,7 @@ class SettlementServiceTest {
         LocalDate today = LocalDate.now(properties.zoneId());
         RecommendationSnapshot snap = pending(today, "BTTS", "BTTS Yes");
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of(snap));
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
         when(completedMatchRepository.findById(1L)).thenReturn(Optional.of(
                 CompletedMatch.builder().fixtureId(1L).status("incomplete").build()));
 
@@ -160,6 +213,7 @@ class SettlementServiceTest {
         LocalDate today = LocalDate.now(properties.zoneId());
         RecommendationSnapshot snap = pending(today, "DRAW", "Draw");
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of(snap));
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
         when(completedMatchRepository.findById(1L)).thenReturn(Optional.empty());
 
         SettlementService.SettlementSummary summary = service.settlePending();
@@ -173,6 +227,7 @@ class SettlementServiceTest {
         LocalDate today = LocalDate.now(properties.zoneId());
         RecommendationSnapshot snap = pending(today, "FIRST_HALF_GOALS", "Over 0.5 HT Goals");
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of(snap));
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
         when(completedMatchRepository.findById(1L)).thenReturn(Optional.of(
                 CompletedMatch.builder().fixtureId(1L).status("complete").homeGoals(2).awayGoals(1).build()));
 
@@ -183,13 +238,15 @@ class SettlementServiceTest {
     }
 
     @Test
-    void onlyPendingRowsAreLoadedForSettlement() {
+    void onlyPendingAndUnsupportedCornersBookingsAreLoaded() {
         when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of());
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of());
 
         SettlementService.SettlementSummary summary = service.settlePending();
 
         assertThat(summary.pendingExamined()).isEqualTo(0);
         verify(snapshotRepository).findByOutcome(PickOutcome.PENDING);
+        verify(snapshotRepository).findByOutcome(PickOutcome.UNSUPPORTED);
         verify(snapshotRepository, org.mockito.Mockito.never()).save(any());
     }
 

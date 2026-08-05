@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -43,15 +44,22 @@ public class SettlementService {
         LocalDate today = LocalDate.now(resultsProperties.zoneId());
         LocalDate lookbackStart = today.minusDays(resultsProperties.getPendingLookbackDays());
 
-        List<RecommendationSnapshot> pending = snapshotRepository.findByOutcome(PickOutcome.PENDING);
+        List<RecommendationSnapshot> candidates = new ArrayList<>(
+                snapshotRepository.findByOutcome(PickOutcome.PENDING));
+        // One-time / catch-up: re-grade corners & bookings previously marked UNSUPPORTED before graders existed
+        for (RecommendationSnapshot unsupported : snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)) {
+            if (isCornersOrBookingsType(unsupported.getType())) {
+                candidates.add(unsupported);
+            }
+        }
 
         int resolved = 0;
         int stillPending = 0;
         int expiredVoids = 0;
 
-        for (RecommendationSnapshot snapshot : pending) {
+        for (RecommendationSnapshot snapshot : candidates) {
             if (grader.isUnsupportedType(snapshot.getType())) {
-                applyResolved(snapshot, GradeResult.unsupported("Deferred market"), null);
+                applyResolved(snapshot, GradeResult.unsupported("Unknown type: " + snapshot.getType()), null);
                 resolved++;
                 continue;
             }
@@ -66,6 +74,7 @@ public class SettlementService {
 
             CompletedMatch match = completedMatchRepository.findById(snapshot.getFixtureId()).orElse(null);
             if (match == null) {
+                demoteUnsupportedToPending(snapshot);
                 stillPending++;
                 continue;
             }
@@ -82,14 +91,29 @@ public class SettlementService {
                 applyResolved(snapshot, result, match);
                 resolved++;
             } else {
+                demoteUnsupportedToPending(snapshot);
                 stillPending++;
             }
         }
 
-        SettlementSummary summary = new SettlementSummary(pending.size(), resolved, stillPending, expiredVoids);
+        SettlementSummary summary = new SettlementSummary(candidates.size(), resolved, stillPending, expiredVoids);
         log.info("Settlement completed: examined={}, resolved={}, pending={}, expiredVoids={}",
                 summary.pendingExamined(), summary.resolved(), summary.stillPending(), summary.expiredVoids());
         return summary;
+    }
+
+    private void demoteUnsupportedToPending(RecommendationSnapshot snapshot) {
+        if (snapshot.getOutcome() == PickOutcome.UNSUPPORTED) {
+            snapshot.setOutcome(PickOutcome.PENDING);
+            snapshot.setResolvedAt(null);
+            snapshotRepository.save(snapshot);
+        }
+    }
+
+    private static boolean isCornersOrBookingsType(String typeName) {
+        return "OVER_CORNERS".equals(typeName)
+                || "UNDER_CORNERS".equals(typeName)
+                || "BOOKING_POINTS".equals(typeName);
     }
 
     private void applyResolved(RecommendationSnapshot snapshot, GradeResult result, CompletedMatch match) {
@@ -111,6 +135,12 @@ public class SettlementService {
         payload.put("htAwayGoals", match.getHtAwayGoals());
         payload.put("secondHalfHomeGoals", match.getSecondHalfHomeGoals());
         payload.put("secondHalfAwayGoals", match.getSecondHalfAwayGoals());
+        payload.put("homeCorners", match.getHomeCorners());
+        payload.put("awayCorners", match.getAwayCorners());
+        payload.put("homeYellowCards", match.getHomeYellowCards());
+        payload.put("awayYellowCards", match.getAwayYellowCards());
+        payload.put("homeRedCards", match.getHomeRedCards());
+        payload.put("awayRedCards", match.getAwayRedCards());
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException e) {

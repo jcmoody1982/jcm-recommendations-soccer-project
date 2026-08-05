@@ -93,12 +93,17 @@ class ResultsMatchIngestServiceTest {
         dto.setTeamBCorners(-1);
 
         when(apiClient.fetchTodaysMatches("2026-08-01", "Europe/London")).thenReturn(List.of(dto));
-        when(completedMatchRepository.findById(55L)).thenReturn(Optional.empty());
+        when(snapshotRepository.findDistinctFixtureIdsByOutcomeAndSnapshotDate(PickOutcome.PENDING, date))
+                .thenReturn(List.of(55L));
+        when(completedMatchRepository.findById(55L))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(CompletedMatch.builder().fixtureId(55L).status("complete").build()));
         when(completedMatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ResultsMatchIngestService.IngestSummary summary = service.ingestForDate(date);
 
         assertThat(summary.matchesUpserted()).isEqualTo(1);
+        assertThat(summary.fallbackFetches()).isEqualTo(0);
         ArgumentCaptor<CompletedMatch> captor = ArgumentCaptor.forClass(CompletedMatch.class);
         verify(completedMatchRepository).save(captor.capture());
         CompletedMatch saved = captor.getValue();
@@ -113,6 +118,29 @@ class ResultsMatchIngestServiceTest {
         assertThat(saved.getAwayCorners()).isNull();
         assertThat(saved.getSourceDate()).isEqualTo(date);
         assertThat(saved.getFetchedAt()).isNotNull();
+        verify(apiClient, never()).fetchMatch(55L);
+    }
+
+    @Test
+    void ingestForDateFallsBackToMatchWhenMissingFromTodaysMatches() {
+        LocalDate date = LocalDate.of(2026, 8, 3);
+        when(apiClient.fetchTodaysMatches("2026-08-03", "Europe/London"))
+                .thenReturn(List.of(match(100L, "complete", 2, 0)));
+        when(snapshotRepository.findDistinctFixtureIdsByOutcomeAndSnapshotDate(PickOutcome.PENDING, date))
+                .thenReturn(List.of(100L, 8468273L));
+        when(completedMatchRepository.findById(100L))
+                .thenReturn(Optional.of(CompletedMatch.builder().fixtureId(100L).status("complete").build()));
+        when(completedMatchRepository.findById(8468273L)).thenReturn(Optional.empty());
+        when(apiClient.fetchMatch(8468273L)).thenReturn(match(8468273L, "complete", 1, 1));
+        when(completedMatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ResultsMatchIngestService.IngestSummary summary = service.ingestForDate(date);
+
+        assertThat(summary.matchesUpserted()).isEqualTo(2);
+        assertThat(summary.fallbackFetches()).isEqualTo(1);
+        assertThat(summary.touchedFixtureIds()).contains(100L, 8468273L);
+        verify(apiClient).fetchMatch(8468273L);
+        verify(apiClient, never()).fetchMatch(100L);
     }
 
     @Test
@@ -177,6 +205,8 @@ class ResultsMatchIngestServiceTest {
         MatchDto missingId = new MatchDto();
         missingId.setStatus("complete");
         when(apiClient.fetchTodaysMatches("2026-08-01", "Europe/London")).thenReturn(List.of(missingId));
+        when(snapshotRepository.findDistinctFixtureIdsByOutcomeAndSnapshotDate(PickOutcome.PENDING, date))
+                .thenReturn(List.of());
 
         ResultsMatchIngestService.IngestSummary summary = service.ingestForDate(date);
 

@@ -2720,7 +2720,7 @@ _Use cases for freezing daily picks, fetching completed match outcomes, settling
 | Snapshot scope | All **STRONG** and **MODERATE** picks (actionable; exclude WEAK) |
 | Snapshot window | Fixtures **kicking off today** in brand timezone |
 | Snapshot timing | Immediately **after** the daily FootyStats sync completes |
-| Settlement v1 | Scoreline markets only (see UC-033); corners/cards deferred |
+| Settlement v1 | Scoreline + corners + booking points (see UC-033) |
 | Timezone | Brand timezone: `Europe/London` (AccaBaccaGlory) |
 | Pending matches | Re-settlement retries until resolved or VOID |
 
@@ -2823,7 +2823,7 @@ RecommendationSnapshot:
 **Data Required:**
 - Snapshot rows still `PENDING` (or all snapshots for a target date)
 - Match status + scoreline (FT goals; HT / 2H goals for half-goal markets)
-- Corners/cards stored when present (for later settlement; not graded in UC-033 v1)
+- Corners/cards stored when present (graded in UC-033)
 
 **Decisions (locked):**
 | Topic | Choice |
@@ -2843,8 +2843,9 @@ RecommendationSnapshot:
 2. Resolve target dates (yesterday + PENDING lookback)
 3. For each date: fetch all pages of todays-matches; upsert `CompletedMatch`
 4. For PENDING snapshot fixtureIds still absent or `INCOMPLETE`: selective `getMatch` fallback
-5. Hand off fixtures with fresh data to settlement (UC-033) — same scheduler run is fine; use-case boundary remains ingest
-6. Incomplete matches remain eligible until lookback expires
+5. Admin `?date=` ingest uses the same fallback for PENDING fixtures on that snapshot date
+6. Hand off fixtures with fresh data to settlement (UC-033) — same scheduler run is fine; use-case boundary remains ingest
+7. Incomplete matches remain eligible until lookback expires
 
 **Edge cases:**
 - Match postponed / still incomplete → upsert status; leave snapshots PENDING for retry
@@ -2879,7 +2880,7 @@ RecommendationSnapshot:
 | `WIN` | Pick correct |
 | `LOSS` | Pick incorrect |
 | `VOID` | Match canceled/suspended, or unresolved after lookback expiry |
-| `UNSUPPORTED` | Type/selection not graded in v1 (e.g. corners, cards) — not a failed tip |
+| `UNSUPPORTED` | Type/selection not graded (unknown or unparseable market) — not a failed tip |
 
 (`PUSH` reserved if needed later for refunded lines; not required for v1.)
 
@@ -2888,23 +2889,24 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 **Decisions (locked):**
 | Topic | Choice |
 |-------|--------|
-| Deferred markets | Mark `UNSUPPORTED` immediately (do not leave as forever-PENDING) |
+| Deferred markets | None for known recommendation types; unknown/unparseable → `UNSUPPORTED` |
 | Team-to-win + draw | **LOSS** |
 | Past 7-day lookback still unresolved | **VOID** (expired) |
 | Half-goal markets in v1 | **Yes**; stay PENDING until HT/2H available |
-| VALUE_BET | Settle when `market` parses as a scoreline shape; else UNSUPPORTED |
-| Re-settle terminal rows | **No** in v1 (do not flip WIN/LOSS/VOID/UNSUPPORTED) |
+| Corners / booking points | **Yes**; Yellow=10, Red=25; missing stats → PENDING |
+| VALUE_BET | Settle when `market` parses as a supported shape; else UNSUPPORTED |
+| Re-settle terminal rows | **No** for WIN/LOSS/VOID; **yes** for corners/bookings previously marked UNSUPPORTED (catch-up) |
 | Selection encoding | v1 parses `type` + `market` with unit tests; structured selection is a follow-up |
 
-**Gate order (every PENDING row):**
-1. Already terminal → skip
+**Gate order (every PENDING row, plus catch-up UNSUPPORTED corners/bookings):**
+1. Already terminal WIN/LOSS/VOID → skip
 2. No `CompletedMatch` → PENDING
 3. Status `INCOMPLETE` / `UNKNOWN` → PENDING
 4. Status `CANCELED` / `SUSPENDED` → VOID
 5. Status `COMPLETE` → run type grader
 6. `snapshotDate` older than lookback and still unresolved → VOID
 
-**Settlement scope v1 (scoreline) — grade using actual engine market strings:**
+**Settlement scope v1 — grade using actual engine market strings:**
 
 | RecommendationType | WIN when | Data |
 |--------------------|----------|------|
@@ -2918,32 +2920,33 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 | `TOP_VS_BOTTOM`, form mismatch, `HOME_AWAY_SPECIALIST` | named team won (draw = LOSS) | FT |
 | `FIRST_HALF_GOALS` | HT total vs line (`Over 0.5/1.5 HT Goals` or `… First Half Goals`) | HT |
 | `SECOND_HALF_GOALS` | 2H total vs line (prefer API 2H; else FT−HT) | HT+FT or 2H |
-| `VALUE_BET` | Dispatch by market: `BTTS Yes/No`, O/U goals, `Home Win` / `Away Win` / `Draw` | FT |
+| `OVER_CORNERS` / `UNDER_CORNERS` | match corners total vs line (`Over/Under 8.5/9.5/10.5 Corners`) | corners |
+| `BOOKING_POINTS` | (yellow×10 + red×25) vs line (`Over/Under 30/40/50 Booking Points`) | cards |
+| `VALUE_BET` | Dispatch by market: scoreline shapes, corners, booking points | as above |
 
-**Deferred → `UNSUPPORTED` (v1):**
-- `OVER_CORNERS` / `UNDER_CORNERS`
-- `BOOKING_POINTS`
-- `VALUE_BET` when market is not a scoreline shape above
+**Still `UNSUPPORTED`:**
+- Unknown `type`
+- Unparseable `market` string
 
 **Settlement rules:**
 - Prefer `type` + parsed `market`; match team names against denormalized snapshot home/away names
 - Insufficient stats for that market → PENDING (retry), never LOSS
-- On resolve: set `outcome`, `resolvedAt`, copy slim status/scoreline into `matchResultJson`
+- On resolve: set `outcome`, `resolvedAt`, copy slim status/scoreline/corners/cards into `matchResultJson`
 
 **Behavior:**
-1. For each eligible PENDING snapshot with `CompletedMatch` (or expiry check)
+1. For each eligible PENDING snapshot (and catch-up UNSUPPORTED corners/bookings) with `CompletedMatch` (or expiry check)
 2. Apply gate order, then type-specific grader
 3. Persist outcome fields
-4. Mark UNSUPPORTED for out-of-scope types without waiting on the match
 
 **Acceptance Criteria:**
 - [ ] All v1 types have explicit grader rules and unit tests against real market strings
 - [ ] BTTS / O-U / match-result / draw / double chance / result+BTTS / clean sheet / team-win settle from FT
 - [ ] Half-goal markets use HT (and 2H) correctly; missing HT → PENDING then VOID after lookback
+- [ ] Corners settle from home+away corners; missing → PENDING
+- [ ] Booking points settle with Yellow=10 / Red=25; missing cards → PENDING
 - [ ] Canceled/suspended → VOID
 - [ ] Incomplete → PENDING and retried within lookback
-- [ ] Corners/cards → UNSUPPORTED (not LOSS, not forever PENDING)
-- [ ] Settlement is idempotent for already-resolved rows
+- [ ] Settlement is idempotent for already-resolved WIN/LOSS/VOID rows
 - [ ] `matchResultJson` populated on resolve
 
 **Status:** Implemented

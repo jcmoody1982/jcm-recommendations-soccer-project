@@ -11,13 +11,17 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * UC-033 v1 scoreline graders. Corners/cards → UNSUPPORTED.
+ * UC-033 graders for scoreline, corners, and booking-points markets.
  */
 @Component
 public class PickSettlementGrader {
 
+    static final int YELLOW_CARD_POINTS = 10;
+    static final int RED_CARD_POINTS = 25;
+
     private static final Pattern OVER_UNDER_LINE = Pattern.compile(
-            "(?i)(Over|Under)\\s+(\\d+(?:\\.\\d+)?)\\s*(?:Goals|HT Goals|2H Goals|First Half Goals|Second Half Goals)?");
+            "(?i)(Over|Under)\\s+(\\d+(?:\\.\\d+)?)\\s*"
+                    + "(?:Goals|HT Goals|2H Goals|First Half Goals|Second Half Goals|Corners|Booking Points)?");
 
     public GradeResult grade(RecommendationSnapshot snapshot, CompletedMatch match) {
         RecommendationType type;
@@ -28,8 +32,8 @@ public class PickSettlementGrader {
         }
 
         return switch (type) {
-            case OVER_CORNERS, UNDER_CORNERS, BOOKING_POINTS ->
-                    GradeResult.unsupported("Deferred market: " + type.name());
+            case OVER_CORNERS, UNDER_CORNERS -> gradeCorners(snapshot.getMarket(), match);
+            case BOOKING_POINTS -> gradeBookingPoints(snapshot.getMarket(), match);
             case BTTS -> gradeBtts(snapshot.getMarket(), match);
             case OVER_GOALS, UNDER_GOALS -> gradeOverUnderGoals(snapshot.getMarket(), match, true);
             case MATCH_RESULT -> gradeTeamOrDraw(snapshot, match, true);
@@ -45,15 +49,32 @@ public class PickSettlementGrader {
         };
     }
 
+    /** True when type is unknown (not a RecommendationType). Known types are always graded. */
     public boolean isUnsupportedType(String typeName) {
         try {
-            RecommendationType type = RecommendationType.valueOf(typeName);
-            return type == RecommendationType.OVER_CORNERS
-                    || type == RecommendationType.UNDER_CORNERS
-                    || type == RecommendationType.BOOKING_POINTS;
+            RecommendationType.valueOf(typeName);
+            return false;
         } catch (RuntimeException e) {
             return true;
         }
+    }
+
+    private GradeResult gradeCorners(String market, CompletedMatch match) {
+        if (match.getHomeCorners() == null || match.getAwayCorners() == null) {
+            return GradeResult.pending("Missing corners");
+        }
+        int total = match.getHomeCorners() + match.getAwayCorners();
+        return gradeOverUnderLine(market, total);
+    }
+
+    private GradeResult gradeBookingPoints(String market, CompletedMatch match) {
+        if (match.getHomeYellowCards() == null || match.getAwayYellowCards() == null
+                || match.getHomeRedCards() == null || match.getAwayRedCards() == null) {
+            return GradeResult.pending("Missing cards");
+        }
+        int points = (match.getHomeYellowCards() + match.getAwayYellowCards()) * YELLOW_CARD_POINTS
+                + (match.getHomeRedCards() + match.getAwayRedCards()) * RED_CARD_POINTS;
+        return gradeOverUnderLine(market, points);
     }
 
     private GradeResult gradeBtts(String market, CompletedMatch match) {
@@ -217,8 +238,11 @@ public class PickSettlementGrader {
         if (lower.equals("home win") || lower.equals("away win") || lower.equals("draw")) {
             return gradeTeamOrDraw(snapshot, match, true);
         }
-        if (lower.contains("corner") || lower.contains("booking")) {
-            return GradeResult.unsupported("Deferred value bet market: " + market);
+        if (lower.contains("corner")) {
+            return gradeCorners(market, match);
+        }
+        if (lower.contains("booking")) {
+            return gradeBookingPoints(market, match);
         }
         return GradeResult.unsupported("Unparseable value bet market: " + market);
     }

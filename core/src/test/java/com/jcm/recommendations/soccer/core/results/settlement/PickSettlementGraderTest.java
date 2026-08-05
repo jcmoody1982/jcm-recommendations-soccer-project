@@ -94,9 +94,61 @@ class PickSettlementGraderTest {
     }
 
     @Test
-    void cornersUnsupported() {
+    void cornersOverWinsWhenTotalAboveLine() {
+        CompletedMatch match = complete(1, 0);
+        match.setHomeCorners(6);
+        match.setAwayCorners(4);
+        assertThat(grader.grade(snapshot("OVER_CORNERS", "Over 9.5 Corners"), match).outcome())
+                .isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(snapshot("UNDER_CORNERS", "Under 8.5 Corners"), match).outcome())
+                .isEqualTo(PickOutcome.LOSS);
+    }
+
+    @Test
+    void cornersPendingWithoutTotals() {
         GradeResult result = grader.grade(snapshot("OVER_CORNERS", "Over 9.5 Corners"), complete(1, 0));
-        assertThat(result.outcome()).isEqualTo(PickOutcome.UNSUPPORTED);
+        assertThat(result.outcome()).isEqualTo(PickOutcome.PENDING);
+    }
+
+    @Test
+    void bookingPointsYellowTenRedTwentyFive() {
+        CompletedMatch match = complete(1, 0);
+        match.setHomeYellowCards(2);
+        match.setAwayYellowCards(1);
+        match.setHomeRedCards(1);
+        match.setAwayRedCards(0);
+        // 30 + 25 = 55 → Over 50 wins; Under 30 loses
+        assertThat(grader.grade(snapshot("BOOKING_POINTS", "Over 50 Booking Points"), match).outcome())
+                .isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(snapshot("BOOKING_POINTS", "Under 30 Booking Points"), match).outcome())
+                .isEqualTo(PickOutcome.LOSS);
+    }
+
+    @Test
+    void bookingPointsPendingWithoutCards() {
+        assertThat(grader.grade(snapshot("BOOKING_POINTS", "Over 40 Booking Points"), complete(1, 0)).outcome())
+                .isEqualTo(PickOutcome.PENDING);
+    }
+
+    @Test
+    void valueBetCornersAndBookings() {
+        CompletedMatch match = complete(1, 0);
+        match.setHomeCorners(3);
+        match.setAwayCorners(5);
+        match.setHomeYellowCards(1);
+        match.setAwayYellowCards(0);
+        match.setHomeRedCards(0);
+        match.setAwayRedCards(0);
+        assertThat(grader.grade(snapshot("VALUE_BET", "Under 8.5 Corners"), match).outcome())
+                .isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(snapshot("VALUE_BET", "Under 30 Booking Points"), match).outcome())
+                .isEqualTo(PickOutcome.WIN);
+    }
+
+    @Test
+    void doubleChanceX2() {
+        assertThat(grader.grade(snapshot("DOUBLE_CHANCE", "Draw/Away (X2)"), complete(0, 1)).outcome())
+                .isEqualTo(PickOutcome.WIN);
     }
 
     @Test
@@ -176,16 +228,6 @@ class PickSettlementGraderTest {
                 .isEqualTo(PickOutcome.LOSS);
         assertThat(grader.grade(snapshot("LOSING_FORM_MISMATCH", "Arsenal"), complete(3, 1)).outcome())
                 .isEqualTo(PickOutcome.WIN);
-    }
-
-    @Test
-    void doubleChanceX2AndBookingUnsupported() {
-        assertThat(grader.grade(snapshot("DOUBLE_CHANCE", "Draw/Away (X2)"), complete(0, 1)).outcome())
-                .isEqualTo(PickOutcome.WIN);
-        assertThat(grader.grade(snapshot("BOOKING_POINTS", "Over 40 Booking Points"), complete(1, 0)).outcome())
-                .isEqualTo(PickOutcome.UNSUPPORTED);
-        assertThat(grader.grade(snapshot("UNDER_CORNERS", "Under 8.5 Corners"), complete(1, 0)).outcome())
-                .isEqualTo(PickOutcome.UNSUPPORTED);
     }
 
     @Test
