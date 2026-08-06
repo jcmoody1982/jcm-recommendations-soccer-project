@@ -40,12 +40,12 @@
 }
 
 .starButton:hover {
-  color: #f59e0b;
+  color: var(--accent-color);
   transform: scale(1.1);
 }
 
 .starButton.starred {
-  color: #f59e0b;
+  color: var(--accent-color);
 }
 
 .sentiment {
@@ -90,12 +90,52 @@
   color: var(--text-primary);
 }
 
-.fixture {
+.urgency_soon .date,
+.urgency_soon.mobileValue {
+  color: var(--urgency-soon-strong);
+  font-weight: 700;
+}
+
+.urgency_soon .time {
+  color: var(--urgency-soon);
+}
+
+.urgency_today .date,
+.urgency_today.mobileValue {
+  color: var(--urgency-today);
+  font-weight: 600;
+}
+
+.urgency_tomorrow .date,
+.urgency_tomorrow.mobileValue {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.urgency_started .date,
+.urgency_started.mobileValue {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.fixture,
+.fixtureLink {
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.fixtureLink {
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.fixtureLink:hover {
+  color: var(--accent-color);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .market {
@@ -160,7 +200,7 @@
   }
 
   .mobileStarButton.starred {
-    color: #f59e0b;
+    color: var(--accent-color);
   }
 
   .mobileSentiment {
@@ -182,11 +222,22 @@
     flex-shrink: 0;
   }
 
-  .mobileFixture {
+  .mobileFixture,
+  .mobileFixtureLink {
     font-weight: 600;
     color: var(--text-primary);
     font-size: 0.95rem;
     flex: 1;
+  }
+
+  .mobileFixtureLink {
+    text-decoration: none;
+  }
+
+  .mobileFixtureLink:hover {
+    color: var(--accent-color);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .mobileCardBody {

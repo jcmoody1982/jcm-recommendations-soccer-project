@@ -6,9 +6,12 @@ export interface Fixture {
   homeTeamName: string;
   awayTeamName: string;
   dateUnix: number;
-  stadium: string;
+  /** Domain field returned by the API */
+  stadiumName?: string;
+  /** Legacy alias kept for older callers */
+  stadium?: string;
   status: string;
-  gameWeek: number;
+  gameWeek?: number;
   refereeId?: number;
   refereeName?: string;
 }

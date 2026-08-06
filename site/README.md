@@ -86,8 +86,10 @@ site/
 
 | Route | Page | Description |
 |-------|------|-------------|
-| `/` | Dashboard | Overview with summary stats and top picks |
+| `/` | Login | Brand homepage + beta access password |
 | `/recommendations` | Recommendations | Filterable list of all recommendations |
+| `/results` | Results | Settled Strong/Moderate picks by day |
+| `/shortlist` | Shortlist | Saved picks |
 | `/fixtures` | Fixtures | Upcoming fixtures grouped by date |
 
 ## Environment Variables

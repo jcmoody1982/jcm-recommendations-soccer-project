@@ -1,5 +1,14 @@
 import axios from 'axios';
-import type { Recommendation, RecommendationSummary, RecommendationType, Fixture, League, LeagueOverviewResponse } from '../types';
+import type {
+  Recommendation,
+  RecommendationSummary,
+  RecommendationType,
+  Fixture,
+  League,
+  LeagueOverviewResponse,
+  DayResults,
+  PickOutcome,
+} from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -8,7 +17,41 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
+
+export type AuthMe = {
+  authenticated: boolean;
+  role?: string;
+  authEnabled?: boolean;
+  error?: string;
+};
+
+export const authService = {
+  login: async (password: string): Promise<AuthMe> => {
+    try {
+      const response = await api.post<AuthMe>('/auth/login', { password });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        return (error.response.data as AuthMe) ?? { authenticated: false, error: 'Invalid password' };
+      }
+      if (axios.isAxiosError(error) && !error.response) {
+        throw new Error('Cannot reach the API');
+      }
+      throw error;
+    }
+  },
+
+  logout: async (): Promise<void> => {
+    await api.post('/auth/logout');
+  },
+
+  me: async (): Promise<AuthMe> => {
+    const response = await api.get<AuthMe>('/auth/me');
+    return response.data;
+  },
+};
 
 export const recommendationService = {
   getAll: async (daysAhead = 7): Promise<Recommendation[]> => {
@@ -26,8 +69,16 @@ export const recommendationService = {
   },
 
   getByFixture: async (fixtureId: number): Promise<Recommendation[]> => {
-    const response = await api.get<Recommendation[]>(`/recommendations/fixture/${fixtureId}`);
-    return response.data;
+    try {
+      const response = await api.get<Recommendation[]>(`/recommendations/fixture/${fixtureId}`);
+      return response.data;
+    } catch (error) {
+      // Older API versions returned 404 when a fixture had no picks.
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   },
 
   getByType: async (type: RecommendationType, daysAhead = 7): Promise<Recommendation[]> => {
@@ -94,6 +145,23 @@ export const leagueService = {
 
   getOverview: async (): Promise<LeagueOverviewResponse> => {
     const response = await api.get<LeagueOverviewResponse>('/leagues/overview');
+    return response.data;
+  },
+};
+
+export const resultsService = {
+  getDates: async (): Promise<string[]> => {
+    const response = await api.get<string[]>('/results/dates');
+    return response.data;
+  },
+
+  getDay: async (date?: string, outcome?: PickOutcome | 'ALL'): Promise<DayResults> => {
+    const response = await api.get<DayResults>('/results', {
+      params: {
+        ...(date ? { date } : {}),
+        ...(outcome && outcome !== 'ALL' ? { outcome } : {}),
+      },
+    });
     return response.data;
   },
 };

@@ -6,8 +6,9 @@ import { SettingsDropdown } from '../components/SettingsDropdown';
 import styles from './MainLayout.module.css';
 
 const navItems = [
-  { path: '/', label: 'Recommendations' },
+  { path: '/recommendations', label: 'Recommendations' },
   { path: '/shortlist', label: 'Shortlist', showBadge: true },
+  { path: '/results', label: 'Results' },
   { path: '/fixtures', label: 'Fixtures' },
 ];
 
@@ -55,9 +56,9 @@ export default function MainLayout() {
     <div className={styles.layout}>
       <header className={styles.header}>
         <div className={styles.logo}>
-          <Link to="/">
+          <Link to="/recommendations">
             <img src="/logo.png" alt="AccaBaccaGlory" className={styles.logoImage} />
-            <span className={styles.logoText}>AccaBaccaGlory</span>
+            <span className={`${styles.logoText} brand-display`}>AccaBaccaGlory</span>
           </Link>
         </div>
         

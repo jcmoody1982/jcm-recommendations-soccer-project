@@ -214,23 +214,75 @@ _Use cases for generating insights, recommendations, and predictions based on co
 - Goals scored/conceded averages
 - Failed to score percentage
 - BTTS potential from API
+- xG for/against averages (when available)
 
 **Logic:**
+
+*Base Weights (when form data IS available):*
 ```
 BTTS Score = weighted average of:
-  - Home team BTTS % (season)           × 0.15
-  - Away team BTTS % (season)           × 0.15
-  - Home team BTTS % (last 5)           × 0.20
-  - Away team BTTS % (last 5)           × 0.20
+  - Home team BTTS % (season, home)     × 0.15
+  - Away team BTTS % (season, away)     × 0.15
+  - Home team BTTS % (last 5, home)     × 0.20
+  - Away team BTTS % (last 5, away)     × 0.20
   - Home team "failed to score" inverse × 0.10
   - Away team "failed to score" inverse × 0.10
   - API btts_potential                  × 0.10
 ```
 
+*Redistributed Weights (when form data is NOT available):*
+```
+BTTS Score = weighted average of:
+  - Home team BTTS % (season, home)     × 0.25
+  - Away team BTTS % (season, away)     × 0.25
+  - Home team "failed to score" inverse × 0.175
+  - Away team "failed to score" inverse × 0.175
+  - API btts_potential                  × 0.15
+```
+
+**Goals Context Boost (Prolific Scorers):**
+```
+When both teams are prolific scorers, add +5% to final score:
+  - Home team must average ≥ 1.5 goals/game at home
+  - Away team must average ≥ 1.0 goals/game away
+
+This addresses the limitation where two teams with the same BTTS % 
+can have very different attacking profiles:
+  - Team A: 65% BTTS, scores 2.1 goals/game → gets boost
+  - Team B: 65% BTTS, scores 0.8 goals/game → no boost
+```
+
+**Defensive Leakiness Boost (Porous Defenses):**
+```
+When both teams have leaky defenses, add +4% to final score:
+  - Home team must concede ≥ 1.2 goals/game at home
+  - Away team must concede ≥ 1.0 goals/game away
+
+This complements the scoring boost - two leaky defenses means
+each team is likely to let the other score:
+  - Team A: Concedes 1.5/game at home → opposition likely to score
+  - Team B: Concedes 1.3/game away → opposition likely to score
+```
+
+**xG (Expected Goals) Boost:**
+```
+When both teams generate high expected goals, add +3% to final score:
+  - Combined xG (home team xG at home + away team xG away) ≥ 2.5
+
+xG measures quality of chances created, providing insight beyond
+actual goals scored:
+  - Team with xG 1.5 but scoring 0.8 → unlucky but creating chances
+  - Team with xG 0.8 but scoring 1.5 → lucky but not sustainable
+  
+xG data is sourced from the FootyStats API team stats endpoint.
+```
+
+All three boosts can stack (max +12% combined).
+
 **Thresholds:**
 - **Strong:** BTTS Score ≥ 80%
 - **Moderate:** BTTS Score 65-79%
-- **Weak:** BTTS Score < 65%
+- **Weak:** BTTS Score < 65% (filtered out)
 
 **Additional Filters:**
 - Both teams must have scored in 50%+ of their matches
@@ -239,8 +291,18 @@ BTTS Score = weighted average of:
 **Output:**
 - Ranked list of fixtures by BTTS score
 - Include: fixture details, both team stats, confidence level
+- Factors tracked:
+  - `formDataAvailable` - whether form data was used
+  - `homeGoalsAvgHome` / `awayGoalsAvgAway` - attacking context
+  - `homeConcededAvgHome` / `awayConcededAvgAway` - defensive context
+  - `goalsBoostApplied` / `goalsBoostAmount` - prolific scorers boost
+  - `leakyDefenseBoostApplied` / `leakyDefenseBoostAmount` - leaky defense boost
+  - `xgDataAvailable` - whether xG data is available
+  - `homeXgForAvgHome` / `awayXgForAvgAway` - expected goals scored
+  - `homeXgAgainstAvgHome` / `awayXgAgainstAvgAway` - expected goals conceded
+  - `xgBoostApplied` / `xgBoostAmount` / `combinedXg` - xG boost details
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -254,39 +316,90 @@ BTTS Score = weighted average of:
 - Goals scored/conceded averages (season + form)
 - Over 2.5/3.5 percentages
 - o25_potential, o35_potential from API
+- xG for/against averages (when available)
 
 **Logic:**
+
+*Base Weights (when form data IS available - 11 factors, total = 1.0):*
 ```
 Over Goals Score = weighted average of:
-  - Home team goals scored avg (season)      × 0.10
-  - Away team goals scored avg (season)      × 0.10
-  - Home team goals conceded avg (season)    × 0.10
-  - Away team goals conceded avg (season)    × 0.10
-  - Home team goals scored avg (last 5)      × 0.15
-  - Away team goals scored avg (last 5)      × 0.15
-  - Home team Over 2.5 % (season)            × 0.10
-  - Away team Over 2.5 % (season)            × 0.10
-  - API o25_potential                        × 0.10
+  - Home team goals scored avg (season)      × 0.08
+  - Away team goals scored avg (season)      × 0.08
+  - Home team goals conceded avg (season)    × 0.08
+  - Away team goals conceded avg (season)    × 0.08
+  - Home team goals scored avg (form)        × 0.12
+  - Away team goals scored avg (form)        × 0.12
+  - Home team goals conceded avg (form)      × 0.08
+  - Away team goals conceded avg (form)      × 0.08
+  - Home team Over 2.5 % (season)            × 0.08
+  - Away team Over 2.5 % (season)            × 0.08
+  - API o25_potential                        × 0.12
 ```
 
-**Calculation:**
-- Convert to expected goals: (Home scored + Away scored + Home conceded + Away conceded) / 2
-- Normalize to percentage based on historical O2.5 rates
+*Redistributed Weights (when form data is NOT available - 7 factors, total = 1.0):*
+```
+Over Goals Score = weighted average of:
+  - Home team goals scored avg (season)      × 0.15
+  - Away team goals scored avg (season)      × 0.15
+  - Home team goals conceded avg (season)    × 0.12
+  - Away team goals conceded avg (season)    × 0.12
+  - Home team Over 2.5 % (season)            × 0.12
+  - Away team Over 2.5 % (season)            × 0.12
+  - API o25_potential                        × 0.22
+```
+
+**High-Scoring Context Boost:**
+```
+When combined goals average ≥ 3.0, add +5% to final score.
+Combined avg = (home scored + away scored + home conceded + away conceded) / 2
+```
+
+**xG Boost:**
+```
+When combined xG (home xG + away xG) ≥ 2.8, add +4% to final score.
+xG data is blended into expected goals calculation (60% actual, 40% xG).
+```
+
+**Expected Goals Calculation:**
+```
+Actual Expected = (Home scored + Away scored + Home conceded + Away conceded) / 2
+
+If xG data available:
+  xG Expected = (Home xG for + Away xG for + Home xG against + Away xG against) / 2
+  Final Expected = (Actual Expected × 0.6) + (xG Expected × 0.4)
+```
 
 **Thresholds:**
 - **Strong:** Score ≥ 80%
 - **Moderate:** Score 65-79%
-- **Weak:** Score < 65%
+- **Weak:** Score < 65% (filtered out)
+
+**Market Selection:**
+- **Over 3.5 Goals:** Expected goals ≥ 3.5 AND score ≥ 80% AND avg Over 3.5% ≥ 40%
+- **Over 2.5 Goals:** Otherwise
 
 **Additional Filters:**
-- Combined goals average ≥ 2.5 per match
-- At least one team with Over 2.5 rate > 50%
+- Expected goals ≥ 2.5 per match
 
 **Output:**
 - Ranked list of fixtures by over goals score
 - Include: expected goals, team averages, confidence level
+- Factors tracked:
+  - `formDataAvailable` - whether form data was used
+  - `expectedGoals` - calculated expected goals for the match
+  - `homeGoalsScoredAvg` / `awayGoalsScoredAvg` - season scoring rates
+  - `homeGoalsConcededAvg` / `awayGoalsConcededAvg` - season conceding rates
+  - `homeOver25Pct` / `awayOver25Pct` - Over 2.5 percentages
+  - `homeOver35Pct` / `awayOver35Pct` - Over 3.5 percentages
+  - `combinedGoalsAvg` - combined average for boost calculation
+  - `highScoringBoostApplied` / `highScoringBoostAmount` - high-scoring boost
+  - `xgDataAvailable` - whether xG data is available
+  - `homeXgForAvgHome` / `awayXgForAvgAway` - expected goals scored
+  - `homeXgAgainstAvgHome` / `awayXgAgainstAvgAway` - expected goals conceded
+  - `xgBoostApplied` / `xgBoostAmount` / `combinedXg` - xG boost details
+  - Form data (when available): `homeScoredFormAvg`, `awayScoredFormAvg`, `homeConcededFormAvg`, `awayConcededFormAvg`
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -297,43 +410,107 @@ Over Goals Score = weighted average of:
 **User Story:** As a user, I want to see which matches are likely to have few goals so I can bet on under goals markets.
 
 **Data Required:**
-- Goals scored/conceded averages
-- Under 2.5/1.5 percentages
+- Goals scored/conceded averages (season + form)
+- Under 2.5/1.5 percentages (derived from Over percentages)
 - Clean sheet percentages
-- Defensive strength metrics
+- Failed to score percentages
+- xG for/against averages (when available)
 
 **Logic:**
+
+*Base Weights (when form data IS available - 13 factors, total = 1.0):*
 ```
 Under Goals Score = weighted average of:
-  - Home team goals scored avg (season) inverse      × 0.10
-  - Away team goals scored avg (season) inverse      × 0.10
-  - Home team goals conceded avg (season) inverse    × 0.10
-  - Away team goals conceded avg (season) inverse    × 0.10
-  - Home team goals scored avg (last 5) inverse      × 0.15
-  - Away team goals scored avg (last 5) inverse      × 0.15
-  - Home team clean sheet % (season)                 × 0.10
-  - Away team clean sheet % (season)                 × 0.10
-  - API u15_potential                                × 0.10
+  - Home team goals scored avg (season) inverse      × 0.07
+  - Away team goals scored avg (season) inverse      × 0.07
+  - Home team goals conceded avg (season) inverse    × 0.07
+  - Away team goals conceded avg (season) inverse    × 0.07
+  - Home team goals scored avg (form) inverse        × 0.10
+  - Away team goals scored avg (form) inverse        × 0.10
+  - Home team goals conceded avg (form) inverse      × 0.06
+  - Away team goals conceded avg (form) inverse      × 0.06
+  - Home team clean sheet % (season)                 × 0.08
+  - Away team clean sheet % (season)                 × 0.08
+  - Home team failed to score % (season)             × 0.06
+  - Away team failed to score % (season)             × 0.06
+  - API u15_potential                                × 0.12
 ```
 
-**Calculation:**
-- Inverse = lower goals = higher score
-- Factor in clean sheet rates and failed to score rates
+*Redistributed Weights (when form data is NOT available - 9 factors, total = 1.0):*
+```
+Under Goals Score = weighted average of:
+  - Home team goals scored avg (season) inverse      × 0.12
+  - Away team goals scored avg (season) inverse      × 0.12
+  - Home team goals conceded avg (season) inverse    × 0.10
+  - Away team goals conceded avg (season) inverse    × 0.10
+  - Home team clean sheet % (season)                 × 0.12
+  - Away team clean sheet % (season)                 × 0.12
+  - Home team failed to score % (season)             × 0.10
+  - Away team failed to score % (season)             × 0.10
+  - API u15_potential                                × 0.22
+```
+
+**Low-Scoring Context Boost:**
+```
+When combined goals average ≤ 2.0, add +5% to final score.
+Combined avg = (home scored + away scored + home conceded + away conceded) / 2
+```
+
+**Defensive Strength Boost:**
+```
+When both teams have clean sheet % ≥ 30%, add +4% to final score.
+Rewards matchups between defensively solid teams.
+```
+
+**xG Boost (Low Expected Goals):**
+```
+When combined xG (home xG + away xG) ≤ 2.2, add +4% to final score.
+xG data is blended into expected goals calculation (60% actual, 40% xG).
+```
+
+**Expected Goals Calculation:**
+```
+Actual Expected = (Home scored + Away scored + Home conceded + Away conceded) / 2
+
+If xG data available:
+  xG Expected = (Home xG for + Away xG for + Home xG against + Away xG against) / 2
+  Final Expected = (Actual Expected × 0.6) + (xG Expected × 0.4)
+```
 
 **Thresholds:**
 - **Strong:** Score ≥ 80%
 - **Moderate:** Score 65-79%
-- **Weak:** Score < 65%
+- **Weak:** Score < 65% (filtered out)
+
+**Market Selection:**
+- **Under 1.5 Goals:** Expected goals ≤ 1.5 AND score ≥ 80% AND avg Under 1.5% ≥ 25%
+- **Under 2.5 Goals:** Otherwise
 
 **Additional Filters:**
-- Combined goals average ≤ 2.5 per match
-- At least one team with Under 2.5 rate > 50%
+- Expected goals ≤ 2.5 per match
 
 **Output:**
 - Ranked list of fixtures by under goals score
 - Include: expected goals, defensive stats, confidence level
+- Factors tracked:
+  - `formDataAvailable` - whether form data was used
+  - `expectedGoals` - calculated expected goals for the match
+  - `homeGoalsScoredAvg` / `awayGoalsScoredAvg` - season scoring rates
+  - `homeGoalsConcededAvg` / `awayGoalsConcededAvg` - season conceding rates
+  - `combinedGoalsAvg` - combined average for boost calculation
+  - `homeCleanSheetPct` / `awayCleanSheetPct` - defensive strength
+  - `homeFailedToScorePct` / `awayFailedToScorePct` - scoring struggles
+  - `homeUnder15Pct` / `awayUnder15Pct` - Under 1.5 percentages
+  - `homeUnder25Pct` / `awayUnder25Pct` - Under 2.5 percentages
+  - `lowScoringBoostApplied` / `lowScoringBoostAmount` - low-scoring boost
+  - `defensiveStrengthBoostApplied` / `defensiveStrengthBoostAmount` - defensive boost
+  - `xgDataAvailable` - whether xG data is available
+  - `homeXgForAvgHome` / `awayXgForAvgAway` - expected goals scored
+  - `homeXgAgainstAvgHome` / `awayXgAgainstAvgAway` - expected goals conceded
+  - `xgBoostApplied` / `xgBoostAmount` / `combinedXg` - xG boost details
+  - Form data (when available): `homeScoredFormAvg`, `awayScoredFormAvg`, `homeConcededFormAvg`, `awayConcededFormAvg`
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -344,41 +521,89 @@ Under Goals Score = weighted average of:
 **User Story:** As a user, I want to see expected booking points for matches so I can bet on cards markets.
 
 **Data Required:**
-- Team cards averages (home/away)
+- Team cards averages (season + form)
 - Referee cards per match stats
-- Referee yellow/red card tendencies
+- Referee over 3.5 cards percentage
+- Referee yellow/red card breakdown
+- API cards potential
 
 **Logic:**
+
+*Base Weights (when referee AND form data available):*
 ```
-Expected Booking Points = sum of:
-  - Home team cards avg per match (home) × 10      × 0.20
-  - Away team cards avg per match (away) × 10     × 0.20
-  - Referee cards per match avg × 10              × 0.25
-  - Home team red card rate × 25                  × 0.05
-  - Away team red card rate × 25                  × 0.05
-  - Referee reliability factor                    × 0.10
-    (appearances ≥ 10 = 1.0, 5-9 = 0.8, <5 = 0.5)
-  - Match intensity factor                        × 0.15
-    (derby/rivalry = 1.5, same league position ±3 = 1.2, normal = 1.0)
+Expected Booking Points = weighted sum of:
+  - Home team cards avg (season, home) × 10       × 0.12
+  - Away team cards avg (season, away) × 10      × 0.12
+  - Home team cards avg (form, home) × 10        × 0.10
+  - Away team cards avg (form, away) × 10        × 0.10
+  - Referee cards per match avg × 10             × 0.20
+  - Referee over 3.5 cards % (scaled)            × 0.08
+  - Red card risk                                × 0.06
+  - API cards potential (scaled)                 × 0.10
+  × Match intensity multiplier                   × 0.12 weight
 ```
 
-**Calculation:**
-- Base expected points from team card averages
-- Adjust heavily based on referee tendencies
-- Scale by referee data reliability
-- Boost for high-intensity matchups (derbies, close standings)
+*Redistributed Weights (when no referee data):*
+```
+  - Home team cards avg (season) × 10            × 0.20
+  - Away team cards avg (season) × 10            × 0.20
+  - Home team cards avg (form) × 10              × 0.15
+  - Away team cards avg (form) × 10              × 0.15
+  - API cards potential (scaled)                 × 0.18
+  × Match intensity multiplier
+```
 
-**Thresholds (for Over/Under 40 booking points):**
-- **Strong Over:** Expected ≥ 50 points
-- **Moderate Over:** Expected 40-49 points
-- **Moderate Under:** Expected 30-39 points
-- **Strong Under:** Expected < 30 points
+*Redistributed Weights (when no form data):*
+```
+  - Home team cards avg (season) × 10            × 0.18
+  - Away team cards avg (season) × 10            × 0.18
+  - Referee cards + O3.5% + red card risk        (normal weights)
+  - API cards potential (scaled)                 × 0.14
+  × Match intensity multiplier
+```
+
+**High-Cards Matchup Boost:**
+```
+When both teams average ≥ 2.0 cards per game, add +5 points.
+```
+
+**Referee Strictness Boost:**
+```
+When referee's Over 3.5 cards percentage ≥ 60%, add +5 points.
+```
+
+**Match Intensity Multiplier:**
+```
+Position difference ≤ 3: × 1.2 (close rivals)
+Position difference 4-6: × 1.1 (competitive)
+Position difference > 6: × 1.0 (normal)
+```
+
+**Thresholds (for Over/Under booking points markets):**
+- **Strong Over:** Expected ≥ 50 points → "Over 50 Booking Points"
+- **Moderate Over:** Expected 40-49 points → "Over 40 Booking Points"
+- **Moderate Under:** Expected 30-39 points → "Under 40 Booking Points"
+- **Strong Under:** Expected < 30 points → "Under 30 Booking Points"
 
 **Output:**
 - Ranked list by expected booking points
 - Include: team card stats, referee stats, intensity flag, confidence level
+- Factors tracked:
+  - `formDataAvailable` / `refereeDataAvailable` - data availability
+  - `homeCardsSeasonAvg` / `awayCardsSeasonAvg` - season cards averages
+  - `homeCardsFormAvg` / `awayCardsFormAvg` - form cards averages
+  - `refereeCardsAvg` - referee's cards per match
+  - `refereeOver35CardsPct` - referee's over 3.5 cards percentage
+  - `refereeYellowCards` / `refereeRedCards` - referee card breakdown
+  - `refereeAppearances` / `refereeReliability` - referee data quality
+  - `apiCardsPotential` - FootyStats cards potential
+  - `matchIntensityFactor` - intensity multiplier
+  - `homePosition` / `awayPosition` / `positionDifference` - league standings
+  - `highCardsBoostApplied` / `highCardsBoostAmount` - high-cards boost
+  - `refereeStrictnessBoostApplied` / `refereeStrictnessBoostAmount` - strictness boost
+  - `redCardRisk` - calculated red card risk
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -389,44 +614,94 @@ Expected Booking Points = sum of:
 **User Story:** As a user, I want to find bets where the odds offer value compared to statistical probability.
 
 **Data Required:**
-- Calculated probabilities from other use cases
-- Bookmaker odds from API
-- Implied probability from odds
+- Calculated probabilities from other use cases (UC-005, UC-006, UC-007)
+- Bookmaker odds from API (all markets)
+- Team season statistics with xG data
+- Recent form data for enhanced match result probabilities
+
+**Markets Analyzed:**
+| Market | Odds Field | Probability Source |
+|--------|------------|-------------------|
+| BTTS Yes | `oddsBttsYes` | UC-005 BTTS Engine score |
+| BTTS No | `oddsBttsNo` | 100 - UC-005 score (inverse) |
+| Over 1.5 Goals | `oddsFtOver15` | UC-006 adjusted (+15%) |
+| Over 2.5 Goals | `oddsFtOver25` | UC-006 Over Goals Engine score |
+| Over 3.5 Goals | `oddsFtOver35` | UC-006 adjusted (-25%) |
+| Under 1.5 Goals | `oddsFtUnder15` | UC-007 adjusted (-15%) |
+| Under 2.5 Goals | `oddsFtUnder25` | UC-007 Under Goals Engine score |
+| Under 3.5 Goals | `oddsFtUnder35` | UC-007 adjusted (+25%) |
+| Home Win | `oddsFt1` | Enhanced probability calculation |
+| Draw | `oddsFtX` | Enhanced probability calculation |
+| Away Win | `oddsFt2` | Enhanced probability calculation |
 
 **Logic:**
 ```
-For each market (BTTS, Over 2.5, Match Result, etc.):
+For each market:
 
 1. Calculate implied probability from bookmaker odds:
    Implied % = 1 / decimal_odds × 100
 
 2. Get our calculated probability from relevant use case:
-   - BTTS: UC-005 score
-   - Over Goals: UC-006 score
-   - Under Goals: UC-007 score
-   - Match Result: UC-017 score
+   - BTTS Yes/No: UC-005 score (or inverse)
+   - Over Goals: UC-006 score (adjusted for market)
+   - Under Goals: UC-007 score (adjusted for market)
+   - Match Result: Enhanced calculation using form + xG
 
 3. Calculate value:
    Value % = Our Probability - Implied Probability
 
 4. Calculate expected value (EV):
    EV = (Our Probability × (odds - 1)) - (1 - Our Probability)
+
+5. Apply source confidence weight:
+   Weighted EV = EV × Source Weight
+   - Strong source: × 1.0
+   - Moderate source: × 0.8
+   - Weak source: × 0.5
+
+6. Calculate Kelly Criterion stake:
+   Kelly = ((odds - 1) × probability - (1 - probability)) / (odds - 1)
+   Suggested Stake = Kelly × 0.25 (quarter Kelly for safety)
+   Maximum stake capped at 10% of bankroll
+```
+
+**Match Result Enhanced Probability:**
+```
+1. Base probability from season win rates (home/away specific)
+2. Blend with recent form PPG (60% season, 40% form)
+3. Incorporate xG ratio if available (70% base, 30% xG)
+4. Normalize to ensure probabilities sum to 1
+5. Draw constrained to 15-35% range
 ```
 
 **Thresholds:**
-- **Strong Value:** Value % ≥ 15% AND EV ≥ 0.10
-- **Moderate Value:** Value % ≥ 10% AND EV ≥ 0.05
-- **No Value:** Value % < 10% OR EV < 0.05
+- **Strong Value:** Value % ≥ 15% AND EV ≥ 0.10 AND odds ≤ 2.50
+- **Moderate Value:** Value % ≥ 10% AND EV ≥ 0.05 (and odds ≤ 3.00)
+- **No Value:** Value % < 10% OR EV < 0.05 OR odds outside range
+- **Odds Range:** 1.50 to 3.00 for all markets including 1X2 (avoids tiny margins and longshots)
 
-**Additional Factors:**
-- Confidence weight from source use case (Strong/Moderate/Weak)
-- Minimum odds threshold (e.g., odds ≥ 1.50) to avoid tiny margins
+**Best Opportunity Selection:**
+- All qualifying opportunities ranked by weighted EV
+- Best opportunity returned as primary recommendation
+- All opportunities tracked in factors for transparency
 
 **Output:**
-- Ranked list by EV or Value %
-- Include: market, our probability, implied probability, odds, EV, confidence
+- Single best value bet recommendation
+- Ranked by weighted expected value
+- Include: market, our probability, implied probability, odds, EV, Kelly stake
+- Factors tracked:
+  - `market` - best market found
+  - `ourProbability` / `impliedProbability` - probability comparison
+  - `odds` - bookmaker odds
+  - `valuePercentage` - value edge found
+  - `expectedValue` / `weightedExpectedValue` - EV calculations
+  - `kellyStake` / `suggestedStakePct` - stake sizing
+  - `sourceConfidence` / `valueConfidence` - confidence levels
+  - `totalOpportunities` - count of all value found
+  - `allOpportunities` - list of all qualifying bets
+  - `bttsOpportunities` / `goalsOpportunities` / `matchResultOpportunities` - breakdown by type
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -437,48 +712,64 @@ For each market (BTTS, Over 2.5, Match Result, etc.):
 **User Story:** As a user, I want to spot teams on hot streaks that may be undervalued by the market.
 
 **Data Required:**
-- Season PPG, goals scored avg, win percentage, clean sheet %
-- Recent form (last 5) PPG, goals scored avg, win percentage, clean sheet %
+- Season PPG, goals scored avg, goals conceded avg, win percentage, clean sheet %
+- Recent form (last 5) PPG, goals scored avg, goals conceded avg, win percentage, clean sheet %
 - Home/away splits for both season and recent form
+- xG data for regression risk assessment
 - Upcoming fixture location (home/away)
 
 **Logic:**
 ```
 Winning Mismatch Score = weighted average of deltas:
-  - PPG delta: (Last 5 PPG - Season PPG) / Season PPG           × 0.30
-  - Goals delta: (Last 5 goals avg - Season goals avg)          × 0.25
-  - Wins delta: (Last 5 win % - Season win %)                   × 0.25
+  - PPG delta: (Last 5 PPG - Season PPG) / Season PPG           × 0.25
+  - Goals delta: (Last 5 goals avg - Season goals avg)          × 0.20
+  - Conceded delta: (Season conceded - Last 5 conceded) / Season × 0.15  (inverted - lower = better)
+  - Wins delta: (Last 5 win % - Season win %)                   × 0.20
   - Clean sheets delta: (Last 5 CS % - Season CS %)             × 0.20
 ```
 
-**Calculation:**
-- Positive delta = team performing BETTER recently
-- Normalize each delta to comparable scale (percentage improvement)
-- For upcoming home fixture: weight home splits at 1.25×
-- For upcoming away fixture: weight away splits at 1.25×
+**Home/Away Context Weighting:**
+```
+If team is playing at home (their strength venue):
+  Final Score = Base Score × 1.25
+```
+
+**Trend Bonuses:**
+```
+Scoring Trend Up: +3% if home scoring > overall scoring by 0.3 goals
+Defensive Trend Up: +2% if home conceding < overall conceding by 0.3 goals
+Winning Streak: +5% if team has won 3+ of last 5 matches
+```
+
+**xG Regression Risk:**
+```
+Flag as regression risk if:
+  Actual goals scored - xG for avg > 0.5 goals per game
+  (Team scoring significantly above expected - likely to regress)
+```
 
 **Thresholds:**
 - **Strong Mismatch:** Score ≥ 25% improvement
 - **Moderate Mismatch:** Score 15-24% improvement
 - **No Mismatch:** Score < 15% improvement
 
-**Additional Factors:**
-1. **Minimum Sample Size:** At least 5 matches in recent form window
-2. **Home/Away Context:** Apply location-based weighting for upcoming fixture
-3. **Streak Bonus:** Add +5% if team has won 3+ consecutive matches
-4. **Quality Opposition Indicator:** Flag if recent opponents were bottom-half teams (potential false signal)
-5. **Scoring Trend:** Note if goals per game increasing over last 5 (momentum indicator)
-6. **Defensive Trend:** Note if goals conceded decreasing over last 5 (solidity indicator)
-7. **Goals vs Performance:** Flag if actual goals significantly > expected from shots (regression risk)
-8. **Fixture Difficulty:** Compare average league position of recent opponents vs season average
-
 **Output:**
-- Ranked list of teams by mismatch score
-- Include: season stats, recent form stats, delta percentages
-- Include: win streak status, opponent quality flag
+- Single best mismatch recommendation per fixture
+- Positive score = Winning Form Mismatch (hot streak)
+- Include: all delta percentages, trend indicators, streak status
 - Flag: "Hot streak - potentially undervalued"
+- Factors tracked:
+  - `team` / `isHomeTeam` / `playingAtStrength` - team context
+  - `mismatchScore` - overall mismatch percentage
+  - `ppgDelta` / `goalsDelta` / `concededDelta` / `winsDelta` / `cleanSheetDelta` - individual deltas
+  - `hasWinningStreak` / `hasLosingStreak` - streak indicators
+  - `scoringTrendUp` / `defensiveTrendUp` - momentum indicators
+  - `xgRegressionRisk` - regression warning flag
+  - `homeAwayContextMultiplier` - context weighting applied
+  - `positiveMomentumIndicators` - count of positive signals
+  - `riskFlags` - list of risk warnings
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -489,49 +780,48 @@ Winning Mismatch Score = weighted average of deltas:
 **User Story:** As a user, I want to spot teams on cold streaks that may be overvalued by the market.
 
 **Data Required:**
-- Season PPG, goals scored avg, win percentage, clean sheet %
-- Recent form (last 5) PPG, goals scored avg, win percentage, clean sheet %
+- Season PPG, goals scored avg, goals conceded avg, win percentage, clean sheet %
+- Recent form (last 5) PPG, goals scored avg, goals conceded avg, win percentage, clean sheet %
 - Home/away splits for both season and recent form
 - Upcoming fixture location (home/away)
 
 **Logic:**
 ```
+Handled by FormMismatchRecommendationEngine (same as UC-010).
+Negative mismatch score indicates LOSING form mismatch.
+
 Losing Mismatch Score = weighted average of negative deltas:
-  - PPG delta: (Season PPG - Last 5 PPG) / Season PPG           × 0.30
-  - Goals delta: (Season goals avg - Last 5 goals avg)          × 0.25
-  - Wins delta: (Season win % - Last 5 win %)                   × 0.25
-  - Clean sheets delta: (Season CS % - Last 5 CS %)             × 0.20
+  - PPG delta: (Last 5 PPG - Season PPG) / Season PPG           × 0.25
+  - Goals delta: (Last 5 goals avg - Season goals avg)          × 0.20
+  - Conceded delta: (Season conceded - Last 5 conceded) / Season × 0.15
+  - Wins delta: (Last 5 win % - Season win %)                   × 0.20
+  - Clean sheets delta: (Last 5 CS % - Season CS %)             × 0.20
 ```
 
-**Calculation:**
-- Positive delta = team performing WORSE recently
-- Normalize each delta to comparable scale (percentage decline)
-- For upcoming home fixture: weight home splits at 1.25×
-- For upcoming away fixture: weight away splits at 1.25×
+**Home/Away Context Weighting:**
+```
+If team is playing at home (their strength venue):
+  Final Score = Base Score × 1.25
+```
+
+**Losing Streak Penalty:**
+```
+If team has lost 3+ of last 5: additional -5% (making negative score worse)
+```
 
 **Thresholds:**
-- **Strong Mismatch:** Score ≥ 25% decline
-- **Moderate Mismatch:** Score 15-24% decline
-- **No Mismatch:** Score < 15% decline
-
-**Additional Factors:**
-1. **Minimum Sample Size:** At least 5 matches in recent form window
-2. **Home/Away Context:** Apply location-based weighting for upcoming fixture
-3. **Losing Streak Indicator:** Add +5% if team has lost 3+ consecutive matches
-4. **Quality Opposition Indicator:** Flag if recent opponents were top-half teams (not necessarily a crisis)
-5. **Scoring Drought:** Note if goals per game decreasing over last 5 (attacking confidence issue)
-6. **Defensive Collapse:** Note if goals conceded increasing over last 5 (structural problem)
-7. **Key Metrics Divergence:** Flag if multiple metrics declining simultaneously (systemic issue)
-8. **Fixture Difficulty:** Compare average league position of recent opponents vs season average
-9. **Injury/Suspension Context:** Note if decline coincides with missing key players (temporary vs permanent)
+- **Strong Mismatch:** Score ≤ -25% decline
+- **Moderate Mismatch:** Score -15% to -24% decline
+- **No Mismatch:** Score > -15%
 
 **Output:**
-- Ranked list of teams by mismatch score
-- Include: season stats, recent form stats, delta percentages
-- Include: losing streak status, opponent quality flag
+- Single worst mismatch recommendation per fixture
+- Negative score = Losing Form Mismatch (cold streak)
+- Include: all delta percentages, losing streak indicator
 - Flag: "Cold streak - potentially overvalued"
+- Same factor tracking as UC-010
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -543,70 +833,86 @@ Losing Mismatch Score = weighted average of negative deltas:
 
 **Data Required:**
 - Team corners won averages (home/away, season + form)
-- Team corners conceded averages (home/away, season + form)
+- Team corners conceded averages (opponent's overall as proxy)
 - corners_potential, corners_o85_potential, corners_o95_potential, corners_o105_potential from API
+- Goals scored averages (for playing style assessment)
+- League positions (for match context)
 
 **Logic:**
 ```
-Over Corners Score = weighted average of:
-  - Home team corners won avg (home)              × 0.12
-  - Away team corners won avg (away)              × 0.12
-  - Home team corners conceded avg (home)         × 0.08
-  - Away team corners conceded avg (away)         × 0.08
-  - Home team corners won avg (last 5 home)       × 0.12
-  - Away team corners won avg (last 5 away)       × 0.12
-  - API corners_o95_potential                     × 0.08
-  - API corners_o105_potential                    × 0.08
-  - Playing style factor (home)                   × 0.05
-  - Playing style factor (away)                   × 0.05
-  - Defensive style factor (home)                 × 0.05
-  - Defensive style factor (away)                 × 0.05
+Expected Corners Calculation:
+
+1. Base Expected per Team:
+   - Home Expected = (home corners won avg + opponent conceded) / 2
+   - Away Expected = (away corners won avg + opponent conceded) / 2
+
+2. If form data available, blend:
+   - Home Expected = (season * 0.6) + (form * 0.4)
+   - Away Expected = (season * 0.6) + (form * 0.4)
+
+3. Base Expected = Home Expected + Away Expected
+
+4. API Potential Adjustment (20% influence):
+   - O95 contribution: 9.5 + ((O95% - 50) / 50) × 2
+   - O105 contribution: 10.5 + ((O105% - 50) / 50) × 2
+   - Final = (base × 0.80) + (apiAdjustment × 0.20)
+
+5. Apply Playing Style Multiplier:
+   - Home goals ≥ 2.0/game: +5%
+   - Home goals < 1.0/game: -5%
+   - Away goals ≥ 1.5/game: +5%
+   - Away goals < 0.8/game: -5%
+
+6. Apply Match Context Multiplier:
+   - Position diff ≤ 3: × 1.10 (close rivals)
+   - Position diff 4-6: × 1.05 (competitive)
+
+7. Apply Recent Trend Multiplier:
+   - Form avg > season avg by 15%+: × 1.10
+   - Form avg < season avg by 15%+: × 0.90
 ```
 
-**Playing Style Factor (per team):**
+**Confidence Determination:**
 ```
-Attacking Index = normalize(goals scored avg + shots on target avg)
-  - High attacking (top 25% in league) = 1.2
-  - Medium attacking = 1.0
-  - Low attacking (bottom 25%) = 0.8
+Strong Over:
+  - Expected corners ≥ 12 OR
+  - corners_o105_potential ≥ 70% (API confidence boost)
+
+Moderate Over:
+  - Expected corners 10-11.9 OR
+  - corners_o95_potential ≥ 65%
+
+Strong Under (handled by same engine):
+  - Expected corners ≤ 8 OR
+  - (O95 potential < 40% AND O105 potential < 25%)
+
+Moderate Under:
+  - Expected corners 8.1-9.5
 ```
 
-**Defensive Style Factor (per team):**
-```
-Deep Defense Index = normalize(goals conceded avg + opposition shots faced)
-  - Deep defending (high conceded corners) = 1.2
-  - Balanced = 1.0
-  - High pressing (low conceded corners) = 0.9
-```
-
-**Recent Trend Adjustment:**
-```
-If last 5 corners avg > season avg by 15%+: multiply final score × 1.10
-If last 5 corners avg < season avg by 15%+: multiply final score × 0.90
-```
-
-**Calculation:**
-- Expected corners = (Home won + Away won + Home conceded + Away conceded) / 2
-- Apply playing style and defensive style multipliers
-- Apply recent trend adjustment
-- Normalize to percentage based on Over 9.5 baseline
-
-**Thresholds:**
-- **Strong:** Expected corners ≥ 12 OR corners_o105_potential ≥ 70%
-- **Moderate:** Expected corners 10-11.9 OR corners_o95_potential ≥ 65%
-- **Weak:** Expected corners < 10
-
-**Additional Factors:**
-1. **Home/Away Split:** Home teams typically win more corners
-2. **Match Context:** Close league positions may lead to more competitive play
-3. **Weather/Pitch:** Note if data available (wet conditions = more corners typically)
+**Market Selection:**
+- **Over 10.5 Corners:** Strong confidence over
+- **Over 9.5 Corners:** Moderate confidence over
+- **Under 9.5 Corners:** Moderate confidence under
+- **Under 8.5 Corners:** Strong confidence under
 
 **Output:**
-- Ranked list of fixtures by expected corners
-- Include: team corner stats, API potentials, expected total
-- Suggested market: Over 9.5 or Over 10.5 based on expected value
+- Single recommendation per fixture (Over or Under)
+- Include: expected corners, market, confidence
+- Factors tracked:
+  - `expectedCorners` - final calculated expected
+  - `formDataAvailable` - data availability flag
+  - `homeCornersWonAvg` / `awayCornersWonAvg` - corners won
+  - `homeConcededAvg` / `awayConcededAvg` - corners conceded
+  - `homeFormCornersAvg` / `awayFormCornersAvg` - form data
+  - `apiCornersO85Potential` / `apiCornersO95Potential` / `apiCornersO105Potential` - API potentials
+  - `apiConfidenceBoostApplied` - whether API boosted confidence
+  - `playingStyleMultiplier` - attacking style adjustment
+  - `matchContextMultiplier` - position-based adjustment
+  - `trendMultiplier` / `trendDirection` - form trend adjustment
+  - `homePosition` / `awayPosition` / `positionDifference` - league standings
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -617,80 +923,33 @@ If last 5 corners avg < season avg by 15%+: multiply final score × 0.90
 **User Story:** As a user, I want to see which matches are likely to have few corners for under corners bets.
 
 **Data Required:**
-- Team corners won averages (home/away, season + form)
-- Team corners conceded averages (home/away, season + form)
-- corners_potential from API
+- Same as UC-012 (handled by same engine)
 
 **Logic:**
 ```
-Under Corners Score = weighted average of inverse metrics:
-  - Home team corners won avg (home) inverse      × 0.12
-  - Away team corners won avg (away) inverse      × 0.12
-  - Home team corners conceded avg (home) inverse × 0.08
-  - Away team corners conceded avg (away) inverse × 0.08
-  - Home team corners won avg (last 5) inverse    × 0.12
-  - Away team corners won avg (last 5) inverse    × 0.12
-  - API corners_potential inverse                 × 0.16
-  - Playing style factor (home) inverse           × 0.05
-  - Playing style factor (away) inverse           × 0.05
-  - Defensive style factor (home) inverse         × 0.05
-  - Defensive style factor (away) inverse         × 0.05
-```
+Handled by CornersRecommendationEngine (same as UC-012).
 
-**Playing Style Factor (inverse for under):**
-```
-  - Low attacking (bottom 25% in league) = 1.2 (good for under)
-  - Medium attacking = 1.0
-  - High attacking (top 25%) = 0.8 (bad for under)
-```
+The engine returns UNDER_CORNERS type when expected corners fall below thresholds.
 
-**Defensive Style Factor (inverse for under):**
+Under Detection:
+- Expected corners ≤ 9.5: triggers Under recommendation
+- Expected corners ≤ 8.0: Strong confidence Under 8.5
+- Low API potentials (O95 < 40% AND O105 < 25%): confidence boost
 ```
-  - High pressing (low conceded corners) = 1.2 (good for under)
-  - Balanced = 1.0
-  - Deep defending (high conceded corners) = 0.8 (bad for under)
-```
-
-**Recent Trend Adjustment:**
-```
-If last 5 corners avg < season avg by 15%+: multiply final score × 1.10
-If last 5 corners avg > season avg by 15%+: multiply final score × 0.90
-```
-
-**Match Context Factor:**
-```
-Stakes Assessment:
-  - Both teams mid-table (nothing to play for) = 1.15
-  - One team secured position = 1.10
-  - Title race / relegation battle = 0.85 (high intensity = more corners)
-  - Derby / rivalry match = 0.85
-
-League Position Proximity:
-  - Teams >10 places apart = 1.10 (likely one-sided, fewer corners)
-  - Teams within 3 places = 0.95 (competitive, more corners)
-```
-
-**Calculation:**
-- Expected corners = (Home won + Away won + Home conceded + Away conceded) / 2
-- Lower expected = higher under score
-- Apply inverse style factors
-- Apply match context factor
 
 **Thresholds:**
-- **Strong:** Expected corners ≤ 8 AND corners_potential ≤ 8.5
-- **Moderate:** Expected corners 8.1-9.5 OR corners_potential ≤ 9.5
-- **Weak:** Expected corners > 9.5
+- **Strong Under:** Expected corners ≤ 8.0 OR (O95 < 40% AND O105 < 25%)
+- **Moderate Under:** Expected corners 8.1-9.5
 
-**Additional Factors:**
-1. **Home/Away Split:** Consider typical corner patterns
-2. **Team Motivation:** End-of-season dead rubbers tend to have fewer corners
+**Market Selection:**
+- **Under 8.5 Corners:** Strong confidence under
+- **Under 9.5 Corners:** Moderate confidence under
 
 **Output:**
-- Ranked list of fixtures by under corners score
-- Include: team corner stats, expected total
-- Suggested market: Under 9.5 or Under 8.5 based on expected value
+- Returns UNDER_CORNERS recommendation type
+- Same factor tracking as UC-012
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -703,64 +962,83 @@ League Position Proximity:
 **Data Required:**
 - Clean sheet percentages (home/away, season + form)
 - Goals conceded averages
+- xGA (expected goals against) for defensive quality
 - Opponent failed to score percentage
-- Opponent goals scored averages
+- Opponent xG (expected goals) for attacking threat
 
 **Logic:**
 ```
+*Base Weights (when xG data IS available - total = 1.0):*
 Clean Sheet Score = weighted average of:
   - Team clean sheet % (season, home/away)        × 0.15
   - Team clean sheet % (last 5)                   × 0.15
   - Team goals conceded avg inverse (season)      × 0.10
   - Team goals conceded avg inverse (last 5)      × 0.10
-  - Team xGA (expected goals against) inverse     × 0.15
+  - Team xGA score                                × 0.15
   - Opponent failed to score % (season)           × 0.10
   - Opponent failed to score % (last 5)           × 0.10
-  - Opponent xG avg inverse                       × 0.15
+  - Opponent xG score                             × 0.15
+
+*Redistributed Weights (when xG data NOT available - total = 1.0):*
+Clean Sheet Score = weighted average of:
+  - Team clean sheet % (season, home/away)        × 0.20
+  - Team clean sheet % (last 5)                   × 0.20
+  - Team goals conceded avg inverse (season)      × 0.15
+  - Team goals conceded avg inverse (last 5)      × 0.15
+  - Opponent failed to score % (season)           × 0.15
+  - Opponent failed to score % (last 5)           × 0.15
 ```
-*(If xG/xGA unavailable from API, redistribute weight to goals conceded/scored)*
 
 **xG-Based Assessment:**
 ```
-Team Defensive xG Rating (xGA per game):
-  - <0.80 xGA = Elite defense (1.25)
-  - 0.80-1.10 xGA = Strong (1.10)
-  - 1.10-1.40 xGA = Average (1.0)
-  - >1.40 xGA = Leaky (0.80)
+Team Defensive xGA Rating (xGA per game):
+  - <0.80 xGA = Elite defense (score: 90)
+  - 0.80-1.10 xGA = Strong (score: 75)
+  - 1.10-1.40 xGA = Average (score: 50)
+  - >1.40 xGA = Leaky (score: 25)
 
 Opponent Attacking xG Rating (xG per game):
-  - <0.80 xG = Poor creators (1.25) - good for clean sheet
-  - 0.80-1.10 xG = Below average (1.10)
-  - 1.10-1.50 xG = Average (1.0)
-  - >1.50 xG = Strong creators (0.75) - bad for clean sheet
-
-xG Overperformance Flag:
-  - If opponent actual goals > xG by 20%+: regression likely (boost score × 1.10)
-  - If team actual conceded < xGA by 20%+: regression risk (reduce score × 0.90)
+  - <0.80 xG = Poor creators (score: 90) - good for clean sheet
+  - 0.80-1.10 xG = Below average (score: 75)
+  - 1.10-1.50 xG = Average (score: 50)
+  - >1.50 xG = Strong creators (score: 25) - bad for clean sheet
 ```
 
-**Defensive Strength Assessment:**
+**Defensive Strength Multiplier:**
 ```
 Goals Conceded Rating:
-  - <0.75 per game = Elite (1.2)
-  - 0.75-1.0 per game = Strong (1.1)
-  - 1.0-1.25 per game = Average (1.0)
-  - >1.25 per game = Weak (0.85)
+  - <0.75 per game = Elite (× 1.20)
+  - 0.75-1.00 per game = Strong (× 1.10)
+  - 1.00-1.25 per game = Average (× 1.00)
+  - >1.25 per game = Weak (× 0.85)
 ```
 
-**Opponent Attacking Weakness:**
+**Opponent Attacking Weakness Multiplier:**
 ```
 Failed to Score Rating:
-  - >40% failed to score = Poor attack (1.2)
-  - 30-40% = Below average (1.1)
-  - 20-30% = Average (1.0)
-  - <20% = Strong attack (0.8)
+  - >40% failed to score = Poor attack (× 1.20)
+  - 30-40% = Below average (× 1.10)
+  - 20-30% = Average (× 1.00)
+  - <20% = Strong attack (× 0.80)
 ```
 
-**Recent Form Adjustment:**
+**Hot Defensive Streak Bonus:**
 ```
-If last 3 matches all clean sheets: × 1.15 (hot defensive streak)
-If conceded in last 3 matches: × 0.90 (defensive concerns)
+If team has 3+ clean sheets in last 5 form matches: × 1.15
+```
+
+**Recent Conceded Penalty:**
+```
+If team conceded in all recent matches (0 CS in form): × 0.90
+```
+
+**xG Regression Adjustments:**
+```
+Team Regression Risk:
+  - If actual conceded < xGA by 20%+: × 0.90 (likely to regress)
+
+Opponent Overperformance:
+  - If opponent actual goals < xG by 20%+: × 1.10 (opponent likely to regress)
 ```
 
 **Thresholds:**
@@ -768,18 +1046,24 @@ If conceded in last 3 matches: × 0.90 (defensive concerns)
 - **Moderate:** Clean Sheet Score 50-69%
 - **Weak:** Clean Sheet Score < 50%
 
-**Additional Factors:**
-1. **Home/Away Context:** Home teams keep more clean sheets typically
-2. **Head-to-Head:** If available, historical clean sheets vs this opponent
-3. **Key Defender Availability:** Flag if data suggests missing players
-4. **Opponent Motivation:** Teams with nothing to play for may lack attacking intent
-
 **Output:**
-- Ranked list of teams by clean sheet probability
+- Single best clean sheet candidate per fixture
 - Include: team defensive stats, opponent attacking stats, confidence level
-- Pair with opponent for fixture context
+- Factors tracked:
+  - `team` / `isHomeTeam` - candidate info
+  - `xgDataAvailable` - data availability flag
+  - `teamCleanSheetSeasonPct` / `teamCleanSheetFormPct` - CS percentages
+  - `teamXgaPerGame` / `teamXgaScore` / `teamDefensiveXgRating` - defensive xG
+  - `opponentFailedToScoreSeasonPct` / `opponentFailedToScoreFormPct` - opponent FTS
+  - `opponentXgPerGame` / `opponentXgScore` / `opponentAttackingXgRating` - opponent xG
+  - `defensiveRatingMultiplier` / `opponentWeaknessMultiplier` - rating adjustments
+  - `hotDefensiveStreak` - 3+ consecutive CS flag
+  - `concededInAllRecent` - no CS in form flag
+  - `xgRegressionRisk` - team conceding below xGA
+  - `opponentXgOverperformance` - opponent scoring below xG
+  - `riskFlags` / `positiveIndicators` - summary lists
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -791,86 +1075,101 @@ If conceded in last 3 matches: × 0.90 (defensive concerns)
 
 **Data Required:**
 - o05HT_potential, o15HT_potential from API
-- First half goals stats (if available)
+- First half goals stats (uses total goals × 0.45 as proxy)
 - Team goals scored/conceded timing patterns
-- BTTS HT percentage
+- BTTS HT percentage (season BTTS % as proxy)
+- xG data (when available)
 
-**Logic:**
+**Implementation:** `FirstHalfGoalsRecommendationEngine.java`
+
+**Logic (with xG data available):**
 ```
 First Half Goals Score = weighted average of:
   - API o05HT_potential                           × 0.15
   - API o15HT_potential                           × 0.10
-  - Home team 1H goals scored avg                 × 0.12
-  - Away team 1H goals scored avg                 × 0.12
-  - Home team 1H goals conceded avg               × 0.08
-  - Away team 1H goals conceded avg               × 0.08
-  - BTTS HT % (home team)                         × 0.05
-  - BTTS HT % (away team)                         × 0.05
+  - Home team 1H goals scored proxy (×0.45)       × 0.12
+  - Away team 1H goals scored proxy (×0.45)       × 0.12
+  - Home team 1H goals conceded proxy (×0.45)     × 0.08
+  - Away team 1H goals conceded proxy (×0.45)     × 0.08
+  - BTTS season % (home team)                     × 0.05
+  - BTTS season % (away team)                     × 0.05
   - Home team xG avg (× 0.45 for 1H proxy)        × 0.10
   - Away team xG avg (× 0.45 for 1H proxy)        × 0.10
   - Combined xGA factor                           × 0.05
 ```
-*(If 1H-specific stats unavailable, use total goals × 0.45 as proxy)*
-*(If xG unavailable, redistribute weight to goals scored/conceded)*
 
-**xG-Based Assessment:**
+**Dynamic Weights (when xG NOT available):**
 ```
-Team 1H xG Estimate = Total xG × 0.45 (typical 1H share)
+Redistributed weights (total = 1.0):
+  - API o05HT_potential                           × 0.20
+  - API o15HT_potential                           × 0.15
+  - Home team 1H goals scored proxy               × 0.15
+  - Away team 1H goals scored proxy               × 0.15
+  - Home team 1H goals conceded proxy             × 0.10
+  - Away team 1H goals conceded proxy             × 0.10
+  - BTTS season % (home team)                     × 0.075
+  - BTTS season % (away team)                     × 0.075
+```
 
+**xG-Based Assessment (multipliers applied sequentially):**
+```
 Combined xG Rating:
-  - Home xG + Away xG > 3.0 = High-scoring potential (1.20)
-  - 2.5-3.0 = Above average (1.10)
-  - 2.0-2.5 = Average (1.0)
-  - <2.0 = Low-scoring potential (0.85)
+  - Home xG + Away xG > 3.0 = High-scoring potential (× 1.20)
+  - 2.5-3.0 = Above average (× 1.10)
+  - 2.0-2.5 = Average (× 1.0)
+  - <2.0 = Low-scoring potential (× 0.85)
 
-xG vs Actual Goals:
-  - Both teams underperforming xG: regression = more goals likely (1.10)
-  - Both teams overperforming xG: regression = fewer goals (0.90)
+xG Regression Adjustment:
+  - Both teams underperforming xG (actual < xG × 0.85): (× 1.10)
+  - Both teams overperforming xG (actual > xG × 1.15): (× 0.90)
 ```
 
-**Fast Starter Assessment:**
+**Fast Starter Detection (via API potentials):**
 ```
-Team 1H Goals Ratio = 1H goals / Total goals
-  - >55% goals in 1H = Fast starter (1.20)
-  - 45-55% = Balanced (1.0)
-  - <45% = Slow starter (0.85)
+Implied Ratio = O05HT_potential / max(50, O25_potential)
+  - Ratio > 0.825 = Fast starters detected (× 1.20)
+  - Ratio < 0.45 = Slow starters detected (× 0.85)
 ```
 
 **Early Conceder Assessment:**
 ```
-Team 1H Conceded Ratio = 1H conceded / Total conceded
-  - >55% conceded in 1H = Vulnerable early (1.15)
-  - 45-55% = Balanced (1.0)
-  - <45% = Strong early defense (0.90)
+Combined Conceded Avg (home + away):
+  - > 2.5 per game = Both teams vulnerable defensively (× 1.15)
+  - < 1.5 per game = Strong combined defense (× 0.90)
 ```
 
-**Recent Form Adjustment:**
+**Recent Form Adjustment (using O1.5 as proxy):**
 ```
-If 1H goals in 4+ of last 5 matches: × 1.10
-If 1H goals in 2 or fewer of last 5: × 0.90
+Total O1.5 in form (out of 10 matches):
+  - ≥ 8 matches with O1.5 = Hot form (× 1.10)
+  - ≤ 4 matches with O1.5 = Cold form (× 0.90)
 ```
 
-**Thresholds (Over 0.5 HT):**
-- **Strong:** Score ≥ 80% OR o05HT_potential ≥ 75%
-- **Moderate:** Score 65-79%
-- **Weak:** Score < 65%
+**Thresholds:**
+- **Strong:** Score ≥ 75%
+- **Moderate:** Score 60-74%
+- **Weak (filtered):** Score < 60%
+- **Minimum filter:** Expected 1H goals ≥ 0.8
 
-**Thresholds (Over 1.5 HT):**
-- **Strong:** Score ≥ 70% AND o15HT_potential ≥ 60%
-- **Moderate:** Score 55-69%
-- **Weak:** Score < 55%
+**Market Selection:**
+- **Over 1.5 HT:** Expected 1H goals ≥ 1.3 AND score ≥ 75% AND O15HT potential ≥ 55%
+- **Over 0.5 HT:** Default market
 
-**Additional Factors:**
-1. **Match Tempo:** High-pressing teams tend to score/concede early
-2. **Stakes:** Must-win situations often see early aggression
-3. **Weather:** Extreme conditions may slow early play
+**Enhanced Factor Tracking:**
+- `expected1HGoals`, `expectedFullTimeGoals`, `firstHalfRatioUsed` (0.45)
+- `home1HScoredProxyAvg`, `away1HScoredProxyAvg`
+- `home1HConcededProxyAvg`, `away1HConcededProxyAvg`
+- `homeBttsSeasonPct`, `awayBttsSeasonPct`
+- `apiO05HtPotential`, `apiO15HtPotential`
+- `xgDataAvailable`, `homeXgForAvgHome`, `awayXgForAvgAway`
+- `combinedXg`, `home1HXgProxy`, `away1HXgProxy`
+- `xgRating`, `homeXgPerformance`, `awayXgPerformance`, `xgRegressionOutlook`
+- `fastStarterImpliedRatio`, `fastStarterStatus`
+- `combinedConcededAvg`, `earlyConcedeStatus`
+- `homeO15RecentForm`, `awayO15RecentForm`, `totalO15InForm`, `recentFormStatus`
+- `positiveIndicators`, `riskFlags`
 
-**Output:**
-- Ranked list of fixtures by 1H goals probability
-- Include: team 1H stats, API potentials, suggested market (O0.5 or O1.5 HT)
-- Flag: "Fast starters" when both teams score >50% goals in 1H
-
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -881,92 +1180,113 @@ If 1H goals in 2 or fewer of last 5: × 0.90
 **User Story:** As a user, I want to see which matches are likely to have second half goals.
 
 **Data Required:**
-- Second half goals stats (if available)
+- Second half goals stats (uses total goals × 0.55 as proxy)
 - Team goals scored/conceded timing patterns
-- 2h_cards_total as proxy for late game intensity
-- xG data
+- Cards average as proxy for late game intensity
+- xG data (when available)
+- Draw percentages for match situation factor
 
-**Logic:**
+**Implementation:** `SecondHalfGoalsRecommendationEngine.java`
+
+**Logic (with xG data available):**
 ```
 Second Half Goals Score = weighted average of:
-  - Home team 2H goals scored avg                 × 0.12
-  - Away team 2H goals scored avg                 × 0.12
-  - Home team 2H goals conceded avg               × 0.08
-  - Away team 2H goals conceded avg               × 0.08
+  - Home team 2H goals scored proxy (×0.55)       × 0.12
+  - Away team 2H goals scored proxy (×0.55)       × 0.12
+  - Home team 2H goals conceded proxy (×0.55)     × 0.08
+  - Away team 2H goals conceded proxy (×0.55)     × 0.08
   - Home team xG avg (× 0.55 for 2H proxy)        × 0.10
   - Away team xG avg (× 0.55 for 2H proxy)        × 0.10
   - Combined xGA factor                           × 0.05
-  - Late game intensity factor                    × 0.10
+  - Late game intensity factor (cards)            × 0.10
+  - Fitness/stamina indicator (goal difference)   × 0.10
+  - Match situation factor (draw % + attacking)   × 0.15
+```
+
+**Dynamic Weights (when xG NOT available):**
+```
+Redistributed weights (total = 1.0):
+  - Home team 2H goals scored proxy               × 0.18
+  - Away team 2H goals scored proxy               × 0.18
+  - Home team 2H goals conceded proxy             × 0.12
+  - Away team 2H goals conceded proxy             × 0.12
+  - Late game intensity factor                    × 0.15
   - Fitness/stamina indicator                     × 0.10
   - Match situation factor                        × 0.15
 ```
-*(If 2H-specific stats unavailable, use total goals × 0.55 as proxy)*
-*(If xG unavailable, redistribute weight to goals scored/conceded)*
 
 **xG-Based Assessment:**
 ```
-Team 2H xG Estimate = Total xG × 0.55 (typical 2H share - slightly higher)
-
 Combined xG Rating:
-  - Home xG + Away xG > 3.0 = High-scoring potential (1.20)
-  - 2.5-3.0 = Above average (1.10)
-  - 2.0-2.5 = Average (1.0)
-  - <2.0 = Low-scoring potential (0.85)
+  - Home xG + Away xG > 3.0 = High-scoring potential (× 1.20)
+  - 2.5-3.0 = Above average (× 1.10)
+  - 2.0-2.5 = Average (× 1.0)
+  - <2.0 = Low-scoring potential (× 0.85)
 ```
 
-**Late Scorer Assessment:**
+**Late Goals Tendency (Strong Finisher Profile):**
 ```
-Team 2H Goals Ratio = 2H goals / Total goals
-  - >60% goals in 2H = Strong finisher (1.25)
-  - 50-60% = Balanced (1.05)
-  - <50% = Front-loaded (0.90)
+Based on combined goals avg + clean sheet %:
+  - Combined goals ≥ 3.0 AND avg CS% < 30% = Strong finisher (× 1.25)
+  - Combined goals ≥ 2.5 = Balanced (× 1.05)
+  - Combined goals < 2.0 = Front-loaded (× 0.90)
 ```
 
-**Late Conceder Assessment:**
+**Late Conceder Profile:**
 ```
-Team 2H Conceded Ratio = 2H conceded / Total conceded
-  - >60% conceded in 2H = Tires late (1.20)
-  - 50-60% = Balanced (1.05)
-  - <50% = Strong late defense (0.85)
+Based on combined conceded avg + clean sheet %:
+  - Combined conceded ≥ 2.5 AND avg CS% < 25% = Vulnerable late (× 1.20)
+  - Combined conceded < 1.5 AND avg CS% > 40% = Strong late defense (× 0.90)
 ```
 
 **Late Game Intensity Factor:**
 ```
-2H Cards Indicator:
-  - 2h_cards_total > 1H cards = Late intensity (1.15)
-  - Balanced = (1.0)
-  - 2h_cards_total < 1H cards = Early intensity (0.95)
+Combined Cards Average:
+  - ≥ 4.0 cards per game = High intensity matchup (× 1.10)
+  - < 2.5 cards per game = Low intensity (× 0.95)
+
+Intensity Score = min(100, (combinedCards / 6.0) × 100)
+```
+
+**Fitness/Stamina Indicator:**
+```
+Based on goal difference per game:
+  - Positive GD = better fitness/ability to push late
+  - Score = 50 + (avgGoalDiff × 25), clamped 0-100
 ```
 
 **Match Situation Factor:**
 ```
-Expected Game State:
-  - Evenly matched (close odds) = likely competitive 2H (1.15)
-  - Heavy favorite = may ease off OR push for more (1.0)
-  - Must-win for underdog = late push likely (1.20)
+Blend of draw likelihood (40%) and attacking intent (60%):
+  - High draw % + high goals avg = competitive 2H expected
+  - Combined goals indicator = min(100, (homeGoals + awayGoals) × 30)
 ```
 
-**Thresholds (Over 0.5 2H):**
-- **Strong:** Score ≥ 80%
-- **Moderate:** Score 65-79%
-- **Weak:** Score < 65%
+**Thresholds:**
+- **Strong:** Score ≥ 75%
+- **Moderate:** Score 60-74%
+- **Weak (filtered):** Score < 60%
+- **Minimum filter:** Expected 2H goals ≥ 0.9
 
-**Thresholds (Over 1.5 2H):**
-- **Strong:** Score ≥ 70%
-- **Moderate:** Score 55-69%
-- **Weak:** Score < 55%
+**Market Selection:**
+- **Over 1.5 2H:** Expected 2H goals ≥ 1.5 AND score ≥ 75%
+- **Over 0.5 2H:** Default market
 
-**Additional Factors:**
-1. **Substitution Impact:** Fresh legs typically increase 2H tempo
-2. **Historical 2H Patterns:** Some teams consistently score late
-3. **Tactical Adjustments:** Teams trailing often open up in 2H
+**Enhanced Factor Tracking:**
+- `expected2HGoals`, `expectedFullTimeGoals`, `secondHalfRatioUsed` (0.55)
+- `home2HScoredProxyAvg`, `away2HScoredProxyAvg`
+- `home2HConcededProxyAvg`, `away2HConcededProxyAvg`
+- `homeCardsAvg`, `awayCardsAvg`, `combinedCardsAvg`, `lateGameIntensityScore`
+- `homeGoalDifferencePerGame`, `awayGoalDifferencePerGame`, `fitnessIndicatorScore`
+- `homeDrawPct`, `awayDrawPct`, `matchSituationScore`
+- `xgDataAvailable`, `homeXgForAvgHome`, `awayXgForAvgAway`
+- `combinedXg`, `home2HXgProxy`, `away2HXgProxy`, `xgRating`
+- `combinedGoalsAvg`, `avgCleanSheetPct`, `finisherProfile`
+- `combinedConcededAvg`, `lateConcedeProfile`
+- `intensityProfile`
+- `positiveIndicators`, `riskFlags`
 
-**Output:**
-- Ranked list of fixtures by 2H goals probability
-- Include: team 2H stats, late game intensity, suggested market
-- Flag: "Strong finishers" when both teams score >55% goals in 2H
-
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -982,11 +1302,12 @@ Expected Game State:
 - Goals scored/conceded
 - xG and xGA
 - odds_ft_1, odds_ft_x, odds_ft_2
+- League positions
 
-**Logic:**
+**Implementation:** `MatchResultRecommendationEngine.java`
+
+**Logic (with xG data available):**
 ```
-For each outcome (Home Win, Draw, Away Win), calculate probability:
-
 Home Win Probability = weighted average of:
   - Home team home win % (season)                 × 0.15
   - Home team home win % (last 5)                 × 0.15
@@ -998,45 +1319,49 @@ Home Win Probability = weighted average of:
   - Goal difference comparison                    × 0.10
   - Implied probability from odds_ft_1 (sanity)   × 0.05
 
-Away Win Probability = weighted average of:
-  - Away team away win % (season)                 × 0.15
-  - Away team away win % (last 5)                 × 0.15
-  - Home team home loss % (season)                × 0.10
-  - Home team home loss % (last 5)                × 0.10
-  - Away team away PPG normalized                 × 0.10
-  - Home team home PPG inverse normalized         × 0.10
-  - Away team xG vs Home team xGA comparison      × 0.15
-  - Goal difference comparison                    × 0.10
-  - Implied probability from odds_ft_2 (sanity)   × 0.05
+Away Win Probability = (same structure inverted)
 
 Draw Probability = 100% - Home Win % - Away Win %
-  (with floor/ceiling adjustments, see UC-019)
+  (bounded to 15-35% range)
 ```
 
-**xG Comparison Factor:**
+**Dynamic Weights (when xG NOT available):**
+```
+Redistributed weights (total = 1.0):
+  - Home team home win % (season)                 × 0.18
+  - Home team home win % (last 5)                 × 0.18
+  - Away team away loss % (season)                × 0.12
+  - Away team away loss % (last 5)                × 0.12
+  - Home team home PPG normalized                 × 0.12
+  - Away team away PPG inverse normalized         × 0.10
+  - Goal difference comparison                    × 0.12
+  - Implied probability from odds                 × 0.06
+```
+
+**xG Comparison Factor (multiplier applied to probabilities):**
 ```
 xG Dominance = Team xG - Opponent xGA
-  - Dominance > 0.5 = Strong advantage (1.25)
-  - Dominance 0.2-0.5 = Moderate advantage (1.10)
-  - Dominance -0.2 to 0.2 = Even (1.0)
-  - Dominance < -0.2 = Disadvantage (0.85)
+  - Dominance > 0.5 = Strong advantage (× 1.25)
+  - Dominance 0.2-0.5 = Moderate advantage (× 1.10)
+  - Dominance -0.2 to 0.2 = Even (× 1.0)
+  - Dominance < -0.2 = Disadvantage (× 0.85)
 ```
 
-**Form Momentum Factor:**
+**Form Momentum Factor (multiplier):**
 ```
-Last 5 Results Trend:
-  - W-W-W-W-W or W-W-W-W-D = Hot streak (1.20)
-  - 3+ wins in last 5 = Good form (1.10)
-  - Mixed results = Neutral (1.0)
-  - 3+ losses in last 5 = Poor form (0.85)
-  - L-L-L-L-L = Crisis (0.70)
+Based on home/away wins and losses in last 5:
+  - 5 wins OR (4 wins + 1 draw) = Hot streak (× 1.20)
+  - 3+ wins = Good form (× 1.10)
+  - Mixed results = Neutral (× 1.0)
+  - 3+ losses = Poor form (× 0.85)
+  - 5 losses = Crisis (× 0.70)
 ```
 
 **Home Advantage Factor:**
 ```
-League Home Win Rate Baseline:
-  - Apply league-specific home advantage multiplier
-  - Typical: Home +8-12% probability boost
+Flat 8% probability boost to home team win probability
+Home team: +8%
+Away team: -4%
 ```
 
 **League Position Gap Factor:**
@@ -1046,72 +1371,41 @@ Position Difference = |Home position - Away position|
   - Gap 6-9 places: Favor higher team × 1.10
   - Gap 3-5 places: Slight favor × 1.05
   - Gap 0-2 places: No adjustment (1.0)
-
-Apply to:
-  - Higher-placed team's win probability
-  - Reduce lower-placed team's win probability proportionally
 ```
 
 **Motivation Factor:**
 ```
-Team Situation Assessment:
-  Title Race (top 2, within 6 pts of leader):
-    - Win probability × 1.15
-  
-  Champions League Race (3rd-5th, within 3 pts):
-    - Win probability × 1.10
-  
-  Relegation Battle (bottom 4, within 4 pts of safety):
-    - Win probability × 1.15 (desperate = determined)
-  
-  Mid-table (nothing to play for):
-    - Win probability × 0.95
-  
-  Position Secured (mathematically safe/qualified):
-    - Win probability × 0.90 (may rotate/relax)
-```
-
-**Fixture Congestion Factor:**
-```
-Games in Last 14 Days:
-  - 5+ matches: Fatigue risk × 0.90
-  - 4 matches: Slight fatigue × 0.95
-  - 3 or fewer: Fresh × 1.0
-
-Comparative Advantage:
-  - If opponent has 2+ more games in period: × 1.10
-  - If team has 2+ more games than opponent: × 0.90
-```
-
-**Key Player Availability Factor:**
-```
-(When data available - flag for manual check if not)
-  - Top scorer missing: Attack × 0.85
-  - Starting goalkeeper missing: Defense × 0.85
-  - Captain/key midfielder missing: Overall × 0.90
-  - 3+ regular starters missing: Overall × 0.80
-  - Full strength: No adjustment (1.0)
-```
-
-**Confidence Assessment:**
-```
-High Confidence: Calculated probability ≥ 60%
-Medium Confidence: Calculated probability 45-59%
-Low Confidence: Calculated probability < 45%
+Position 1-2 (Title race): × 1.15
+Position 3-5 (European qualification): × 1.10
+Position ≥ 17 (Relegation battle): × 1.15
+Other positions: × 1.0
 ```
 
 **Thresholds:**
-- **Strong Recommendation:** Probability ≥ 55% AND value vs odds ≥ 5%
-- **Moderate Recommendation:** Probability ≥ 45%
-- **No Clear Recommendation:** All outcomes < 45%
+- **Strong:** Probability ≥ 55% AND value vs odds ≥ 5%
+- **Moderate:** Probability ≥ 45%
+- **Weak (filtered):** Probability < 45%
 
-**Output:**
-- All three outcome probabilities for each fixture
-- Recommended outcome (highest probability)
-- Confidence level and value assessment vs odds
-- Flag mismatches where our probability differs significantly from market
+**Enhanced Factor Tracking:**
+- `homeWinProbability`, `drawProbability`, `awayWinProbability`
+- `valueVsOdds`
+- `oddsFt1`, `oddsFtX`, `oddsFt2`
+- `impliedHomeWinPct`, `impliedDrawPct`, `impliedAwayWinPct`
+- `homePosition`, `awayPosition`, `positionGap`
+- `xgDataAvailable`
+- `homeXgForAvg`, `awayXgForAvg`, `homeXgAgainstAvg`, `awayXgAgainstAvg`
+- `homeXgDominance`, `awayXgDominance`
+- `homeXgDominanceMultiplier`, `awayXgDominanceMultiplier`
+- `homeFormMomentumMultiplier`, `awayFormMomentumMultiplier`
+- `homeFormStatus`, `awayFormStatus` (Hot streak/Good form/Neutral/Poor form/Crisis)
+- `homeFormWins`, `homeFormDraws`, `homeFormLosses` (same for away)
+- `homeAdvantageApplied` (8%)
+- `homeMotivation`, `awayMotivation` (Title race/European qualification/Relegation battle)
+- `homePpgHome`, `awayPpgAway`
+- `homeGoalDifference`, `awayGoalDifference`
+- `positiveIndicators`, `riskFlags`
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -1206,19 +1500,45 @@ Last 5 Home/Away Form:
 - **Moderate Specialist:** Disparity Score 25-39%
 - **Balanced:** Disparity Score < 25%
 
-**Additional Factors:**
-1. **Stadium Factor:** Some stadiums have notable home advantage
-2. **Travel Distance:** Long away trips may affect performance
-3. **Altitude/Climate:** Significant for some leagues
-4. **Fan Attendance:** Correlation with home performance
+**Form Divergence Detection:**
+```
+Form diverges from season if PPG difference > 0.3:
+  - If formPpg > seasonPpg: "Improving"
+  - If formPpg < seasonPpg: "Declining"
+```
+
+**Factors Tracked:**
+```
+- team / isHomeTeam / classification / recommendation
+- overallDisparityScore
+- homePpg / awayPpg / ppgDisparity
+- homeWinPct / awayWinPct / winDisparity
+- homeGoalsAvg / awayGoalsAvg / goalsDisparity
+- homeConcededAvg / awayConcededAvg / concededDisparity
+- xgDataAvailable / xgDisparity / homeXgAvg / awayXgAvg
+- formDataAvailable / formPpgDivergence / formGoalsDivergence
+- formDivergesFromSeason / formStatus
+- candidatesFound / allCandidates (list with team/classification/score/confidence)
+- positiveIndicators / riskFlags
+```
+
+**Positive Indicators Tracked:**
+- Strong disparity score (≥ 40%)
+- Home fortress classification
+- Opponent is poor traveler
+- xG data confirms disparity
+
+**Risk Flags Tracked:**
+- Recent form declining from season pattern
+- No xG data available for validation
 
 **Output:**
-- Ranked list of teams by home/away disparity
-- Classification: Home Specialist, Away Specialist, Poor Traveler, Fortress, Balanced
-- Upcoming fixture context (playing home or away)
-- Recommendation: Back/Fade based on location
+- Best candidate recommendation per fixture
+- Classification: Strong/Moderate Home Specialist, Strong/Consistent Away Performer, Strong/Moderate Poor Traveler, Home Fortress
+- All candidates found listed in factors
+- Recommendation: Back Home Win, Back Away Win, Fade Away based on classification
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -1349,21 +1669,50 @@ Fixture Timing:
 ```
 
 **Thresholds:**
-- **Strong:** Draw Score ≥ 35% AND odds_ft_x ≥ 3.20
-- **Moderate:** Draw Score 28-34%
-- **Weak:** Draw Score < 28%
+- **Strong:** Draw Score ≥ 40 AND odds_ft_x in **2.80–3.80** (mid-price band; longshots stay at most Moderate)
+- **Moderate:** Draw Score ≥ 28 (including score ≥ 40 when odds are missing or outside the Strong band)
+- **Weak:** Draw Score < 28
 
-**Additional Factors:**
-1. **Historical H2H:** High draw rate in previous meetings
-2. **Weather Conditions:** Poor weather can lead to cagey games
+**Factors Tracked:**
+```
+- drawScore - overall draw probability score
+- homeDrawPctSeason / awayDrawPctSeason - season draw percentages
+- homeDrawsLast5 / awayDrawsLast5 - recent draw counts
+- ppgDifference / evenlyMatchedScore - team similarity
+- homePosition / awayPosition / positionDifference - league positions
+- homeGoalsAvg / awayGoalsAvg / lowScoringScore - attacking data
+- homeConcededAvg / awayConcededAvg / defensiveStrengthScore - defensive data
+- xgDataAvailable / homeXgAvg / awayXgAvg / xgDifference / xgSimilarityScore - xG metrics
+- drawSpecialistMultiplier / recentDrawFormMultiplier - team multipliers
+- refereeCardsMultiplier / matchContextMultiplier - context multipliers
+- refereeDrawPct / refereeAppearances / refereeCardsPerMatch - referee data
+- drawOdds / impliedProbability / valueVsOdds - betting data
+- positiveIndicators / riskFlags - analysis summary
+```
+
+**Positive Indicators Tracked:**
+- Very evenly matched teams (PPG diff < 0.3)
+- Draw specialist team(s) involved (draw % > 35%)
+- Very similar xG profiles (diff < 0.2)
+- Both teams defensively strong (concede < 1.0/game)
+- Recent draw-heavy form (2+ draws in last 5)
+- Draw-friendly referee (draw % > 30%)
+
+**Risk Flags Tracked:**
+- No xG data available for validation
+- Both teams high-scoring - goals more likely than draw
+- Both teams defensively weak - goals likely
+- Neither team has drawn recently (decisive form)
+- Mismatch in stakes - one team desperate
 
 **Output:**
 - Ranked list of fixtures by draw probability
 - Include: both team draw %, similarity scores, xG comparison
 - Value flag: Compare our probability vs implied odds probability
 - Flag: "Draw specialists meeting" when both teams draw > 30%
+- Dynamic weight redistribution when xG data unavailable
 
-**Status:** Reviewed
+**Status:** `Implemented`
 
 ---
 
@@ -1445,12 +1794,64 @@ Recommend when Value ≥ 5%
 - **Moderate:** Combined probability ≥ 60%
 - **Weak:** Combined probability < 60% (filter out)
 
+**xG Integration:**
+```
+xG Score = (Team xG for avg + Opponent xG against avg) / 2
+Normalized to 0-100 scale
+
+Weight: 15% of probability when xG available
+Redistributed to other factors when not available
+```
+
+**Weights:**
+```
+With xG:
+  - Win % component: 35%
+  - PPG component: 20%
+  - Position component: 15%
+  - Form component: 15%
+  - xG component: 15%
+
+Without xG:
+  - Win % component: 40%
+  - PPG component: 25%
+  - Position component: 18%
+  - Form component: 17%
+```
+
+**Factors Tracked:**
+```
+- homeWinProbability / drawProbability / awayWinProbability
+- homeDrawCombined / drawAwayCombined
+- implied1X / value1X / impliedX2 / valueX2
+- homeFortress / awayPoorTraveler / awayRoadWarrior / homeWeakAtHome
+- homePosition / awayPosition / positionGap
+- homeWinRateHome / homeLossRateHome / awayWinRateAway / awayLossRateAway
+- homeLast5Wins / homeLast5Losses / awayLast5Wins / awayLast5Losses
+- xgDataAvailable / homeXgFor / awayXgFor / homeXgAgainst / awayXgAgainst
+- positiveIndicators / riskFlags
+```
+
+**Positive Indicators Tracked:**
+- Home team is a fortress (rarely loses at home)
+- Away team struggles on the road
+- Away team is a road warrior (strong away record)
+- Home team weak at home
+- 1X/X2 offers value vs odds
+- Home/away team significantly higher ranked
+
+**Risk Flags Tracked:**
+- No xG data available for validation
+- High probability but negative value vs odds
+- Both teams have strong home/away characteristics
+
 **Output:**
 - Market: "Home/Draw (1X)" or "Draw/Away (X2)"
-- Combined probability percentage
+- Combined probability percentage with value vs odds
 - Individual probabilities breakdown (Home %, Draw %, Away %)
-- Value vs odds indicator
-- Key factor highlights
+- Team characteristics (fortress, road warrior, poor traveler)
+- Calculated double chance odds from individual markets
+- Positive indicators and risk flags
 
 **Status:** `Implemented`
 
@@ -1504,36 +1905,100 @@ Example:
    - Evenly matched (PPG difference < 0.4)
 ```
 
-**Key Exclusion Criteria:**
+**Key Exclusion Criteria (applied per market, not globally):**
 ```
-Do NOT recommend when:
-  - Winning team has high clean sheet % (> 40%)
-  - Winning team's opponent has high failed to score % (> 35%)
-  - One team is extremely dominant (likely win to nil)
+Do NOT recommend a market when:
+  - The backed winner keeps clean sheets in > 40% of matches (win to nil likely)
+  - The winner's opponent fails to score in > 35% of matches
+  - The winner's own goals requirements are not met (see Markets above)
+
+Exclusions are evaluated per candidate market, so a strong Away + BTTS
+candidate is not discarded because the home side keeps clean sheets.
+```
+
+**BTTS Probability Calculation:**
+```
+Inputs blended by availability:
+
+API potential + xG:  home BTTS 0.28 + away BTTS 0.28 + api 0.24 + xG 0.20
+API potential only:  home BTTS 0.35 + away BTTS 0.35 + api 0.30
+xG only:             home BTTS 0.40 + away BTTS 0.40 + xG 0.20
+Neither:             average of home and away season BTTS %
+```
+
+**xG BTTS Indicator:**
+```
+homeExpected = (home xG for + away xG against) / 2
+awayExpected = (away xG for + home xG against) / 2
+
+Both teams must threaten, so the limiting side governs:
+  indicator = clamp((min(homeExpected, awayExpected) / 1.2) x 100)
+```
+
+**xG Dominance (applied to win probability):**
+```
+Win probability is blended 85% base / 15% xG dominance when xG is available.
+
+dominance = clamp(50 + ((team xG for - opponent xG for) x 40))
 ```
 
 **Confidence Calculation:**
 ```
 Combined Score = Result Probability × BTTS Probability
 
-Adjustments:
-  + 10% if both teams scored in last 3 meetings
-  + 5% if both teams concede regularly (< 25% clean sheet rate)
-  - 10% if either team has > 35% clean sheet rate
-  - 5% if either team fails to score > 30% of games
+Adjustments (multiplicative):
+  x 1.10 if both teams are BTTS-heavy in recent form (>= 60% each)
+  x 1.05 if both teams concede regularly (< 25% clean sheet rate)
+  x 0.90 if either team has > 35% clean sheet rate
+  x 0.95 if either team fails to score > 30% of games
 ```
 
+> **Deviation from spec:** the spec's "+10% if both teams scored in last 3
+> meetings" requires head-to-head history, which is not present in
+> `FixtureContext`. Recent-form BTTS percentage (last 5, home/away split) is
+> used as a proxy. Adding true H2H support would require a new data source and
+> entity, so it is tracked separately rather than approximated silently.
+
 **Thresholds:**
-- **Strong:** Combined probability ≥ 35% AND both individual probs meet thresholds
-- **Moderate:** Combined probability ≥ 28%
-- **Weak:** Combined probability < 28% (filter out)
+- **Strong:** Adjusted probability ≥ 35%
+- **Moderate:** Adjusted probability ≥ 28%
+- **Weak:** Adjusted probability < 28% (filter out)
+
+**Factors Tracked:**
+```
+- homeWinProbability / drawProbability / awayWinProbability
+- bttsProbability / resultProbability
+- combinedProbability / adjustedProbability / selectedResultType
+- homeScoredAvg / awayScoredAvg / homeConcededAvg / awayConcededAvg
+- homeCleanSheetPct / awayCleanSheetPct
+- homeFailedToScorePct / awayFailedToScorePct
+- homeBttsPctSeason / awayBttsPctSeason / apiBttsPotential
+- homeBttsPctForm / awayBttsPctForm
+- xgDataAvailable / homeXgFor / homeXgAgainst / awayXgFor / awayXgAgainst
+- xgBttsIndicator
+- confidenceAdjustmentMultiplier / adjustmentsApplied
+- positiveIndicators / riskFlags
+```
+
+**Positive Indicators Tracked:**
+- Strong BTTS probability (≥ 65%)
+- Neither team keeps many clean sheets
+- Both teams score at a healthy rate
+- xG profiles support both teams scoring
+- Net positive confidence adjustment
+
+**Risk Flags Tracked:**
+- No xG data available for validation
+- A team keeps clean sheets often - win to nil risk
+- A team fails to score often - BTTS at risk
+- No recent form data - head-to-head proxy unavailable
 
 **Output:**
-- Market: "Home Win + BTTS", "Away Win + BTTS", or "Draw + BTTS"
-- Combined probability percentage
+- Market: "{Home Team} + BTTS", "{Away Team} + BTTS", or "Draw + BTTS"
+- Combined and adjusted probability percentages
 - Individual breakdown (Result %, BTTS %)
-- Key supporting stats (goals avg, clean sheet %, etc.)
-- Expected odds range indication
+- Applied confidence adjustments listed in the description
+- Key supporting stats (goals avg, clean sheet %, failed to score %, xG)
 
 **Status:** `Implemented`
 
@@ -1690,9 +2155,18 @@ _Use cases for the web application interface._
    - Expanded section shows:
      - List of upcoming fixtures for that competition
      - Each fixture displays: home team vs away team, date/time
-     - Clicking again collapses the section
+     - Each fixture links to `/fixtures/{fixtureId}` (fixture detail + recommendations)
+     - Clicking the competition header again collapses the section
 
-4. **Empty State**
+4. **Fixture Detail Page** (`/fixtures/{fixtureId}`)
+   - Match header: home vs away, kickoff, stadium, gameweek
+   - Recommendations for that fixture from `GET /api/recommendations/fixture/{id}`
+   - Grouped by recommendation type; shortlist star works as elsewhere
+   - Empty state when no engines produce a pick
+   - Back link to `/fixtures`
+   - Reverse bridge: recommendation rows on other pages link fixture names to this page
+
+5. **Empty State**
    - Message when no upcoming fixtures available
    - "No upcoming fixtures" or similar
 
@@ -1769,6 +2243,8 @@ GET /api/leagues/overview
 - [x] Clicking a competition expands to show fixtures
 - [x] Clicking again collapses the fixture list
 - [x] Expanded fixtures show home vs away and date/time
+- [x] Clicking a fixture opens fixture detail with its recommendations
+- [x] Recommendation rows link fixture names to fixture detail
 - [ ] Page loads within 500ms (cached data)
 - [x] Responsive layout works on mobile and desktop
 
@@ -1790,15 +2266,23 @@ GET /api/leagues/overview
 
 1. **Page Header**
    - Title: "Recommendations"
-   - Days ahead filter (1, 3, 7, 14 days)
+   - Days ahead filter (12 hours, 24 hours, 3 days, 7 days)
 
-2. **Recommendation Sections**
+2. **Kickoff urgency**
+   - Filter chips: All kickoffs / Soon (next 3 hours) / Today / Tomorrow
+   - Chip labels show fixture counts for Soon / Today / Tomorrow
+   - Sort control: Best score (default) or Soonest kickoff
+   - Selecting Soon/Today/Tomorrow switches sort to soonest kickoff
+   - Rows show relative kickoff labels (`in 45m`, `Today`, `Tomorrow`) with urgency colouring
+   - Footer hint when picks are starting within 3 hours
+
+3. **Recommendation Sections**
    - One section per recommendation type
    - Section title with icon/badge
    - Shows top 5 recommendations for that type
    - Each recommendation card shows:
      - Home vs Away teams
-     - Match date/time
+     - Match date/time (relative when soon/today/tomorrow)
      - Confidence level (Strong/Moderate)
      - Score/probability
      - Key factors
@@ -2134,7 +2618,7 @@ RecommendationHistory:
 - [ ] Stats update automatically after matches complete
 - [ ] Minimum sample size indicator (e.g., "Not enough data" if < 10 picks)
 
-**Status:** Draft
+**Status:** Superseded — see **Results** section (UC-031–UC-035). Performance hit-rate analytics live under UC-035.
 
 ---
 
@@ -2225,6 +2709,332 @@ RecommendationHistory:
 
 ---
 
+### Results
+
+_Use cases for freezing daily picks, fetching completed match outcomes, settling win/loss, and presenting Results on the AccaBaccaGlory site._
+
+**Product decisions (locked):**
+
+| Decision | Choice |
+|----------|--------|
+| Snapshot scope | All **STRONG** and **MODERATE** picks (actionable; exclude WEAK) |
+| Snapshot window | Fixtures **kicking off today** in brand timezone |
+| Snapshot timing | Immediately **after** the daily FootyStats sync completes |
+| Settlement v1 | Scoreline + corners + booking points (see UC-033) |
+| Timezone | Brand timezone: `Europe/London` (AccaBaccaGlory) |
+| Pending matches | Re-settlement retries until resolved or VOID |
+
+**Daily rhythm (brand timezone):**
+
+```text
+Day N   scheduled sync (existing)     → refresh fixtures/odds/stats
+Day N   then snapshot job             → freeze STRONG+MODERATE picks for kickoffs today
+Day N+1 scheduled results job         → fetch completed results → settle → retry PENDING
+        Results page                  → shows settled / pending picks by day
+```
+
+Exact cron times remain configurable; order is fixed: **sync → snapshot**, then next day **ingest → settle**.
+
+---
+
+#### UC-031: Daily Recommendation Snapshot
+
+**Goal:** Persist a durable, immutable daily record of published picks so they can be graded after matches finish. Live recommendations are ephemeral (on-demand + short cache); without a snapshot, yesterday’s board cannot be graded fairly.
+
+**User Story:** As the system, I want to freeze all Strong and Moderate picks for fixtures kicking off today after the daily sync so that we have a stable pick history to settle against results.
+
+**Data Required:**
+- Live recommendation engine output (production `Recommendation` model)
+- Fixture kickoff (`matchDateUnix`) for “today” filtering
+- Brand calendar day in `Europe/London`
+
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Sync gate | Snapshot only when `SyncSummary.success` is true (`failedSeasons == 0`); otherwise skip |
+| Same-day re-run | Upsert only rows that are still `PENDING` **and** whose kickoff is still in the future; never rewrite post-kickoff or settled rows |
+| Types snapshotted | All actionable types (including corners/cards); settlement scope is UC-033 |
+| Generation window | Generate for fixtures through end of London today (prefer `daysAhead` covering today only, not full 7-day board), then filter |
+| Manual admin sync | On successful `POST /api/admin/sync`, chain the same snapshot job |
+| factorsJson | Persist for debugging/transparency; not required on Results v1 UI |
+| Timezone | Configurable property defaulting to `Europe/London` |
+
+**Snapshot rules:**
+- Trigger: after successful daily sync (scheduler pipeline) and after successful manual admin sync
+- Include: confidence `STRONG` or `MODERATE` only
+- Include: picks whose fixture kickoff falls on **today** in brand timezone
+- Exclude: `WEAK` picks; fixtures kicking off on other calendar days
+- Unique key: `(snapshotDate, fixtureId, type)` — type from the recommendation record
+- Store denormalized display fields (team names, league, market, odds, score, description) so Results UI does not depend on live fixture rows that may later age out of the upcoming window
+
+**Persisted fields (minimum):**
+```
+RecommendationSnapshot:
+  - id
+  - snapshotDate          (LocalDate, brand timezone)
+  - fixtureId
+  - homeTeamId / awayTeamId
+  - homeTeamName / awayTeamName
+  - matchDateUnix         (kickoff)
+  - leagueId / leagueName / leagueImage
+  - type                  (RecommendationType)
+  - market                (selection string, e.g. "BTTS Yes", "Over 2.5")
+  - confidence            (STRONG | MODERATE)
+  - score
+  - odds                  (nullable)
+  - description
+  - factorsJson           (optional; transparency)
+  - generatedAt
+  - outcome               (PENDING initially)
+  - resolvedAt            (null until settled)
+  - matchResultJson       (null until settled; relevant scoreline/stats)
+```
+
+**API Source(s):** Internal — `RecommendationService` after sync; no extra FootyStats call beyond the sync that just ran.
+
+**Behavior:**
+1. Confirm daily (or admin) sync completed successfully
+2. Evict recommendation caches (existing post-sync step), then generate recommendations for today’s window
+3. Filter to STRONG/MODERATE + kickoff date == today (brand timezone)
+4. Upsert into snapshot storage per re-run policy above
+5. Leave new/updated outcomes as `PENDING`
+
+**Acceptance Criteria:**
+- [ ] Snapshot runs only when sync reports success
+- [ ] Only STRONG and MODERATE picks are stored
+- [ ] Only brand-timezone-today kickoffs are stored
+- [ ] Unique on `(snapshotDate, fixtureId, type)` — no duplicates
+- [ ] Re-run does not alter post-kickoff or already-settled rows
+- [ ] Snapshots survive cache eviction and recommendation regeneration
+- [ ] Picks remain queryable by `snapshotDate`
+- [ ] All new outcomes start as `PENDING`
+- [ ] Manual admin sync chains snapshot on success
+
+**Status:** Implemented
+
+---
+
+#### UC-032: Completed Match Result Ingest
+
+**Goal:** Fetch final (or updated) match results for snapshotted fixtures so picks can be settled. Current sync keeps upcoming incomplete fixtures only and does not refresh completed scores.
+
+**User Story:** As the system, I want to pull completed match data for yesterday’s snapshotted fixtures so that each pick can be marked win or loss.
+
+**Data Required:**
+- Snapshot rows still `PENDING` (or all snapshots for a target date)
+- Match status + scoreline (FT goals; HT / 2H goals for half-goal markets)
+- Corners/cards stored when present (graded in UC-033)
+
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Fetch strategy | Bulk `GET /todays-matches?date=&timezone=` (paginated) per target date; `GET /match?match_id=` fallback for fixtureIds still missing or incomplete |
+| Target dates | London **yesterday**, plus any `snapshotDate` with PENDING rows in the last **7 days** |
+| Storage | Persist **`CompletedMatch`** keyed by `fixtureId` (status, scoreline, stats, `fetchedAt`); snapshot `matchResultJson` filled at settle time (UC-033) |
+| HT / 2H | Store whenever the API provides them |
+| Scheduling | Separate morning cron (configurable brand timezone); **not** chained to sync→snapshot |
+| Manual trigger | Admin endpoint to ingest by date and/or all PENDING in lookback |
+| After lookback | Stop automatic retries; remaining PENDING handled by UC-033 expiry/VOID policy |
+
+**API Source(s):** FootyStats `/todays-matches`, `/match`; map via `MatchStatus`, `Scoreline`, `MatchStats` (existing WIP mapper).
+
+**Behavior:**
+1. Scheduled results job runs (default: morning Day N+1, brand timezone)
+2. Resolve target dates (yesterday + PENDING lookback)
+3. For each date: fetch all pages of todays-matches; upsert `CompletedMatch`
+4. For PENDING snapshot fixtureIds still absent or `INCOMPLETE`: selective `getMatch` fallback
+5. Admin `?date=` ingest uses the same fallback for PENDING fixtures on that snapshot date
+6. Hand off fixtures with fresh data to settlement (UC-033) — same scheduler run is fine; use-case boundary remains ingest
+7. Incomplete matches remain eligible until lookback expires
+
+**Edge cases:**
+- Match postponed / still incomplete → upsert status; leave snapshots PENDING for retry
+- Suspended / canceled → upsert status for VOID in UC-033
+- Partial data (FT in, HT missing) → store what is available; half-goal settle stays PENDING until data arrives or UC-033 policy applies
+- API partial failure → do not wipe existing good `CompletedMatch` rows
+
+**Acceptance Criteria:**
+- [ ] Job can load results for fixtures no longer in the upcoming 7-day sync window
+- [ ] Completed matches yield FT scoreline on `CompletedMatch`
+- [ ] HT/2H stored when present
+- [ ] Incomplete matches do not force LOSS; snapshots stay PENDING and retry within 7 days
+- [ ] Canceled/suspended status is captured for VOID handling
+- [ ] Job is safe to re-run (idempotent upserts)
+- [ ] Admin can trigger ingest manually
+- [ ] Automatic retries stop after 7-day lookback
+
+**Status:** Implemented
+
+---
+
+#### UC-033: Pick Settlement (Win / Loss / Void)
+
+**Goal:** Mark each snapshotted pick as a winner or loser (or void/pending/unsupported) using market-specific rules against ingested results.
+
+**User Story:** As the system, I want to resolve each frozen pick against the match result so that the Results page can show which tips landed.
+
+**Outcomes:**
+| Outcome | Meaning |
+|---------|---------|
+| `PENDING` | Result not available yet, or required stats missing; will retry |
+| `WIN` | Pick correct |
+| `LOSS` | Pick incorrect |
+| `VOID` | Match canceled/suspended, or unresolved after lookback expiry |
+| `UNSUPPORTED` | Type/selection not graded (unknown or unparseable market) — not a failed tip |
+
+(`PUSH` reserved if needed later for refunded lines; not required for v1.)
+
+Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
+
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Deferred markets | None for known recommendation types; unknown/unparseable → `UNSUPPORTED` |
+| Team-to-win + draw | **LOSS** |
+| Past 7-day lookback still unresolved | **VOID** (expired) |
+| Half-goal markets in v1 | **Yes**; stay PENDING until HT/2H available |
+| Corners / booking points | **Yes**; Yellow=10, Red=25; missing stats → PENDING |
+| VALUE_BET | Settle when `market` parses as a supported shape; else UNSUPPORTED |
+| Re-settle terminal rows | **No** for WIN/LOSS/VOID; **yes** for corners/bookings previously marked UNSUPPORTED (catch-up) |
+| Selection encoding | v1 parses `type` + `market` with unit tests; structured selection is a follow-up |
+
+**Gate order (every PENDING row, plus catch-up UNSUPPORTED corners/bookings):**
+1. Already terminal WIN/LOSS/VOID → skip
+2. No `CompletedMatch` → PENDING
+3. Status `INCOMPLETE` / `UNKNOWN` → PENDING
+4. Status `CANCELED` / `SUSPENDED` → VOID
+5. Status `COMPLETE` → run type grader
+6. `snapshotDate` older than lookback and still unresolved → VOID
+
+**Settlement scope v1 — grade using actual engine market strings:**
+
+| RecommendationType | WIN when | Data |
+|--------------------|----------|------|
+| `BTTS` | `BTTS Yes` → both teams scored | FT |
+| `OVER_GOALS` / `UNDER_GOALS` | FT total vs line in market (`Over/Under 1.5/2.5/3.5 Goals`) | FT |
+| `MATCH_RESULT` | market is home name → home win; away name → away win; `Draw` → draw | FT |
+| `DRAW` | FT draw (`market` = `Draw`) | FT |
+| `DOUBLE_CHANCE` | `Home/Draw (1X)` → home or draw; `Draw/Away (X2)` → draw or away | FT |
+| `RESULT_BTTS` | result leg and BTTS both true (`{Team} + BTTS` or `Draw + BTTS`) | FT |
+| `CLEAN_SHEET` | named team (`{Team} Clean Sheet`) conceded 0 | FT |
+| `TOP_VS_BOTTOM`, form mismatch, `HOME_AWAY_SPECIALIST` | named team won (draw = LOSS) | FT |
+| `FIRST_HALF_GOALS` | HT total vs line (`Over 0.5/1.5 HT Goals` or `… First Half Goals`) | HT |
+| `SECOND_HALF_GOALS` | 2H total vs line (prefer API 2H; else FT−HT) | HT+FT or 2H |
+| `OVER_CORNERS` / `UNDER_CORNERS` | match corners total vs line (`Over/Under 8.5/9.5/10.5 Corners`) | corners |
+| `BOOKING_POINTS` | (yellow×10 + red×25) vs line (`Over/Under 30/40/50 Booking Points`) | cards |
+| `VALUE_BET` | Dispatch by market: scoreline shapes, corners, booking points | as above |
+
+**Still `UNSUPPORTED`:**
+- Unknown `type`
+- Unparseable `market` string
+
+**Settlement rules:**
+- Prefer `type` + parsed `market`; match team names against denormalized snapshot home/away names
+- Insufficient stats for that market → PENDING (retry), never LOSS
+- On resolve: set `outcome`, `resolvedAt`, copy slim status/scoreline/corners/cards into `matchResultJson`
+
+**Behavior:**
+1. For each eligible PENDING snapshot (and catch-up UNSUPPORTED corners/bookings) with `CompletedMatch` (or expiry check)
+2. Apply gate order, then type-specific grader
+3. Persist outcome fields
+
+**Acceptance Criteria:**
+- [ ] All v1 types have explicit grader rules and unit tests against real market strings
+- [ ] BTTS / O-U / match-result / draw / double chance / result+BTTS / clean sheet / team-win settle from FT
+- [ ] Half-goal markets use HT (and 2H) correctly; missing HT → PENDING then VOID after lookback
+- [ ] Corners settle from home+away corners; missing → PENDING
+- [ ] Booking points settle with Yellow=10 / Red=25; missing cards → PENDING
+- [ ] Canceled/suspended → VOID
+- [ ] Incomplete → PENDING and retried within lookback
+- [ ] Settlement is idempotent for already-resolved WIN/LOSS/VOID rows
+- [ ] `matchResultJson` populated on resolve
+
+**Status:** Implemented
+
+---
+
+#### UC-034: Results Page - Settled Picks Board
+
+**Goal:** Add a **Results** section to the AccaBaccaGlory website that shows snapshotted picks and whether they won or lost. Layout/visual design TBD; this use case defines the product contract.
+
+**User Story:** As a user, I want to open Results and see how yesterday’s (and prior days’) Strong/Moderate picks performed so that I can judge the tips over time.
+
+**Data Required:**
+- Recommendation snapshots with outcomes and match result summary
+- Filters: date, outcome (type/confidence deferred to v1.1)
+
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Default date | Latest `snapshotDate` ≤ today (brand timezone) |
+| List shape | Group by fixture |
+| v1 filters | Date + outcome |
+| Day hit rate | `wins / (wins + losses)`; exclude VOID / PENDING / UNSUPPORTED |
+| UNSUPPORTED on UI | Show, muted; not counted in hit rate |
+| Nav position | After Shortlist, before Fixtures |
+| Type/confidence filters | Defer to v1.1 |
+| UC-035 entry | Not required on v1 page |
+
+**Website:**
+- New nav item: **Results**
+- Route: `/results`
+- Default view: most recent snapshot day with settled/pending picks
+
+**Minimum content (v1 page contract):**
+- Pick list for a selected calendar day (`Europe/London`), grouped by fixture
+- Per pick: type, market, confidence, outcome badge (Win / Loss / Void / Pending / Unsupported)
+- Per fixture: home vs away, kickoff, league, FT scoreline when available
+- Empty states: no snapshot for day; snapshot exists but all pending
+- Day summary strip: wins / losses / voids / pending / unsupported / hit rate
+
+**API Endpoints:**
+- `GET /api/results/dates` — dates that have snapshots (descending)
+- `GET /api/results?date=YYYY-MM-DD&outcome=` — day board (outcome optional); omit date → latest ≤ today
+
+**Out of scope for this UC:** charts, ROI, long-window analytics (see UC-035).
+
+**Acceptance Criteria:**
+- [x] Results appears in site navigation
+- [x] User can view picks for a snapshot date
+- [x] Win / Loss / Void / Pending / Unsupported are clearly identifiable
+- [x] Scoreline shown when completed match data exists
+- [x] Timezone for “day” is `Europe/London`
+- [x] Page remains usable when some picks are still PENDING
+
+**Status:** Implemented
+
+---
+
+#### UC-035: Results Performance Analytics
+
+**Goal:** Aggregate historical settled picks into hit rates by type and confidence (the analytics intent formerly drafted as UC-028).
+
+**User Story:** As a user, I want to see how accurate each recommendation type has been over recent periods so that I know which markets are most reliable.
+
+**Depends on:** UC-031–UC-033 (and preferably UC-034 as the host surface).
+
+**Statistics:**
+- Hit rate % per recommendation type (7d / 30d / 90d / all)
+- Hit rate by confidence (Strong vs Moderate)
+- Sample size per bucket
+- Optional later: ROI % from stored odds, streaks
+
+**UI (later):** tab or sub-view under Results, or dedicated `/results/performance` — design TBD.
+
+**API Endpoints (suggested):**
+- `GET /api/results/performance/summary`
+- `GET /api/results/performance/by-type`
+
+**Acceptance Criteria:**
+- [ ] Stats computed only from terminal outcomes (`WIN`/`LOSS`; policy for VOID exclusion documented)
+- [ ] Time period filters work
+- [ ] Minimum sample size messaging when data is sparse
+- [ ] Updates as new days settle (no manual rebuild required)
+
+**Status:** Pending review
+
+---
+
 ### iOS Native App
 
 _Use cases for the iOS mobile application._
@@ -2262,6 +3072,8 @@ _As use cases are defined, summarize the domain entities needed here._
 | Referee | id, full_name, first_name, last_name, known_as, seasonId | API `/league-referees` | UC-003 |
 | RefereeStats | refereeId, seasonId, appearances, outcomes, goals, btts, penalties, cards (all fields) | API `/league-referees` | UC-003 |
 | TeamRecentForm | teamId, results, goals, btts, over/under, corners, cards, fouls, cleanSheets (last 5 matches) | API `/lastx` | UC-004 |
+| RecommendationSnapshot | snapshotDate, fixtureId, type, market, confidence, score, odds, outcome, matchResultJson, denormalized fixture/league labels | Internal engines + FootyStats results | UC-031–UC-035 |
+| CompletedMatch | fixtureId, status, FT/HT/2H goals, corners/cards, fetchedAt | FootyStats `/todays-matches`, `/match` | UC-032–UC-033 |
 
 ---
 

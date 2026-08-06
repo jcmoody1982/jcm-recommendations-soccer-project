@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import styles from './SettingsDropdown.module.css';
 
 type Theme = 'light' | 'dark' | 'system';
@@ -14,6 +16,8 @@ export function SettingsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
+  const { logout, authEnabled } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -33,6 +37,12 @@ export function SettingsDropdown() {
 
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
+  };
+
+  const handleLogout = async () => {
+    setIsOpen(false);
+    await logout();
+    navigate('/', { replace: true });
   };
 
   return (
@@ -63,6 +73,14 @@ export function SettingsDropdown() {
               ))}
             </div>
           </div>
+          {authEnabled && (
+            <div className={styles.section}>
+              <button className={styles.themeOption} onClick={() => void handleLogout()}>
+                <span className={styles.themeIcon}>🔒</span>
+                <span className={styles.themeLabel}>Log out</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

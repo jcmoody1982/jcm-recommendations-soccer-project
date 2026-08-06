@@ -79,6 +79,12 @@ public class TeamMapper {
                 .cardsAvgOverall(dto.getCardsAvgOverall())
                 .cardsAvgHome(dto.getCardsAvgHome())
                 .cardsAvgAway(dto.getCardsAvgAway())
+                .xgForAvgOverall(dto.getXgForAvgOverall())
+                .xgForAvgHome(dto.getXgForAvgHome())
+                .xgForAvgAway(dto.getXgForAvgAway())
+                .xgAgainstAvgOverall(dto.getXgAgainstAvgOverall())
+                .xgAgainstAvgHome(dto.getXgAgainstAvgHome())
+                .xgAgainstAvgAway(dto.getXgAgainstAvgAway())
                 .build();
     }
 

@@ -53,6 +53,36 @@ public class MatchDto {
     @JsonProperty("totalGoalCount")
     private Integer totalGoalCount;
 
+    @JsonProperty("ht_goals_team_a")
+    private Integer htGoalsTeamA;
+
+    @JsonProperty("ht_goals_team_b")
+    private Integer htGoalsTeamB;
+
+    @JsonProperty("goals_2hg_team_a")
+    private Integer goals2hgTeamA;
+
+    @JsonProperty("goals_2hg_team_b")
+    private Integer goals2hgTeamB;
+
+    @JsonProperty("team_a_corners")
+    private Integer teamACorners;
+
+    @JsonProperty("team_b_corners")
+    private Integer teamBCorners;
+
+    @JsonProperty("team_a_yellow_cards")
+    private Integer teamAYellowCards;
+
+    @JsonProperty("team_b_yellow_cards")
+    private Integer teamBYellowCards;
+
+    @JsonProperty("team_a_red_cards")
+    private Integer teamARedCards;
+
+    @JsonProperty("team_b_red_cards")
+    private Integer teamBRedCards;
+
     @JsonProperty("odds_ft_1")
     private Double oddsFt1;
 

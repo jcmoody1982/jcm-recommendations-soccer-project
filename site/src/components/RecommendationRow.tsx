@@ -1,17 +1,21 @@
+import { Link } from 'react-router-dom';
 import type { Recommendation } from '../types';
 import { useShortlist } from '../contexts/ShortlistContext';
+import { formatKickoffDisplay } from '../utils/kickoff';
 import styles from './RecommendationRow.module.css';
 
 interface Props {
   recommendation: Recommendation;
   showPrice?: boolean;
+  /** When false, fixture names are plain text (e.g. already on the fixture page). */
+  linkToFixture?: boolean;
 }
 
 const ConfidenceIcon = ({ level }: { level: string }) => {
   if (level === 'STRONG') {
     return (
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="9" fill="#22c55e" stroke="#16a34a" strokeWidth="1"/>
+        <circle cx="10" cy="10" r="9" fill="var(--confidence-strong)" stroke="var(--confidence-strong)" strokeWidth="1"/>
         <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     );
@@ -19,7 +23,7 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
   if (level === 'MODERATE') {
     return (
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="9" fill="#f59e0b" stroke="#d97706" strokeWidth="1"/>
+        <circle cx="10" cy="10" r="9" fill="var(--confidence-moderate)" stroke="var(--confidence-moderate)" strokeWidth="1"/>
         <path d="M10 6V10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
         <circle cx="10" cy="13" r="1" fill="white"/>
       </svg>
@@ -33,7 +37,11 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
   );
 };
 
-export function RecommendationRow({ recommendation, showPrice = true }: Props) {
+export function RecommendationRow({
+  recommendation,
+  showPrice = true,
+  linkToFixture = true,
+}: Props) {
   const { isShortlisted, toggleShortlist } = useShortlist();
   const isInShortlist = isShortlisted(recommendation.fixtureId, recommendation.type);
 
@@ -41,18 +49,9 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
     e.stopPropagation();
     toggleShortlist(recommendation.fixtureId, recommendation.type);
   };
-  const matchDate = new Date(recommendation.matchDateUnix * 1000);
-  
-  const formattedDate = matchDate.toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-  
-  const formattedTime = matchDate.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const fixtureLabel = `${recommendation.homeTeamName} vs ${recommendation.awayTeamName}`;
+  const fixturePath = `/fixtures/${recommendation.fixtureId}`;
+  const kickoff = formatKickoffDisplay(recommendation.matchDateUnix);
 
   const score = Number(recommendation.score || 0).toFixed(0);
   const isBookingPoints = recommendation.type === 'BOOKING_POINTS';
@@ -81,13 +80,20 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
             <span className={styles.leaguePlaceholder}>⚽</span>
           )}
         </span>
-        <span className={styles.datetime}>
-          <span className={styles.date}>{formattedDate}</span>
-          <span className={styles.time}>{formattedTime}</span>
+        <span
+          className={`${styles.datetime} ${styles[`urgency_${kickoff.urgency}`] || ''}`}
+          title={kickoff.title}
+        >
+          <span className={styles.date}>{kickoff.primaryLabel}</span>
+          <span className={styles.time}>{kickoff.timeLabel}</span>
         </span>
-        <span className={styles.fixture}>
-          {recommendation.homeTeamName} vs {recommendation.awayTeamName}
-        </span>
+        {linkToFixture ? (
+          <Link to={fixturePath} className={styles.fixtureLink}>
+            {fixtureLabel}
+          </Link>
+        ) : (
+          <span className={styles.fixture}>{fixtureLabel}</span>
+        )}
         <span className={styles.market}>{recommendation.market}</span>
         {showPrice && (
           <span className={styles.price}>
@@ -119,9 +125,13 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
           ) : (
             <span className={styles.mobileLeaguePlaceholder}>⚽</span>
           )}
-          <span className={styles.mobileFixture}>
-            {recommendation.homeTeamName} vs {recommendation.awayTeamName}
-          </span>
+          {linkToFixture ? (
+            <Link to={fixturePath} className={styles.mobileFixtureLink}>
+              {fixtureLabel}
+            </Link>
+          ) : (
+            <span className={styles.mobileFixture}>{fixtureLabel}</span>
+          )}
           <button 
             className={`${styles.mobileStarButton} ${isInShortlist ? styles.starred : ''}`}
             onClick={handleToggleShortlist}
@@ -133,7 +143,12 @@ export function RecommendationRow({ recommendation, showPrice = true }: Props) {
         <div className={styles.mobileCardBody}>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>When</span>
-            <span className={styles.mobileValue}>{formattedDate} {formattedTime}</span>
+            <span
+              className={`${styles.mobileValue} ${styles[`urgency_${kickoff.urgency}`] || ''}`}
+              title={kickoff.title}
+            >
+              {kickoff.primaryLabel} {kickoff.timeLabel}
+            </span>
           </div>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>Selection</span>

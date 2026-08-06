@@ -6,7 +6,10 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = "com.jcm.recommendations.soccer")
-@ConfigurationPropertiesScan(basePackages = "com.jcm.recommendations.soccer.core.config")
+@ConfigurationPropertiesScan(basePackages = {
+        "com.jcm.recommendations.soccer.core.config",
+        "com.jcm.recommendations.soccer.web.config"
+})
 @EnableScheduling
 public class SoccerRecommendationsApplication {
 

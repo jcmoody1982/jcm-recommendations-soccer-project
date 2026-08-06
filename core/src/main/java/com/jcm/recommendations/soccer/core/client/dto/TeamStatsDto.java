@@ -109,6 +109,21 @@ public class TeamStatsDto {
     @JsonProperty("cardsAVG_away")
     private Double cardsAvgAway;
 
+    // Expected Goals (xG) data
+    @JsonProperty("xg_for_avg_overall")
+    private Double xgForAvgOverall;
+    @JsonProperty("xg_for_avg_home")
+    private Double xgForAvgHome;
+    @JsonProperty("xg_for_avg_away")
+    private Double xgForAvgAway;
+
+    @JsonProperty("xg_against_avg_overall")
+    private Double xgAgainstAvgOverall;
+    @JsonProperty("xg_against_avg_home")
+    private Double xgAgainstAvgHome;
+    @JsonProperty("xg_against_avg_away")
+    private Double xgAgainstAvgAway;
+
     private Integer matchesPlayed;
     private Integer points;
     @JsonProperty("table_position")

@@ -2,14 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -61,8 +63,8 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed());
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed());
+        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
+        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
 
         double estimated1HGoals = (homeGoalsAvg + awayGoalsAvg) * FIRST_HALF_SHARE;
         double goalsScore = normalizeGoalsToScore(estimated1HGoals);
@@ -90,8 +92,8 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed());
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed());
+        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
+        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
 
         double estimated2HGoals = (homeGoalsAvg + awayGoalsAvg) * SECOND_HALF_SHARE;
         double goalsScore = normalizeGoalsToScore(estimated2HGoals);
@@ -145,24 +147,14 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
             factors.put("apiO15HtPotential", context.getPotentials().getO15HtPotential());
         }
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.FIRST_HALF_GOALS)
                 .confidence(confidence)
                 .score(score)
                 .market(market)
                 .odds(null)
-                .description(buildDescription(context, confidence, score, market, "First"))
+                .description(RecommendationFactory.buildStandardDescription(confidence, market, score, "score", context))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("First Half Goals recommendation generated: fixtureId={}, score={}, confidence={}, market={}", 
@@ -190,37 +182,20 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
         factors.put("half", "Second");
         factors.put("lateGameIntensity", calculateLateGameIntensity(context));
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.SECOND_HALF_GOALS)
                 .confidence(confidence)
                 .score(score)
                 .market(market)
                 .odds(null)
-                .description(buildDescription(context, confidence, score, market, "Second"))
+                .description(RecommendationFactory.buildStandardDescription(confidence, market, score, "score", context))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Second Half Goals recommendation generated: fixtureId={}, score={}, confidence={}, market={}", 
                 context.getFixture().getId(), String.format("%.1f", score), confidence, market);
 
         return Optional.of(recommendation);
-    }
-
-    private double calculateGoalsAvg(Integer goals, Integer matches) {
-        if (matches == null || matches == 0 || goals == null) {
-            return 1.0;
-        }
-        return goals / (double) matches;
     }
 
     private double normalizeGoalsToScore(double expectedGoals) {
@@ -231,19 +206,5 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
         double homeBttsHt = safePercentage(homeStats.getSeasonBttsPercentageHome()) * 0.5;
         double awayBttsHt = safePercentage(awayStats.getSeasonBttsPercentageAway()) * 0.5;
         return (homeBttsHt + awayBttsHt) * 0.5;
-    }
-
-    private String buildDescription(FixtureContext context, ConfidenceLevel confidence, 
-            double score, String market, String half) {
-        return String.format("%s confidence %s recommendation (%.1f%% score) - %s vs %s",
-                confidence.getDisplayName(),
-                market,
-                score,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
-    }
-
-    private double safePercentage(Double value) {
-        return value != null ? value : 50.0;
     }
 }

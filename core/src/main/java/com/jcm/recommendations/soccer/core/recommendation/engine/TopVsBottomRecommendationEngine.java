@@ -2,14 +2,16 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 @Component
 @Slf4j
@@ -53,7 +55,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
 
         boolean homeIsFavorite = homePos < awayPos;
         String favoriteTeam = homeIsFavorite ? context.getHomeTeam().getName() : context.getAwayTeam().getName();
-        String underdogTeam = homeIsFavorite ? context.getAwayTeam().getName() : context.getHomeTeam().getName();
 
         double qualityScore = calculateQualityScore(context, homeIsFavorite);
         ConfidenceLevel confidence = determineConfidence(positionGap, qualityScore, homeIsFavorite);
@@ -62,21 +63,12 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        String market = buildMarket(favoriteTeam, positionGap, homeIsFavorite);
+        String market = favoriteTeam;
         String flag = determineFlag(positionGap, qualityScore, homeIsFavorite);
 
         Map<String, Object> factors = buildFactors(context, positionGap, qualityScore, homeIsFavorite, flag);
 
-        Recommendation recommendation = Recommendation.builder()
-                .fixtureId(context.getFixture().getId())
-                .homeTeamId(context.getHomeTeam().getId())
-                .awayTeamId(context.getAwayTeam().getId())
-                .homeTeamName(context.getHomeTeam().getName())
-                .awayTeamName(context.getAwayTeam().getName())
-                .matchDateUnix(context.getFixture().getDateUnix())
-                .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
-                .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)
-                .leagueImage(context.getLeague() != null ? context.getLeague().getImage() : null)
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.TOP_VS_BOTTOM)
                 .confidence(confidence)
                 .score(qualityScore)
@@ -84,7 +76,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
                 .odds(null)
                 .description(buildDescription(context, favoriteTeam, positionGap, confidence, flag))
                 .factors(factors)
-                .generatedAt(Instant.now())
                 .build();
 
         log.info("Top vs Bottom recommendation: fixtureId={}, market={}, gap={}, quality={}, flag={}",
@@ -131,13 +122,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         return ConfidenceLevel.WEAK;
     }
 
-    private String buildMarket(String favoriteTeam, int positionGap, boolean favoriteAtHome) {
-        if (positionGap >= EXTREME_POSITION_GAP && favoriteAtHome) {
-            return favoriteTeam;
-        }
-        return favoriteTeam;
-    }
-
     private String determineFlag(int positionGap, double qualityScore, boolean favoriteAtHome) {
         if (positionGap >= EXTREME_POSITION_GAP && qualityScore >= 70 && favoriteAtHome) {
             return "Banker";
@@ -179,13 +163,5 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
                 flag,
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
-    }
-
-    private double safeDouble(Double value) {
-        return value != null ? value : 0.0;
     }
 }

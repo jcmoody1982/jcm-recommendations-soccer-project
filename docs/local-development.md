@@ -76,28 +76,45 @@ curl http://localhost:8080/health
 
 ### Manual Data Sync
 
-Instead of waiting for the scheduler, trigger sync manually via REST endpoint:
+Admin routes require the **admin** beta password (default local: `admin`). Login first to get a session cookie:
 
 ```bash
+curl -c /tmp/abg-cookies -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"admin"}'
+
 # Trigger full sync
-curl -X POST http://localhost:8080/api/admin/sync
+curl -b /tmp/abg-cookies -X POST http://localhost:8080/api/admin/sync
 
 # Sync specific league only
-curl -X POST http://localhost:8080/api/admin/sync?seasonId=17146
+curl -b /tmp/abg-cookies -X POST "http://localhost:8080/api/admin/sync?seasonId=17146"
 ```
+
+Site password (default local: `beta`) unlocks the UI and `/api/**` but not `/api/admin/**`.
 
 ### Inspect Data via H2 Console
 
-1. Open browser: `http://localhost:8080/h2-console`
-2. JDBC URL: `jdbc:h2:file:./data/soccer-recommendations`
-3. Username: `sa`
-4. Password: (leave blank)
-5. Click Connect
+Spring Boot 4 requires `spring-boot-h2console` (already in `web/pom.xml`) and `spring.h2.console.enabled=true`.
+
+1. Restart the app after pulling dependency changes
+2. Open browser: `http://localhost:8080/h2-console`
+3. JDBC URL:
+   - **local profile** (file DB): `jdbc:h2:file:./data/soccer-recommendations`
+   - **default profile** (in-memory): `jdbc:h2:mem:soccer-recommendations`
+4. Username: `sa`
+5. Password: (leave blank)
+6. Click Connect
 
 **Useful queries:**
 ```sql
 -- Check leagues
 SELECT * FROM league;
+
+-- Today's recommendation snapshots
+SELECT * FROM recommendation_snapshot ORDER BY match_date_unix, type;
+
+-- Completed match results
+SELECT * FROM completed_match;
 
 -- Check fixtures for next 7 days
 SELECT * FROM fixture WHERE date_unix > UNIX_TIMESTAMP() AND date_unix < UNIX_TIMESTAMP() + (7 * 86400);
@@ -234,8 +251,10 @@ Before deploying to AWS, verify locally:
 # 1. Start the app
 cd web && mvn spring-boot:run -Dspring-boot.run.profiles=local
 
-# 2. In another terminal, trigger sync
-curl -X POST http://localhost:8080/api/admin/sync
+# 2. In another terminal, login as admin then trigger sync
+curl -c /tmp/abg-cookies -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' -d '{"password":"admin"}'
+curl -b /tmp/abg-cookies -X POST http://localhost:8080/api/admin/sync
 
 # 3. Watch logs for progress
 # INFO [DataSyncJob] Starting daily data sync job

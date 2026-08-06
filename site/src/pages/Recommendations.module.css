@@ -16,8 +16,12 @@
 }
 
 .title {
+  font-family: var(--font-display);
   color: var(--text-primary);
-  font-size: 1.75rem;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   margin: 0;
 }
 
@@ -58,6 +62,35 @@
   background: var(--bg-secondary);
   border-radius: 8px;
   border: 1px solid var(--border-color);
+}
+
+.kickoffGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.kickoffChip {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.kickoffChip:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.kickoffChipActive {
+  background: var(--bg-option-active);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 
 .searchContainer {
@@ -157,7 +190,7 @@
   background: var(--accent-color);
   border: none;
   border-radius: 8px;
-  color: white;
+  color: var(--accent-contrast);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -165,7 +198,7 @@
 }
 
 .clearFiltersAlt:hover {
-  background: var(--accent-color-hover, #5558e6);
+  background: var(--accent-hover);
 }
 
 @media (max-width: 640px) {
@@ -238,7 +271,7 @@
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-contrast);
   border: none;
   border-radius: 8px;
   font-size: 0.95rem;
@@ -248,7 +281,7 @@
 }
 
 .retryButton:hover {
-  background: var(--accent-color-hover, #5558e6);
+  background: var(--accent-hover);
 }
 
 .retryButton:active {
@@ -268,6 +301,26 @@
   margin-top: 2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border-color);
-  text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
   transition: border-color 0.3s ease;
+}
+
+.soonHint {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--urgency-soon-strong);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.soonHint:hover {
+  background: var(--bg-option-active);
 }

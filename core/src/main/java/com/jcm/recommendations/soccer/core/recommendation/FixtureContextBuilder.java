@@ -7,8 +7,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -73,13 +74,50 @@ public class FixtureContextBuilder {
     }
 
     public List<FixtureContext> buildContextsForFixtures(List<Fixture> fixtures) {
-        log.info("Building contexts for fixtures: count={}", fixtures.size());
+        if (fixtures.isEmpty()) {
+            return Collections.emptyList();
+        }
         
+        log.info("Building contexts for fixtures (batch mode): count={}", fixtures.size());
+        long startTime = System.currentTimeMillis();
+        
+        // Collect all IDs needed for batch queries
+        Set<Long> fixtureIds = new HashSet<>();
+        Set<Long> teamIds = new HashSet<>();
+        Set<Long> seasonIds = new HashSet<>();
+        Set<Long> refereeIds = new HashSet<>();
+        
+        for (Fixture fixture : fixtures) {
+            fixtureIds.add(fixture.getId());
+            seasonIds.add(fixture.getSeasonId());
+            if (fixture.getHomeTeamId() != null) teamIds.add(fixture.getHomeTeamId());
+            if (fixture.getAwayTeamId() != null) teamIds.add(fixture.getAwayTeamId());
+            if (fixture.getRefereeId() != null) refereeIds.add(fixture.getRefereeId());
+        }
+        
+        // Batch fetch all related data
+        Map<Long, FixtureOdds> oddsMap = fetchOddsMap(fixtureIds);
+        Map<Long, FixturePotentials> potentialsMap = fetchPotentialsMap(fixtureIds);
+        Map<Long, League> leagueMap = fetchLeagueMap(seasonIds);
+        Map<Long, Team> teamMap = fetchTeamMap(teamIds);
+        Map<String, TeamSeasonStats> teamStatsMap = fetchTeamStatsMap(teamIds, seasonIds);
+        Map<Long, TeamRecentForm> teamFormMap = fetchTeamFormMap(teamIds);
+        Map<String, RefereeStats> refereeStatsMap = fetchRefereeStatsMap(refereeIds, seasonIds);
+        
+        long fetchTime = System.currentTimeMillis() - startTime;
+        log.debug("Batch data fetched in {}ms: odds={}, potentials={}, leagues={}, teams={}, teamStats={}, teamForms={}, refereeStats={}",
+                fetchTime, oddsMap.size(), potentialsMap.size(), leagueMap.size(), 
+                teamMap.size(), teamStatsMap.size(), teamFormMap.size(), refereeStatsMap.size());
+        
+        // Build contexts using pre-fetched data
         List<FixtureContext> contexts = new ArrayList<>();
         int completeCount = 0;
         
         for (Fixture fixture : fixtures) {
-            FixtureContext context = buildContext(fixture);
+            FixtureContext context = buildContextFromMaps(
+                    fixture, oddsMap, potentialsMap, leagueMap, teamMap, 
+                    teamStatsMap, teamFormMap, refereeStatsMap);
+            
             if (context.hasCompleteData()) {
                 contexts.add(context);
                 completeCount++;
@@ -88,9 +126,102 @@ public class FixtureContextBuilder {
             }
         }
         
-        log.info("Fixture contexts built: total={}, complete={}, skipped={}", 
-                fixtures.size(), completeCount, fixtures.size() - completeCount);
+        long totalTime = System.currentTimeMillis() - startTime;
+        log.info("Fixture contexts built (batch mode): total={}, complete={}, skipped={}, duration={}ms", 
+                fixtures.size(), completeCount, fixtures.size() - completeCount, totalTime);
         
         return contexts;
+    }
+    
+    private FixtureContext buildContextFromMaps(
+            Fixture fixture,
+            Map<Long, FixtureOdds> oddsMap,
+            Map<Long, FixturePotentials> potentialsMap,
+            Map<Long, League> leagueMap,
+            Map<Long, Team> teamMap,
+            Map<String, TeamSeasonStats> teamStatsMap,
+            Map<Long, TeamRecentForm> teamFormMap,
+            Map<String, RefereeStats> refereeStatsMap) {
+        
+        Long fixtureId = fixture.getId();
+        Long seasonId = fixture.getSeasonId();
+        Long homeTeamId = fixture.getHomeTeamId();
+        Long awayTeamId = fixture.getAwayTeamId();
+        Long refereeId = fixture.getRefereeId();
+        
+        Team homeTeam = homeTeamId != null ? teamMap.get(homeTeamId) : null;
+        Team awayTeam = awayTeamId != null ? teamMap.get(awayTeamId) : null;
+        
+        return FixtureContext.builder()
+                .fixture(fixture)
+                .odds(oddsMap.get(fixtureId))
+                .potentials(potentialsMap.get(fixtureId))
+                .league(leagueMap.get(seasonId))
+                .homeTeam(homeTeam)
+                .awayTeam(awayTeam)
+                .homeTeamStats(homeTeamId != null ? teamStatsMap.get(teamStatsKey(homeTeamId, seasonId)) : null)
+                .awayTeamStats(awayTeamId != null ? teamStatsMap.get(teamStatsKey(awayTeamId, seasonId)) : null)
+                .homeTeamForm(homeTeamId != null ? teamFormMap.get(homeTeamId) : null)
+                .awayTeamForm(awayTeamId != null ? teamFormMap.get(awayTeamId) : null)
+                .refereeStats(refereeId != null ? refereeStatsMap.get(refereeStatsKey(refereeId, seasonId)) : null)
+                .build();
+    }
+    
+    private Map<Long, FixtureOdds> fetchOddsMap(Set<Long> fixtureIds) {
+        return fixtureOddsRepository.findAllById(fixtureIds).stream()
+                .collect(Collectors.toMap(FixtureOdds::getFixtureId, Function.identity()));
+    }
+    
+    private Map<Long, FixturePotentials> fetchPotentialsMap(Set<Long> fixtureIds) {
+        return fixturePotentialsRepository.findAllById(fixtureIds).stream()
+                .collect(Collectors.toMap(FixturePotentials::getFixtureId, Function.identity()));
+    }
+    
+    private Map<Long, League> fetchLeagueMap(Set<Long> seasonIds) {
+        return leagueRepository.findAllById(seasonIds).stream()
+                .collect(Collectors.toMap(League::getCurrentSeasonId, Function.identity()));
+    }
+    
+    private Map<Long, Team> fetchTeamMap(Set<Long> teamIds) {
+        return teamRepository.findAllById(teamIds).stream()
+                .collect(Collectors.toMap(Team::getId, Function.identity()));
+    }
+    
+    private Map<String, TeamSeasonStats> fetchTeamStatsMap(Set<Long> teamIds, Set<Long> seasonIds) {
+        if (teamIds.isEmpty() || seasonIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return teamSeasonStatsRepository.findByTeamIdsAndSeasonIds(teamIds, seasonIds).stream()
+                .collect(Collectors.toMap(
+                        stats -> teamStatsKey(stats.getTeamId(), stats.getSeasonId()),
+                        Function.identity(),
+                        (existing, replacement) -> existing));
+    }
+    
+    private Map<Long, TeamRecentForm> fetchTeamFormMap(Set<Long> teamIds) {
+        if (teamIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return teamRecentFormRepository.findByTeamIdIn(teamIds).stream()
+                .collect(Collectors.toMap(TeamRecentForm::getTeamId, Function.identity()));
+    }
+    
+    private Map<String, RefereeStats> fetchRefereeStatsMap(Set<Long> refereeIds, Set<Long> seasonIds) {
+        if (refereeIds.isEmpty() || seasonIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return refereeStatsRepository.findByRefereeIdsAndSeasonIds(refereeIds, seasonIds).stream()
+                .collect(Collectors.toMap(
+                        stats -> refereeStatsKey(stats.getRefereeId(), stats.getSeasonId()),
+                        Function.identity(),
+                        (existing, replacement) -> existing));
+    }
+    
+    private String teamStatsKey(Long teamId, Long seasonId) {
+        return teamId + ":" + seasonId;
+    }
+    
+    private String refereeStatsKey(Long refereeId, Long seasonId) {
+        return refereeId + ":" + seasonId;
     }
 }
