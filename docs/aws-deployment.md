@@ -1,6 +1,15 @@
 # AWS Deployment Guide
 
-This guide covers deploying AccaBaccaGlory to AWS using Option A (Simple & Cost-Effective).
+This guide covers deploying AccaBaccaGlory to AWS using a Simple & Cost-Effective approach.
+
+## Deployment Phases
+
+| Phase | Description | Domain |
+|-------|-------------|--------|
+| **Phase 1** | Initial deployment | AWS default URLs (CloudFront + App Runner) |
+| **Phase 2** | Add custom domain | `accabaccaglory.com` (when ready) |
+
+---
 
 ## Architecture
 
@@ -11,11 +20,15 @@ This guide covers deploying AccaBaccaGlory to AWS using Option A (Simple & Cost-
 │  ┌─────────────┐         ┌─────────────────────────────┐    │
 │  │ CloudFront  │────────▶│  S3 Bucket (React Website)  │    │
 │  │   (CDN)     │         │  accabaccaglory-website     │    │
-│  └─────────────┘         └─────────────────────────────┘    │
-│                                                              │
+│  │  + SSL/TLS  │         └─────────────────────────────┘    │
+│  └─────────────┘                                            │
+│        │                                                     │
+│        │ (Phase 2: Add Route 53 + ACM Certificate)          │
+│        ▼                                                     │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │              AWS App Runner                          │    │
 │  │         (Spring Boot Backend API)                    │    │
+│  │              + Auto SSL/TLS                          │    │
 │  │                                                      │    │
 │  │  ┌─────────────┐    ┌─────────────────────────┐     │    │
 │  │  │   ECR       │    │   Secrets Manager       │     │    │
@@ -30,6 +43,10 @@ This guide covers deploying AccaBaccaGlory to AWS using Option A (Simple & Cost-
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+# Phase 1: Initial Deployment (No Custom Domain)
 
 ## Prerequisites
 
@@ -317,3 +334,167 @@ psql -h YOUR_RDS_ENDPOINT -U postgres -d soccer_recommendations
 ```bash
 curl https://YOUR_APP_RUNNER_URL/actuator/health
 ```
+
+---
+
+# Phase 2: Add Custom Domain (When Ready)
+
+Once you've acquired your domain (e.g., `accabaccaglory.com`), follow these steps.
+
+## Step 1: Register Domain in Route 53 (or Transfer DNS)
+
+### Option A: Domain purchased through Route 53
+Your hosted zone is created automatically.
+
+### Option B: Domain purchased elsewhere (GoDaddy, Namecheap, etc.)
+```bash
+# Create hosted zone in Route 53
+aws route53 create-hosted-zone \
+  --name accabaccaglory.com \
+  --caller-reference "$(date +%s)" \
+  --region us-east-1
+
+# Note the nameservers from the output
+# Update your domain registrar to use these nameservers
+```
+
+## Step 2: Request SSL Certificate (ACM)
+
+```bash
+# Request certificate for your domain (must be in us-east-1 for CloudFront)
+aws acm request-certificate \
+  --domain-name accabaccaglory.com \
+  --subject-alternative-names "*.accabaccaglory.com" \
+  --validation-method DNS \
+  --region us-east-1
+
+# Note the CertificateArn from the output
+```
+
+### Validate the certificate:
+1. Go to **AWS Console → Certificate Manager**
+2. Click on your certificate
+3. Click **"Create records in Route 53"** (if using Route 53)
+4. Wait for status to change to **"Issued"** (~5-30 minutes)
+
+## Step 3: Update CloudFront with Custom Domain
+
+1. Go to **CloudFront Console** → Your distribution
+2. Click **"Edit"**
+3. **Alternate domain names (CNAMEs):** Add `accabaccaglory.com` and `www.accabaccaglory.com`
+4. **Custom SSL certificate:** Select your ACM certificate
+5. Save changes
+
+## Step 4: Create Route 53 DNS Records
+
+```bash
+# Get your CloudFront distribution domain name
+CF_DOMAIN="dxxxxxxxxxx.cloudfront.net"
+
+# Get your hosted zone ID
+ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name accabaccaglory.com \
+  --query 'HostedZones[0].Id' \
+  --output text | sed 's|/hostedzone/||')
+
+# Create A record (apex domain)
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $ZONE_ID \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "accabaccaglory.com",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "Z2FDTNDATAQYW2",
+          "DNSName": "'$CF_DOMAIN'",
+          "EvaluateTargetHealth": false
+        }
+      }
+    }]
+  }'
+
+# Create CNAME for www
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $ZONE_ID \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "www.accabaccaglory.com",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "accabaccaglory.com"}]
+      }
+    }]
+  }'
+```
+
+## Step 5: (Optional) Custom Domain for API
+
+If you want `api.accabaccaglory.com` instead of the App Runner URL:
+
+1. Go to **App Runner Console** → Your service → **Custom domains**
+2. Click **"Add domain"**
+3. Enter `api.accabaccaglory.com`
+4. App Runner will provide DNS records to add to Route 53
+5. Add the CNAME records to Route 53
+6. Wait for validation
+
+## Step 6: Update CORS Configuration
+
+Update App Runner environment variable:
+
+```
+CORS_ALLOWED_ORIGINS=https://accabaccaglory.com,https://www.accabaccaglory.com
+```
+
+## Step 7: Update Frontend API URL
+
+```bash
+cd site
+
+# Update production environment
+echo "VITE_API_BASE_URL=https://api.accabaccaglory.com/api" > .env.production
+
+# Or if not using custom API domain:
+# echo "VITE_API_BASE_URL=https://YOUR_APP_RUNNER_URL.us-east-1.awsapprunner.com/api" > .env.production
+
+# Rebuild and deploy
+npm run build
+aws s3 sync dist/ s3://accabaccaglory-website --delete
+
+# Invalidate CloudFront cache
+aws cloudfront create-invalidation \
+  --distribution-id YOUR_DISTRIBUTION_ID \
+  --paths "/*"
+```
+
+---
+
+## Phase 2 Estimated Additional Costs
+
+| Service | Cost |
+|---------|------|
+| Route 53 Hosted Zone | $0.50/month |
+| Route 53 Queries | ~$0.40/million queries |
+| ACM Certificate | Free |
+| **Additional Total** | **~$1-2/month** |
+
+---
+
+## Final URLs
+
+### Phase 1 (Default AWS URLs)
+| Service | URL |
+|---------|-----|
+| Frontend | `https://dxxxxxxxxxx.cloudfront.net` |
+| Backend API | `https://xxxxxxxx.us-east-1.awsapprunner.com/api` |
+
+### Phase 2 (Custom Domain)
+| Service | URL |
+|---------|-----|
+| Frontend | `https://accabaccaglory.com` |
+| Frontend (www) | `https://www.accabaccaglory.com` |
+| Backend API | `https://api.accabaccaglory.com/api` |
