@@ -183,6 +183,22 @@ class DrawRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("STRONG requires score >= 40 and draw odds in 2.80-3.80 band")
+    void determineConfidence_strongOnlyInOddsBand() {
+        FixtureContext inBand = contextWithDrawOdds(3.50);
+        FixtureContext longshot = contextWithDrawOdds(6.00);
+        FixtureContext shortPrice = contextWithDrawOdds(2.50);
+        FixtureContext noOdds = createEvenlyMatchedContext();
+
+        assertThat(engine.determineConfidence(42.0, inBand)).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(engine.determineConfidence(42.0, longshot)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(42.0, shortPrice)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(42.0, noOdds)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(30.0, inBand)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(20.0, inBand)).isEqualTo(ConfidenceLevel.WEAK);
+    }
+
+    @Test
     @DisplayName("analyze tracks referee draw percentage")
     void analyze_tracksRefereeDrawPct() {
         FixtureContext context = createContextWithDrawFriendlyReferee();
@@ -208,6 +224,45 @@ class DrawRecommendationEngineTest {
     }
 
     // Helper methods to create test contexts
+
+    private FixtureContext contextWithDrawOdds(double drawOdds) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .ppgOverall(1.4)
+                .position(9)
+                .seasonWinsHome(5)
+                .seasonDrawsHome(7)
+                .seasonLossesHome(8)
+                .seasonGoalsHome(22)
+                .seasonConcededHome(24)
+                .xgForAvgOverall(1.2)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .ppgOverall(1.3)
+                .position(10)
+                .seasonWinsAway(5)
+                .seasonDrawsAway(6)
+                .seasonLossesAway(9)
+                .seasonGoalsAway(18)
+                .seasonConcededAway(22)
+                .xgForAvgOverall(1.1)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture(120L))
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .odds(FixtureOdds.builder().fixtureId(120L).oddsFtX(drawOdds).build())
+                .build();
+    }
 
     private FixtureContext createEvenlyMatchedContext() {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()

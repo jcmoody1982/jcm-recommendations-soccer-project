@@ -21,7 +21,9 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
     private static final double THRESHOLD_STRONG_EV = 0.10;
     private static final double THRESHOLD_MODERATE_EV = 0.05;
     private static final double MIN_ODDS = 1.50;
-    private static final double MAX_ODDS = 10.0;  // Avoid extreme longshots
+    private static final double MAX_ODDS = 3.0;
+    /** STRONG value also requires price not longer than this. */
+    private static final double STRONG_MAX_ODDS = 2.50;
 
     // Kelly Criterion fraction (conservative)
     private static final double KELLY_FRACTION = 0.25;  // Quarter Kelly for safety
@@ -212,16 +214,20 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
         return odds != null && odds >= MIN_ODDS && odds <= MAX_ODDS;
     }
 
-    private Optional<ValueOpportunity> createValueOpportunity(String market, double ourProbability, 
-            double odds, ConfidenceLevel sourceConfidence) {
+    private Optional<ValueOpportunity> createValueOpportunity(String market, double ourProbability,
+            Double odds, ConfidenceLevel sourceConfidence) {
+        if (!isValidOdds(odds)) {
+            return Optional.empty();
+        }
+
         double impliedProbability = 1.0 / odds;
         double valuePercentage = (ourProbability - impliedProbability) * 100;
         double expectedValue = (ourProbability * (odds - 1)) - (1 - ourProbability);
-        
+
         // Apply source confidence weight to EV
         double sourceWeight = getSourceWeight(sourceConfidence);
         double weightedEv = expectedValue * sourceWeight;
-        
+
         // Calculate Kelly stake
         double kellyStake = calculateKellyStake(ourProbability, odds);
 
@@ -235,7 +241,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
                     expectedValue,
                     weightedEv,
                     kellyStake,
-                    determineConfidence(valuePercentage, expectedValue),
+                    determineConfidence(valuePercentage, expectedValue, odds),
                     sourceConfidence
             ));
         }
@@ -340,8 +346,10 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
         return awayWins / (double) awayMatches;
     }
 
-    private ConfidenceLevel determineConfidence(double valuePercentage, double expectedValue) {
-        if (valuePercentage >= THRESHOLD_STRONG_VALUE && expectedValue >= THRESHOLD_STRONG_EV) {
+    ConfidenceLevel determineConfidence(double valuePercentage, double expectedValue, double odds) {
+        if (valuePercentage >= THRESHOLD_STRONG_VALUE
+                && expectedValue >= THRESHOLD_STRONG_EV
+                && odds <= STRONG_MAX_ODDS) {
             return ConfidenceLevel.STRONG;
         } else if (valuePercentage >= THRESHOLD_MODERATE_VALUE && expectedValue >= THRESHOLD_MODERATE_EV) {
             return ConfidenceLevel.MODERATE;

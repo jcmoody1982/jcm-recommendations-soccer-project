@@ -54,9 +54,11 @@ public class DrawRecommendationEngine implements RecommendationEngine {
     private static final double WEIGHT_DEFENSIVE_STRENGTH_NO_XG = 0.07;
 
     // Thresholds
-    private static final double THRESHOLD_STRONG = 35.0;
+    private static final double THRESHOLD_STRONG = 40.0;
     private static final double THRESHOLD_MODERATE = 28.0;
-    private static final double MIN_ODDS_VALUE = 3.20;
+    /** STRONG draws must sit in a mid-price band (not longshots). */
+    private static final double STRONG_ODDS_MIN = 2.80;
+    private static final double STRONG_ODDS_MAX = 3.80;
 
     // Draw specialist thresholds
     private static final double DRAW_SPECIALIST_HIGH = 35.0;
@@ -410,13 +412,14 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         return multiplier;
     }
 
-    private ConfidenceLevel determineConfidence(double score, FixtureContext context) {
-        boolean hasValueOdds = false;
+    ConfidenceLevel determineConfidence(double score, FixtureContext context) {
+        boolean inStrongOddsBand = false;
         if (context.hasOdds() && context.getOdds().getOddsFtX() != null) {
-            hasValueOdds = context.getOdds().getOddsFtX() >= MIN_ODDS_VALUE;
+            double drawOdds = context.getOdds().getOddsFtX();
+            inStrongOddsBand = drawOdds >= STRONG_ODDS_MIN && drawOdds <= STRONG_ODDS_MAX;
         }
 
-        if (score >= THRESHOLD_STRONG && hasValueOdds) {
+        if (score >= THRESHOLD_STRONG && inStrongOddsBand) {
             return ConfidenceLevel.STRONG;
         } else if (score >= THRESHOLD_MODERATE) {
             return ConfidenceLevel.MODERATE;

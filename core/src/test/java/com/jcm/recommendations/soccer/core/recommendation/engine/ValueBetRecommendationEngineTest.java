@@ -219,6 +219,98 @@ class ValueBetRecommendationEngineTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    @DisplayName("STRONG value requires edge/EV and odds <= 2.50")
+    void determineConfidence_strongRequiresShortOdds() {
+        assertThat(engine.determineConfidence(20.0, 0.15, 2.20)).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(engine.determineConfidence(20.0, 0.15, 2.80)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(12.0, 0.08, 2.20)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(5.0, 0.02, 2.20)).isEqualTo(ConfidenceLevel.WEAK);
+    }
+
+    @Test
+    @DisplayName("match-result value rejects odds above 3.0")
+    void analyze_rejectsLongshotMatchResultValue() {
+        FixtureContext context = createDominantHomeContext(4.00, 5.00, 1.40);
+        stubNoGoalEngines();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        // Away at 4.00 is outside MAX_ODDS; home 1.40 is below MIN_ODDS — no 1X2 value
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("match-result value at 2.80 with large edge is MODERATE not STRONG")
+    void analyze_midPriceValueIsModerate() {
+        FixtureContext context = createDominantHomeContext(2.80, 3.00, 3.00);
+        stubNoGoalEngines();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Home Win");
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(result.get().getOdds()).isEqualTo(2.80);
+    }
+
+    @Test
+    @DisplayName("match-result value at 2.20 with large edge can be STRONG")
+    void analyze_shortPriceValueCanBeStrong() {
+        FixtureContext context = createDominantHomeContext(2.20, 3.00, 3.00);
+        stubNoGoalEngines();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Home Win");
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(result.get().getOdds()).isEqualTo(2.20);
+    }
+
+    private void stubNoGoalEngines() {
+        when(bttsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(overGoalsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
+    }
+
+    private FixtureContext createDominantHomeContext(double homeOdds, double drawOdds, double awayOdds) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonWinsHome(9)
+                .seasonDrawsHome(1)
+                .seasonLossesHome(0)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonWinsAway(1)
+                .seasonDrawsAway(2)
+                .seasonLossesAway(7)
+                .build();
+
+        FixtureOdds odds = FixtureOdds.builder()
+                .fixtureId(1000L)
+                .oddsFt1(homeOdds)
+                .oddsFtX(drawOdds)
+                .oddsFt2(awayOdds)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .odds(odds)
+                .build();
+    }
+
     private FixtureContext createContextWithOdds() {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
                 .teamId(1L)

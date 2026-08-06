@@ -675,10 +675,10 @@ For each market:
 ```
 
 **Thresholds:**
-- **Strong Value:** Value % ≥ 15% AND EV ≥ 0.10
-- **Moderate Value:** Value % ≥ 10% AND EV ≥ 0.05
-- **No Value:** Value % < 10% OR EV < 0.05
-- **Odds Range:** 1.50 to 10.00 (avoids tiny margins and extreme longshots)
+- **Strong Value:** Value % ≥ 15% AND EV ≥ 0.10 AND odds ≤ 2.50
+- **Moderate Value:** Value % ≥ 10% AND EV ≥ 0.05 (and odds ≤ 3.00)
+- **No Value:** Value % < 10% OR EV < 0.05 OR odds outside range
+- **Odds Range:** 1.50 to 3.00 for all markets including 1X2 (avoids tiny margins and longshots)
 
 **Best Opportunity Selection:**
 - All qualifying opportunities ranked by weighted EV
@@ -1669,9 +1669,9 @@ Fixture Timing:
 ```
 
 **Thresholds:**
-- **Strong:** Draw Score ≥ 35% AND odds_ft_x ≥ 3.20
-- **Moderate:** Draw Score 28-34%
-- **Weak:** Draw Score < 28%
+- **Strong:** Draw Score ≥ 40 AND odds_ft_x in **2.80–3.80** (mid-price band; longshots stay at most Moderate)
+- **Moderate:** Draw Score ≥ 28 (including score ≥ 40 when odds are missing or outside the Strong band)
+- **Weak:** Draw Score < 28
 
 **Factors Tracked:**
 ```
