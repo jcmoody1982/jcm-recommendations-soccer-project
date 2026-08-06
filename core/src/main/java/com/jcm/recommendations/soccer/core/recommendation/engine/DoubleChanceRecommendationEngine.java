@@ -193,7 +193,7 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         return Optional.of(recommendation);
     }
 
-    private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
         return homeStats.getXgForAvgOverall() != null && awayStats.getXgForAvgOverall() != null;
     }
 
@@ -201,11 +201,11 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats stats = isHome ? context.getHomeTeamStats() : context.getAwayTeamStats();
         TeamSeasonStats opponentStats = isHome ? context.getAwayTeamStats() : context.getHomeTeamStats();
         
-        if (stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+        if (calculateMatchesAtVenue(stats, isHome) == 0) {
             return 33.3;
         }
 
-        // Win percentage component
+        // Win percentage component (using venue-specific denominator)
         double winPct = calculateWinPercentage(stats, isHome);
 
         // PPG component (normalized to 0-100)
@@ -325,7 +325,7 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         double ppgDiff = Math.abs(safeDouble(homeStats.getPpgOverall()) - safeDouble(awayStats.getPpgOverall()));
         double similarityBonus = ppgDiff < 0.3 ? 10.0 : ppgDiff < 0.5 ? 5.0 : 0.0;
 
-        // xG similarity bonus
+// xG similarity bonus
         if (hasXgData) {
             double xgDiff = Math.abs(safeDouble(homeStats.getXgForAvgOverall()) - safeDouble(awayStats.getXgForAvgOverall()));
             if (xgDiff < 0.2) {
@@ -344,6 +344,45 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         }
 
         return baseDrawProb + similarityBonus;
+    }
+
+    private double calculateDrawPercentage(TeamSeasonStats stats, boolean isHome) {
+        int matchesAtVenue = calculateMatchesAtVenue(stats, isHome);
+        if (matchesAtVenue == 0) {
+            return 25.0;
+        }
+        int draws = isHome ? safeInt(stats.getSeasonDrawsHome()) : safeInt(stats.getSeasonDrawsAway());
+        return (draws * 100.0) / matchesAtVenue;
+    }
+
+    private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
+        int matchesAtVenue = calculateMatchesAtVenue(stats, isHome);
+        if (matchesAtVenue == 0) {
+            return 33.3;
+        }
+        int wins = isHome ? safeInt(stats.getSeasonWinsHome()) : safeInt(stats.getSeasonWinsAway());
+        return (wins * 100.0) / matchesAtVenue;
+    }
+
+    private double calculateLossPercentage(TeamSeasonStats stats, boolean isHome) {
+        int matchesAtVenue = calculateMatchesAtVenue(stats, isHome);
+        if (matchesAtVenue == 0) {
+            return 33.3;
+        }
+        int losses = isHome ? safeInt(stats.getSeasonLossesHome()) : safeInt(stats.getSeasonLossesAway());
+        return (losses * 100.0) / matchesAtVenue;
+    }
+
+    private int calculateMatchesAtVenue(TeamSeasonStats stats, boolean isHome) {
+        if (isHome) {
+            return safeInt(stats.getSeasonWinsHome()) 
+                    + safeInt(stats.getSeasonDrawsHome()) 
+                    + safeInt(stats.getSeasonLossesHome());
+        } else {
+            return safeInt(stats.getSeasonWinsAway()) 
+                    + safeInt(stats.getSeasonDrawsAway()) 
+                    + safeInt(stats.getSeasonLossesAway());
+        }
     }
 
     private boolean checkFortress(TeamSeasonStats stats) {

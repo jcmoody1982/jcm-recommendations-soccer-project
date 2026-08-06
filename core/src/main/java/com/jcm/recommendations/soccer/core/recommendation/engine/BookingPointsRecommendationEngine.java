@@ -18,37 +18,38 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 @Slf4j
 public class BookingPointsRecommendationEngine implements RecommendationEngine {
 
-    private static final int YELLOW_CARD_POINTS = 10;
+private static final int YELLOW_CARD_POINTS = 10;
     private static final int RED_CARD_POINTS = 25;
 
     // Base weights when referee data IS available (total for weighted calculation)
-    private static final double WEIGHT_HOME_CARDS_SEASON = 0.12;
-    private static final double WEIGHT_AWAY_CARDS_SEASON = 0.12;
-    private static final double WEIGHT_HOME_CARDS_FORM = 0.10;
-    private static final double WEIGHT_AWAY_CARDS_FORM = 0.10;
-    private static final double WEIGHT_REFEREE_CARDS = 0.20;
+    private static final double WEIGHT_HOME_CARDS_SEASON = 0.10;
+    private static final double WEIGHT_AWAY_CARDS_SEASON = 0.10;
+    private static final double WEIGHT_HOME_CARDS_FORM = 0.08;
+    private static final double WEIGHT_AWAY_CARDS_FORM = 0.08;
+    private static final double WEIGHT_REFEREE_CARDS = 0.18;
     private static final double WEIGHT_REFEREE_O35_CARDS = 0.08;
     private static final double WEIGHT_RED_CARD_RISK = 0.06;
-    private static final double WEIGHT_API_POTENTIAL = 0.10;
-    private static final double WEIGHT_MATCH_INTENSITY = 0.12;
+    private static final double WEIGHT_API_POTENTIAL = 0.15;
+    private static final double WEIGHT_MATCH_INTENSITY = 0.10;
+    private static final double WEIGHT_REFEREE_RELIABILITY = 0.07;
 
     // Redistributed weights when referee data is NOT available
-    private static final double WEIGHT_CARDS_SEASON_NO_REF = 0.20;     // 0.12 → 0.20 each
-    private static final double WEIGHT_CARDS_FORM_NO_REF = 0.15;       // 0.10 → 0.15 each
-    private static final double WEIGHT_API_POTENTIAL_NO_REF = 0.18;    // 0.10 → 0.18
-    private static final double WEIGHT_MATCH_INTENSITY_NO_REF = 0.12;  // same
+    private static final double WEIGHT_CARDS_SEASON_NO_REF = 0.18;
+    private static final double WEIGHT_CARDS_FORM_NO_REF = 0.12;
+    private static final double WEIGHT_API_POTENTIAL_NO_REF = 0.20;
+    private static final double WEIGHT_MATCH_INTENSITY_NO_REF = 0.12;
 
     // Redistributed weights when form data is NOT available (but referee is)
-    private static final double WEIGHT_CARDS_SEASON_NO_FORM = 0.18;    // 0.12 → 0.18 each
-    private static final double WEIGHT_API_POTENTIAL_NO_FORM = 0.14;   // 0.10 → 0.14
+    private static final double WEIGHT_CARDS_SEASON_NO_FORM = 0.16;
+    private static final double WEIGHT_API_POTENTIAL_NO_FORM = 0.18;
 
     // High-cards matchup boost
-    private static final double HIGH_CARDS_TEAM_THRESHOLD = 2.0;       // Cards per game
-    private static final double HIGH_CARDS_BOOST_POINTS = 5.0;         // Bonus points
+    private static final double HIGH_CARDS_TEAM_THRESHOLD = 2.0;
+    private static final double HIGH_CARDS_BOOST_POINTS = 5.0;
 
     // Referee strictness boost
-    private static final double REFEREE_STRICT_O35_THRESHOLD = 60.0;   // Over 3.5 cards %
-    private static final double REFEREE_STRICT_BOOST_POINTS = 5.0;     // Bonus points
+    private static final double REFEREE_STRICT_O35_THRESHOLD = 60.0;
+    private static final double REFEREE_STRICT_BOOST_POINTS = 5.0;
 
     private static final double THRESHOLD_STRONG_OVER = 50.0;
     private static final double THRESHOLD_MODERATE_OVER = 40.0;
@@ -112,7 +113,7 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
         double homeCardsSeason = safeDouble(homeStats.getCardsAvgHome()) * YELLOW_CARD_POINTS;
         double awayCardsSeason = safeDouble(awayStats.getCardsAvgAway()) * YELLOW_CARD_POINTS;
 
-        // API potential
+// API potential
         double apiPotential = 40.0; // Default neutral
         if (context.hasPotentials() && context.getPotentials().getCardsPotential() != null) {
             apiPotential = context.getPotentials().getCardsPotential();
@@ -358,6 +359,10 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
         // Red card risk
         if (context.hasRefereeStats()) {
             factors.put("redCardRisk", calculateRedCardRisk(context));
+        }
+
+        if (context.hasPotentials() && context.getPotentials().getCardsPotential() != null) {
+            factors.put("apiCardsPotential", context.getPotentials().getCardsPotential());
         }
 
         return factors;

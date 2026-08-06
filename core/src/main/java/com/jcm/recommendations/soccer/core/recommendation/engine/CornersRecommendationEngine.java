@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.domain.FixturePotentials;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,7 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 @Slf4j
 public class CornersRecommendationEngine implements RecommendationEngine {
 
-    // Base weights when form data IS available (total = 1.0)
+// Base weights when form data IS available (total = 1.0)
     private static final double WEIGHT_HOME_CORNERS_WON = 0.12;
     private static final double WEIGHT_AWAY_CORNERS_WON = 0.12;
     private static final double WEIGHT_HOME_CORNERS_CONCEDED = 0.08;
@@ -44,6 +45,10 @@ public class CornersRecommendationEngine implements RecommendationEngine {
     private static final double THRESHOLD_MODERATE_OVER = 10.0;
     private static final double THRESHOLD_MODERATE_UNDER = 9.5;
     private static final double THRESHOLD_STRONG_UNDER = 8.0;
+
+// API line thresholds for confidence determination
+    private static final double API_LINE_STRONG_THRESHOLD = 65.0;
+    private static final double API_LINE_MODERATE_THRESHOLD = 55.0;
 
     // API Potential thresholds for confidence boost
     private static final double API_O105_STRONG_THRESHOLD = 70.0;
@@ -73,15 +78,12 @@ public class CornersRecommendationEngine implements RecommendationEngine {
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
 
-        double expectedCorners = calculateExpectedCorners(context);
+double expectedCorners = calculateExpectedCorners(context);
         
         // Get API potentials for confidence determination
-        double apiO95 = 0.0;
-        double apiO105 = 0.0;
-        if (context.hasPotentials()) {
-            apiO95 = safeDouble(context.getPotentials().getCornersO95Potential(), 0.0);
-            apiO105 = safeDouble(context.getPotentials().getCornersO105Potential(), 0.0);
-        }
+        Double apiO85 = context.hasPotentials() ? context.getPotentials().getCornersO85Potential() : null;
+        Double apiO95 = context.hasPotentials() ? context.getPotentials().getCornersO95Potential() : null;
+        Double apiO105 = context.hasPotentials() ? context.getPotentials().getCornersO105Potential() : null;
 
         RecommendationType type;
         ConfidenceLevel confidence;
@@ -91,31 +93,28 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         if (expectedCorners >= THRESHOLD_MODERATE_OVER) {
             type = RecommendationType.OVER_CORNERS;
             
-            // Determine confidence with API potential boost
-            if (expectedCorners >= THRESHOLD_STRONG_OVER || apiO105 >= API_O105_STRONG_THRESHOLD) {
-                confidence = ConfidenceLevel.STRONG;
+            // Determine confidence using API line helpers
+            if (expectedCorners >= THRESHOLD_STRONG_OVER || isApiLineStrong(apiO105)) {
                 market = "Over 10.5 Corners";
-                apiBoostApplied = apiO105 >= API_O105_STRONG_THRESHOLD && expectedCorners < THRESHOLD_STRONG_OVER;
-            } else if (apiO95 >= API_O95_MODERATE_THRESHOLD) {
-                confidence = ConfidenceLevel.MODERATE;
-                market = "Over 9.5 Corners";
+                confidence = (expectedCorners >= THRESHOLD_STRONG_OVER && isApiLineModerate(apiO105)) 
+                        ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+                apiBoostApplied = isApiLineStrong(apiO105) && expectedCorners < THRESHOLD_STRONG_OVER;
             } else {
-                confidence = ConfidenceLevel.MODERATE;
                 market = "Over 9.5 Corners";
+                confidence = isApiLineStrong(apiO95) ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
             }
         } else if (expectedCorners <= THRESHOLD_MODERATE_UNDER) {
             type = RecommendationType.UNDER_CORNERS;
             
-            // For under, low API potentials boost confidence
-            boolean lowApiPotentials = apiO95 < 40.0 && apiO105 < 25.0;
-            
-            if (expectedCorners <= THRESHOLD_STRONG_UNDER || lowApiPotentials) {
-                confidence = expectedCorners <= THRESHOLD_STRONG_UNDER ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
-                market = expectedCorners <= THRESHOLD_STRONG_UNDER ? "Under 8.5 Corners" : "Under 9.5 Corners";
-                apiBoostApplied = lowApiPotentials && expectedCorners > THRESHOLD_STRONG_UNDER;
+            // For under, weak API potentials boost confidence
+            if (expectedCorners <= THRESHOLD_STRONG_UNDER || isApiLineWeak(apiO85)) {
+                market = "Under 8.5 Corners";
+                confidence = (expectedCorners <= THRESHOLD_STRONG_UNDER && isApiLineWeak(apiO95)) 
+                        ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+                apiBoostApplied = isApiLineWeak(apiO85) && expectedCorners > THRESHOLD_STRONG_UNDER;
             } else {
-                confidence = ConfidenceLevel.MODERATE;
                 market = "Under 9.5 Corners";
+                confidence = isApiLineWeak(apiO95) ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
             }
         } else {
             return Optional.empty();
@@ -167,7 +166,7 @@ public class CornersRecommendationEngine implements RecommendationEngine {
             awayFormCorners = safeDouble(context.getAwayTeamForm().getCornersAvgAway(), awayCornersWon);
         }
 
-        // Base expected corners: average of team corners + opponent conceded
+// Base expected corners: average of team corners + opponent conceded
         // For home team: (home corners won + what away team concedes) / 2
         // For away team: (away corners won + what home team concedes) / 2
         double homeExpected = (homeCornersWon + homeConceded) / 2.0;
@@ -305,7 +304,7 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         factors.put("homeConcededAvg", safeDouble(awayStats.getCornersAvgOverall(), DEFAULT_CORNERS_AVG));
         factors.put("awayConcededAvg", safeDouble(homeStats.getCornersAvgOverall(), DEFAULT_CORNERS_AVG));
 
-        // Form corners
+// Form corners
         if (hasForm) {
             factors.put("homeFormCornersAvg", safeDouble(context.getHomeTeamForm().getCornersAvgHome(), DEFAULT_CORNERS_AVG));
             factors.put("awayFormCornersAvg", safeDouble(context.getAwayTeamForm().getCornersAvgAway(), DEFAULT_CORNERS_AVG));
@@ -373,5 +372,17 @@ public class CornersRecommendationEngine implements RecommendationEngine {
                 context.getAwayTeam().getName()));
         
         return desc.toString();
+    }
+
+    private boolean isApiLineStrong(Double potential) {
+        return potential != null && potential >= API_LINE_STRONG_THRESHOLD;
+    }
+
+    private boolean isApiLineModerate(Double potential) {
+        return potential != null && potential >= API_LINE_MODERATE_THRESHOLD;
+    }
+
+    private boolean isApiLineWeak(Double potential) {
+        return potential != null && potential < (100 - API_LINE_STRONG_THRESHOLD);
     }
 }
