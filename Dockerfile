@@ -30,12 +30,12 @@ USER spring:spring
 # Copy the built artifact
 COPY --from=build /app/web/target/*.war app.war
 
-# Expose port (AWS Elastic Beanstalk expects 5000 by default)
-EXPOSE 5000
+# Expose port 80 (nginx default proxy target)
+EXPOSE 80
 
-# Health check - use PORT env var with fallback to 5000
+# Health check on port 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-5000}/actuator/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/actuator/health || exit 1
 
-# Run the application with port from environment (default 5000 for EB)
-ENTRYPOINT ["sh", "-c", "java -jar app.war --spring.profiles.active=prod --server.port=${PORT:-5000}"]
+# Run the application on port 80
+ENTRYPOINT ["java", "-jar", "app.war", "--spring.profiles.active=prod", "--server.port=80"]
