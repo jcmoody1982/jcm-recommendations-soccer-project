@@ -65,6 +65,8 @@ public class ResultsQueryService {
     public record DayResultsView(
             LocalDate snapshotDate,
             DaySummary summary,
+            DaySummary strongSummary,
+            DaySummary moderateSummary,
             List<FixtureResultsView> fixtures
     ) {}
 
@@ -75,19 +77,21 @@ public class ResultsQueryService {
     public DayResultsView getDayResults(LocalDate date, String outcomeFilter) {
         LocalDate snapshotDate = date != null ? date : resolveDefaultDate();
         if (snapshotDate == null) {
-            return new DayResultsView(null, emptySummary(), List.of());
+            return new DayResultsView(null, emptySummary(), emptySummary(), emptySummary(), List.of());
         }
 
-        List<RecommendationSnapshot> rows = snapshotRepository
+        List<RecommendationSnapshot> allRows = snapshotRepository
                 .findBySnapshotDateOrderByMatchDateUnixAscIdAsc(snapshotDate);
 
+        DaySummary summary = summarize(allRows);
+        DaySummary strongSummary = summarize(filterByConfidence(allRows, "STRONG"));
+        DaySummary moderateSummary = summarize(filterByConfidence(allRows, "MODERATE"));
+
+        List<RecommendationSnapshot> rows = allRows;
         PickOutcome filter = parseOutcome(outcomeFilter);
         if (filter != null) {
             rows = rows.stream().filter(r -> r.getOutcome() == filter).toList();
         }
-
-        DaySummary summary = summarize(
-                snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(snapshotDate));
 
         Set<Long> fixtureIds = rows.stream()
                 .map(RecommendationSnapshot::getFixtureId)
@@ -124,7 +128,7 @@ public class ResultsQueryService {
                 FixtureResultsView::matchDateUnix,
                 Comparator.nullsLast(Long::compareTo)));
 
-        return new DayResultsView(snapshotDate, summary, fixtures);
+        return new DayResultsView(snapshotDate, summary, strongSummary, moderateSummary, fixtures);
     }
 
     LocalDate resolveDefaultDate() {
@@ -157,6 +161,13 @@ public class ResultsQueryService {
 
     private static DaySummary emptySummary() {
         return new DaySummary(0, 0, 0, 0, 0, null);
+    }
+
+    private static List<RecommendationSnapshot> filterByConfidence(
+            List<RecommendationSnapshot> rows, String confidence) {
+        return rows.stream()
+                .filter(r -> confidence.equalsIgnoreCase(r.getConfidence()))
+                .toList();
     }
 
     private PickView toPickView(RecommendationSnapshot row) {

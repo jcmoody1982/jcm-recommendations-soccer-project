@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { resultsService } from '../services/api';
-import type { PickOutcome } from '../types';
+import type { DayResults, PickOutcome, ResultsDaySummary, ResultsFixture } from '../types';
 import styles from './Results.module.css';
 
 const OUTCOME_FILTERS: Array<PickOutcome | 'ALL'> = [
@@ -13,6 +13,8 @@ const OUTCOME_FILTERS: Array<PickOutcome | 'ALL'> = [
   'PENDING',
   'UNSUPPORTED',
 ];
+
+type ConfidenceBand = 'STRONG' | 'MODERATE';
 
 function formatKickoff(unix: number | null | undefined): string {
   if (!unix) return '';
@@ -34,6 +36,168 @@ function outcomeLabel(outcome: string): string {
   return outcome.charAt(0) + outcome.slice(1).toLowerCase();
 }
 
+function formatHitRate(summary?: ResultsDaySummary | null): string {
+  if (summary?.hitRate == null) return '—';
+  return `${summary.hitRate.toFixed(0)}%`;
+}
+
+function fixturesForConfidence(fixtures: ResultsFixture[], confidence: ConfidenceBand): ResultsFixture[] {
+  return fixtures
+    .map((fixture) => ({
+      ...fixture,
+      picks: fixture.picks.filter((pick) => pick.confidence?.toUpperCase() === confidence),
+    }))
+    .filter((fixture) => fixture.picks.length > 0);
+}
+
+function SummaryStrip({
+  title,
+  summary,
+  tone,
+}: {
+  title: string;
+  summary: ResultsDaySummary;
+  tone: 'strong' | 'moderate' | 'all';
+}) {
+  return (
+    <section className={`${styles.summaryPanel} ${styles[`summary${tone[0].toUpperCase()}${tone.slice(1)}`]}`}>
+      <div className={styles.summaryHeading}>
+        <h2 className={styles.summaryTitle}>{title}</h2>
+        <span className={styles.summaryHitRate}>{formatHitRate(summary)}</span>
+      </div>
+      <div className={styles.summaryStrip}>
+        <div className={styles.summaryStat}>
+          <span className={`${styles.summaryValue} ${styles.win}`}>{summary.wins}</span>
+          <span className={styles.summaryLabel}>Wins</span>
+        </div>
+        <div className={styles.summaryStat}>
+          <span className={`${styles.summaryValue} ${styles.loss}`}>{summary.losses}</span>
+          <span className={styles.summaryLabel}>Losses</span>
+        </div>
+        <div className={styles.summaryStat}>
+          <span className={styles.summaryValue}>{summary.voids}</span>
+          <span className={styles.summaryLabel}>Voids</span>
+        </div>
+        <div className={styles.summaryStat}>
+          <span className={styles.summaryValue}>{summary.pending}</span>
+          <span className={styles.summaryLabel}>Pending</span>
+        </div>
+        <div className={styles.summaryStat}>
+          <span className={`${styles.summaryValue} ${styles.unsupported}`}>{summary.unsupported}</span>
+          <span className={styles.summaryLabel}>Unsupported</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FixtureList({
+  fixtures,
+  emptyTitle,
+  emptyBody,
+}: {
+  fixtures: ResultsFixture[];
+  emptyTitle: string;
+  emptyBody: string;
+}) {
+  if (fixtures.length === 0) {
+    return (
+      <div className={styles.sectionEmpty}>
+        <h3>{emptyTitle}</h3>
+        <p>{emptyBody}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.fixtureList}>
+      {fixtures.map((fixture) => (
+        <section key={fixture.fixtureId} className={styles.fixtureBlock}>
+          <header className={styles.fixtureHeader}>
+            <div>
+              <Link to={`/fixtures/${fixture.fixtureId}`} className={styles.fixtureTitle}>
+                {fixture.homeTeamName} vs {fixture.awayTeamName}
+              </Link>
+              <div className={styles.fixtureMeta}>
+                {fixture.leagueName && <span>{fixture.leagueName}</span>}
+                {fixture.matchDateUnix != null && <span>{formatKickoff(fixture.matchDateUnix)}</span>}
+              </div>
+            </div>
+            <div className={styles.scoreline}>
+              {fixture.scoreline
+                ? `${fixture.scoreline.home} – ${fixture.scoreline.away}`
+                : fixture.matchStatus === 'incomplete'
+                  ? 'Pending'
+                  : '—'}
+            </div>
+          </header>
+
+          <ul className={styles.pickList}>
+            {fixture.picks.map((pick) => (
+              <li key={pick.id} className={styles.pickRow}>
+                <div className={styles.pickMain}>
+                  <span className={styles.pickMarket}>{pick.market}</span>
+                  <span className={styles.pickType}>{formatType(pick.type)}</span>
+                </div>
+                <div className={styles.pickSide}>
+                  <span className={`${styles.outcome} ${styles[`outcome${pick.outcome}`]}`}>
+                    {outcomeLabel(pick.outcome)}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function ConfidenceSection({
+  title,
+  tone,
+  summary,
+  fixtures,
+  outcomeFilter,
+  snapshotDate,
+}: {
+  title: string;
+  tone: 'strong' | 'moderate';
+  summary: ResultsDaySummary;
+  fixtures: ResultsFixture[];
+  outcomeFilter: PickOutcome | 'ALL';
+  snapshotDate: string;
+}) {
+  const emptyBody =
+    outcomeFilter === 'ALL'
+      ? `No ${title.toLowerCase()} picks for ${snapshotDate}.`
+      : `No ${outcomeLabel(outcomeFilter).toLowerCase()} ${title.toLowerCase()} picks on ${snapshotDate}.`;
+
+  return (
+    <section className={styles.confidenceSection}>
+      <SummaryStrip title={title} summary={summary} tone={tone} />
+      <FixtureList
+        fixtures={fixtures}
+        emptyTitle={`No ${title.toLowerCase()} picks`}
+        emptyBody={emptyBody}
+      />
+    </section>
+  );
+}
+
+function emptySummary(): ResultsDaySummary {
+  return { wins: 0, losses: 0, voids: 0, pending: 0, unsupported: 0, hitRate: null };
+}
+
+function withConfidenceDefaults(data: DayResults | undefined): DayResults | undefined {
+  if (!data) return data;
+  return {
+    ...data,
+    strongSummary: data.strongSummary ?? emptySummary(),
+    moderateSummary: data.moderateSummary ?? emptySummary(),
+  };
+}
+
 export default function Results() {
   const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
   const [outcomeFilter, setOutcomeFilter] = useState<PickOutcome | 'ALL'>('ALL');
@@ -51,17 +215,22 @@ export default function Results() {
 
   const dateIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const { data: rawData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['results-day', selectedDate, outcomeFilter],
     queryFn: () => resultsService.getDay(selectedDate, outcomeFilter),
     enabled: Boolean(selectedDate) || dates.length === 0,
   });
 
-  const summary = data?.summary;
-  const hitRateLabel = useMemo(() => {
-    if (summary?.hitRate == null) return '—';
-    return `${summary.hitRate.toFixed(0)}%`;
-  }, [summary]);
+  const data = withConfidenceDefaults(rawData);
+
+  const strongFixtures = useMemo(
+    () => fixturesForConfidence(data?.fixtures ?? [], 'STRONG'),
+    [data?.fixtures],
+  );
+  const moderateFixtures = useMemo(
+    () => fixturesForConfidence(data?.fixtures ?? [], 'MODERATE'),
+    [data?.fixtures],
+  );
 
   const goPrev = () => {
     if (dateIndex < 0 || dateIndex >= dates.length - 1) return;
@@ -78,7 +247,7 @@ export default function Results() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Results</h1>
-          <p className={styles.subtitle}>How the daily Strong &amp; Moderate picks landed</p>
+          <p className={styles.subtitle}>Strong and Moderate picks graded separately</p>
         </div>
       </header>
 
@@ -120,33 +289,8 @@ export default function Results() {
         </div>
       </div>
 
-      {summary && data?.snapshotDate && (
-        <div className={styles.summaryStrip}>
-          <div className={styles.summaryStat}>
-            <span className={styles.summaryValue}>{hitRateLabel}</span>
-            <span className={styles.summaryLabel}>Hit rate</span>
-          </div>
-          <div className={styles.summaryStat}>
-            <span className={`${styles.summaryValue} ${styles.win}`}>{summary.wins}</span>
-            <span className={styles.summaryLabel}>Wins</span>
-          </div>
-          <div className={styles.summaryStat}>
-            <span className={`${styles.summaryValue} ${styles.loss}`}>{summary.losses}</span>
-            <span className={styles.summaryLabel}>Losses</span>
-          </div>
-          <div className={styles.summaryStat}>
-            <span className={styles.summaryValue}>{summary.voids}</span>
-            <span className={styles.summaryLabel}>Voids</span>
-          </div>
-          <div className={styles.summaryStat}>
-            <span className={styles.summaryValue}>{summary.pending}</span>
-            <span className={styles.summaryLabel}>Pending</span>
-          </div>
-          <div className={styles.summaryStat}>
-            <span className={`${styles.summaryValue} ${styles.unsupported}`}>{summary.unsupported}</span>
-            <span className={styles.summaryLabel}>Unsupported</span>
-          </div>
-        </div>
+      {data?.summary && data.snapshotDate && (
+        <SummaryStrip title="All picks" summary={data.summary} tone="all" />
       )}
 
       {isLoading && <div className={styles.message}>Loading results…</div>}
@@ -166,60 +310,24 @@ export default function Results() {
         </div>
       )}
 
-      {!isLoading && !isError && data?.snapshotDate && data.fixtures.length === 0 && (
-        <div className={styles.empty}>
-          <h2>No picks for this filter</h2>
-          <p>
-            {outcomeFilter === 'ALL'
-              ? 'No snapshotted picks for this date.'
-              : `No ${outcomeLabel(outcomeFilter).toLowerCase()} picks on ${data.snapshotDate}.`}
-          </p>
-        </div>
-      )}
-
-      {!isLoading && !isError && data?.fixtures && data.fixtures.length > 0 && (
-        <div className={styles.fixtureList}>
-          {data.fixtures.map((fixture) => (
-            <section key={fixture.fixtureId} className={styles.fixtureBlock}>
-              <header className={styles.fixtureHeader}>
-                <div>
-                  <Link to={`/fixtures/${fixture.fixtureId}`} className={styles.fixtureTitle}>
-                    {fixture.homeTeamName} vs {fixture.awayTeamName}
-                  </Link>
-                  <div className={styles.fixtureMeta}>
-                    {fixture.leagueName && <span>{fixture.leagueName}</span>}
-                    {fixture.matchDateUnix != null && <span>{formatKickoff(fixture.matchDateUnix)}</span>}
-                  </div>
-                </div>
-                <div className={styles.scoreline}>
-                  {fixture.scoreline
-                    ? `${fixture.scoreline.home} – ${fixture.scoreline.away}`
-                    : fixture.matchStatus === 'incomplete'
-                      ? 'Pending'
-                      : '—'}
-                </div>
-              </header>
-
-              <ul className={styles.pickList}>
-                {fixture.picks.map((pick) => (
-                  <li key={pick.id} className={styles.pickRow}>
-                    <div className={styles.pickMain}>
-                      <span className={styles.pickMarket}>{pick.market}</span>
-                      <span className={styles.pickType}>{formatType(pick.type)}</span>
-                    </div>
-                    <div className={styles.pickSide}>
-                      <span className={`${styles.confidence} ${pick.confidence === 'STRONG' ? styles.strong : styles.moderate}`}>
-                        {pick.confidence === 'STRONG' ? 'Strong' : 'Moderate'}
-                      </span>
-                      <span className={`${styles.outcome} ${styles[`outcome${pick.outcome}`]}`}>
-                        {outcomeLabel(pick.outcome)}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+      {!isLoading && !isError && data?.snapshotDate && (
+        <div className={styles.splitSections}>
+          <ConfidenceSection
+            title="Strong"
+            tone="strong"
+            summary={data.strongSummary}
+            fixtures={strongFixtures}
+            outcomeFilter={outcomeFilter}
+            snapshotDate={data.snapshotDate}
+          />
+          <ConfidenceSection
+            title="Moderate"
+            tone="moderate"
+            summary={data.moderateSummary}
+            fixtures={moderateFixtures}
+            outcomeFilter={outcomeFilter}
+            snapshotDate={data.snapshotDate}
+          />
         </div>
       )}
     </div>

@@ -40,5 +40,7 @@ export interface ResultsFixture {
 export interface DayResults {
   snapshotDate: string | null;
   summary: ResultsDaySummary;
+  strongSummary: ResultsDaySummary;
+  moderateSummary: ResultsDaySummary;
   fixtures: ResultsFixture[];
 }

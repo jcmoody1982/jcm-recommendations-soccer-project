@@ -54,6 +54,13 @@ class ResultsQueryServiceTest {
         assertThat(view.summary().losses()).isEqualTo(1);
         assertThat(view.summary().pending()).isEqualTo(1);
         assertThat(view.summary().hitRate()).isEqualTo(50.0);
+        assertThat(view.strongSummary().wins()).isEqualTo(1);
+        assertThat(view.strongSummary().losses()).isEqualTo(0);
+        assertThat(view.strongSummary().pending()).isEqualTo(1);
+        assertThat(view.strongSummary().hitRate()).isEqualTo(100.0);
+        assertThat(view.moderateSummary().wins()).isEqualTo(0);
+        assertThat(view.moderateSummary().losses()).isEqualTo(1);
+        assertThat(view.moderateSummary().hitRate()).isEqualTo(0.0);
         assertThat(view.fixtures()).hasSize(2);
         assertThat(view.fixtures().getFirst().fixtureId()).isEqualTo(100L);
         assertThat(view.fixtures().getFirst().scoreline().home()).isEqualTo(2);
