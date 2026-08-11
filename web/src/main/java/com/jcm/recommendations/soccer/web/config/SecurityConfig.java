@@ -43,12 +43,10 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+        config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
-                .toList();
-        // Patterns allow localhost:* style entries; exact origins still work.
-        config.setAllowedOriginPatterns(origins);
+                .toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -75,7 +73,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/health",
                                 "/actuator/**",
-                                "/api/auth/**",
+                                "/api/auth/login",
+                                "/api/auth/me",
                                 "/h2-console",
                                 "/h2-console/**")
                         .permitAll()
