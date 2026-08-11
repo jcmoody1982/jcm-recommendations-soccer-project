@@ -58,10 +58,12 @@ logging.level.com.jcm.recommendations.soccer=DEBUG
 
 ```bash
 cd web
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run
 ```
 
-Or run from IDE with profile `local`.
+The `local` profile is the default (H2, port 8080, scheduler off).  
+To force it explicitly: `mvn spring-boot:run -Dspring-boot.run.profiles=local`  
+Or run from IDE with profile `local` / no profile set.
 
 ### 4. Verify It's Running
 
