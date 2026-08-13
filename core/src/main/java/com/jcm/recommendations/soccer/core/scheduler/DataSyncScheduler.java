@@ -5,8 +5,10 @@ import com.jcm.recommendations.soccer.core.results.RecommendationSnapshotService
 import com.jcm.recommendations.soccer.core.results.ResultsMatchIngestService;
 import com.jcm.recommendations.soccer.core.results.SettlementService;
 import com.jcm.recommendations.soccer.core.service.DataSyncService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,9 +25,24 @@ public class DataSyncScheduler {
     private final ResultsMatchIngestService resultsMatchIngestService;
     private final SettlementService settlementService;
 
-    @Scheduled(cron = "${scheduler.cron:0 0 4 * * ?}")
+    @Value("${scheduler.cron:0 0 4 * * ?}")
+    private String syncCron;
+
+    @Value("${scheduler.results-cron:0 0 6 * * ?}")
+    private String resultsCron;
+
+    @Value("${results.timezone:Europe/London}")
+    private String scheduleZone;
+
+    @PostConstruct
+    void logSchedule() {
+        log.info("DataSyncScheduler active: syncCron='{}', resultsCron='{}', zone='{}'",
+                syncCron, resultsCron, scheduleZone);
+    }
+
+    @Scheduled(cron = "${scheduler.cron:0 0 4 * *?}", zone = "${results.timezone:Europe/London}")
     public void scheduledSync() {
-        log.info("Scheduled sync triggered");
+        log.info("Scheduled sync triggered (zone={})", scheduleZone);
         try {
             DataSyncService.SyncSummary summary = dataSyncService.runFullSync();
             log.info("Scheduled sync completed: success={}, duration={}s",
@@ -47,9 +64,9 @@ public class DataSyncScheduler {
         }
     }
 
-    @Scheduled(cron = "${scheduler.results-cron:0 0 6 * * ?}")
+    @Scheduled(cron = "${scheduler.results-cron:0 0 6 * *?}", zone = "${results.timezone:Europe/London}")
     public void scheduledResultsIngestAndSettle() {
-        log.info("Scheduled results ingest/settle triggered");
+        log.info("Scheduled results ingest/settle triggered (zone={})", scheduleZone);
         try {
             ResultsMatchIngestService.IngestSummary ingest = resultsMatchIngestService.ingestPendingResults();
             log.info("Scheduled ingest: dates={}, upserted={}, touched={}",
