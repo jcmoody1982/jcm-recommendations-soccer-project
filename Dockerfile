@@ -30,12 +30,12 @@ USER spring:spring
 # Copy the built artifact
 COPY --from=build /app/web/target/*.war app.war
 
-# Expose port 80 (nginx default proxy target)
-EXPOSE 80
+# Non-root cannot reliably bind to ports <1024; use 8080
+EXPOSE 8080
 
-# Health check on port 80
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/actuator/health || exit 1
+# Health check on port 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=90s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
 
-# Run the application on port 80
-ENTRYPOINT ["java", "-jar", "app.war", "--spring.profiles.active=prod", "--server.port=80"]
+# Run the application on port 8080
+ENTRYPOINT ["java", "-jar", "app.war", "--spring.profiles.active=prod", "--server.port=8080"]
