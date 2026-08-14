@@ -3067,14 +3067,14 @@ GET /api/results/performance?period=7d|30d|90d|all
 ```
 
 **Acceptance Criteria:**
-- [ ] Stats computed only from terminal outcomes (`WIN`/`LOSS`); VOID/PENDING/UNSUPPORTED excluded from hit-rate denominator
-- [ ] Period filters work (`7d` / `30d` / `90d` / `all`) on `snapshotDate`
-- [ ] Overall + by confidence + by type returned
-- [ ] Minimum sample size messaging when graded count &lt; 10
-- [ ] Updates as new days settle (query live snapshots; no batch rebuild)
-- [ ] Results page hosts Performance via Day board / Performance toggle
+- [x] Stats computed only from terminal outcomes (`WIN`/`LOSS`); VOID/PENDING/UNSUPPORTED excluded from hit-rate denominator
+- [x] Period filters work (`7d` / `30d` / `90d` / `all`) on `snapshotDate`
+- [x] Overall + by confidence + by type returned
+- [x] Minimum sample size messaging when graded count &lt; 10
+- [x] Updates as new days settle (query live snapshots; no batch rebuild)
+- [x] Results page hosts Performance via Day board / Performance toggle
 
-**Status:** Reviewed
+**Status:** Implemented
 
 ---
 
