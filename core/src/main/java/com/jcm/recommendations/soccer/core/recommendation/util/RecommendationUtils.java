@@ -150,6 +150,62 @@ public final class RecommendationUtils {
         return (scored * 100.0) / stats.getMatchesPlayed();
     }
 
+    /**
+     * Venue match count from W+D+L (home or away). Prefer this over matchesPlayed/2.
+     */
+    public static int calculateMatchesAtVenue(TeamSeasonStats stats, boolean isHome) {
+        if (stats == null) {
+            return 0;
+        }
+        if (isHome) {
+            return safeInt(stats.getSeasonWinsHome())
+                    + safeInt(stats.getSeasonDrawsHome())
+                    + safeInt(stats.getSeasonLossesHome());
+        }
+        return safeInt(stats.getSeasonWinsAway())
+                + safeInt(stats.getSeasonDrawsAway())
+                + safeInt(stats.getSeasonLossesAway());
+    }
+
+    /**
+     * Failed-to-score % at venue, using venue match count (not overall matchesPlayed).
+     */
+    public static double calculateVenueFailedToScorePercentage(TeamSeasonStats stats, boolean isHome) {
+        int matches = calculateMatchesAtVenue(stats, isHome);
+        if (matches == 0) {
+            return 100.0;
+        }
+        int fts = isHome
+                ? safeInt(stats.getSeasonFailedToScoreHome())
+                : safeInt(stats.getSeasonFailedToScoreAway());
+        return (fts * 100.0) / matches;
+    }
+
+    /**
+     * Scored-in-match % at venue (= 100 - venue FTS %).
+     */
+    public static double calculateVenueScoredPercentage(TeamSeasonStats stats, boolean isHome) {
+        return 100.0 - calculateVenueFailedToScorePercentage(stats, isHome);
+    }
+
+    public static double calculateVenueGoalsAvg(TeamSeasonStats stats, boolean isHome) {
+        int matches = calculateMatchesAtVenue(stats, isHome);
+        if (matches == 0) {
+            return 0.0;
+        }
+        int goals = isHome ? safeInt(stats.getSeasonGoalsHome()) : safeInt(stats.getSeasonGoalsAway());
+        return goals / (double) matches;
+    }
+
+    public static double calculateVenueConcededAvg(TeamSeasonStats stats, boolean isHome) {
+        int matches = calculateMatchesAtVenue(stats, isHome);
+        if (matches == 0) {
+            return 0.0;
+        }
+        int conceded = isHome ? safeInt(stats.getSeasonConcededHome()) : safeInt(stats.getSeasonConcededAway());
+        return conceded / (double) matches;
+    }
+
     // ===== PPG normalization =====
 
     public static double normalizePpg(double ppg) {

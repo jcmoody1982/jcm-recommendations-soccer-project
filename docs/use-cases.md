@@ -210,97 +210,107 @@ _Use cases for generating insights, recommendations, and predictions based on co
 **User Story:** As a user, I want to see which upcoming matches are most likely to have both teams score so I can make informed BTTS bets.
 
 **Data Required:**
-- Team BTTS percentage (season + recent form)
-- Goals scored/conceded averages
-- Failed to score percentage
-- BTTS potential from API
+- Team BTTS percentage (season + recent form), venue-specific
+- Goals scored/conceded averages at venue (from W+D+L match counts)
+- Failed to score percentage (venue-aware when sample ≥ 3)
+- BTTS potential from API (when present)
 - xG for/against averages (when available)
+
+**Implementation:** `BttsRecommendationEngine.java`
 
 **Logic:**
 
-*Base Weights (when form data IS available):*
+*Base weights (preferred; renormalized when signals are missing):*
 ```
-BTTS Score = weighted average of:
+BTTS Score = weighted average of available signals:
   - Home team BTTS % (season, home)     × 0.15
   - Away team BTTS % (season, away)     × 0.15
-  - Home team BTTS % (last 5, home)     × 0.20
-  - Away team BTTS % (last 5, away)     × 0.20
-  - Home team "failed to score" inverse × 0.10
-  - Away team "failed to score" inverse × 0.10
+  - Home team BTTS % (form, blended)    × 0.20
+  - Away team BTTS % (form, blended)    × 0.20
+  - Home team venue FTS inverse         × 0.10
+  - Away team venue FTS inverse         × 0.10
   - API btts_potential                  × 0.10
 ```
 
-*Redistributed Weights (when form data is NOT available):*
+**Missing data (P2):**
 ```
-BTTS Score = weighted average of:
-  - Home team BTTS % (season, home)     × 0.25
-  - Away team BTTS % (season, away)     × 0.25
-  - Home team "failed to score" inverse × 0.175
-  - Away team "failed to score" inverse × 0.175
-  - API btts_potential                  × 0.15
+Null BTTS % or missing API potential are OMITTED (not defaulted to 50).
+Remaining signal weights are renormalized to sum to 1.0.
 ```
 
-**Goals Context Boost (Prolific Scorers):**
+**Form sample dampening (P1):**
 ```
-When both teams are prolific scorers, add +5% to final score:
-  - Home team must average ≥ 1.5 goals/game at home
-  - Away team must average ≥ 1.0 goals/game away
-
-This addresses the limitation where two teams with the same BTTS % 
-can have very different attacking profiles:
-  - Team A: 65% BTTS, scores 2.1 goals/game → gets boost
-  - Team B: 65% BTTS, scores 0.8 goals/game → no boost
+Venue form sample = wins + draws + losses at venue.
+  - sample < 3: omit form signal (weights renormalize)
+  - sample 3–4: blend form % toward season % by sample/5
+  - sample ≥ 5: use form % fully
+  - If form % is present but W/D/L counts are missing: treat as full sample
 ```
 
-**Defensive Leakiness Boost (Porous Defenses):**
+**Venue match counts (P0):**
 ```
-When both teams have leaky defenses, add +4% to final score:
-  - Home team must concede ≥ 1.2 goals/game at home
-  - Away team must concede ≥ 1.0 goals/game away
-
-This complements the scoring boost - two leaky defenses means
-each team is likely to let the other score:
-  - Team A: Concedes 1.5/game at home → opposition likely to score
-  - Team B: Concedes 1.3/game away → opposition likely to score
+Goals / conceded averages use W+D+L at venue — never matchesPlayed / 2.
 ```
 
-**xG (Expected Goals) Boost:**
+**Filters (P1 — venue-aware):**
 ```
-When both teams generate high expected goals, add +3% to final score:
-  - Combined xG (home team xG at home + away team xG away) ≥ 2.5
+When venue matches ≥ 3:
+  - Home scored % / FTS % from home venue games
+  - Away scored % / FTS % from away venue games
+When venue matches < 3: fall back to overall season rates.
 
-xG measures quality of chances created, providing insight beyond
-actual goals scored:
-  - Team with xG 1.5 but scoring 0.8 → unlucky but creating chances
-  - Team with xG 0.8 but scoring 1.5 → lucky but not sustainable
-  
-xG data is sourced from the FootyStats API team stats endpoint.
+Both teams must have scored in ≥ 50% of (venue/overall) matches.
+Neither team's FTS rate may exceed 40%.
 ```
 
-All three boosts can stack (max +12% combined).
+**Goals Context Boost (graded, max +5%):**
+```
+Home strength vs 1.5 goals/home game; away strength vs 1.0 goals/away.
+Strength ramps from 0 at (threshold − 0.25) to 1 at (threshold + 0.5).
+Boost = 5% × √(homeStrength × awayStrength)
+```
+
+**Defensive Leakiness Boost (graded, max +4%):**
+```
+Home vs 1.2 conceded/home; away vs 1.0 conceded/away.
+Same graded ramp; Boost = 4% × √(homeStrength × awayStrength)
+```
+
+**xG Matchup Boost (graded, max +3%):**
+```
+When xG for available for both sides:
+  homeAttack = (home xG for home + away xGA away) / 2   (fallback: home xG for)
+  awayAttack = (away xG for away + home xGA home) / 2   (fallback: away xG for)
+  combined = homeAttack + awayAttack
+  Boost ramps 0→3% between combined 2.0 and 3.0
+```
+
+**Combined boost cap (P2):**
+```
+appliedBoost = min(8.0, goalsBoost + leakyBoost + xgBoost)
+```
 
 **Thresholds:**
 - **Strong:** BTTS Score ≥ 80%
 - **Moderate:** BTTS Score 65-79%
 - **Weak:** BTTS Score < 65% (filtered out)
 
-**Additional Filters:**
-- Both teams must have scored in 50%+ of their matches
-- Neither team's "failed to score" rate > 40%
-
 **Output:**
 - Ranked list of fixtures by BTTS score
 - Include: fixture details, both team stats, confidence level
 - Factors tracked:
-  - `formDataAvailable` - whether form data was used
-  - `homeGoalsAvgHome` / `awayGoalsAvgAway` - attacking context
-  - `homeConcededAvgHome` / `awayConcededAvgAway` - defensive context
-  - `goalsBoostApplied` / `goalsBoostAmount` - prolific scorers boost
-  - `leakyDefenseBoostApplied` / `leakyDefenseBoostAmount` - leaky defense boost
-  - `xgDataAvailable` - whether xG data is available
-  - `homeXgForAvgHome` / `awayXgForAvgAway` - expected goals scored
-  - `homeXgAgainstAvgHome` / `awayXgAgainstAvgAway` - expected goals conceded
-  - `xgBoostApplied` / `xgBoostAmount` / `combinedXg` - xG boost details
+  - `filtersVenueAware`, `homeVenueMatches`, `awayVenueMatches`
+  - `homeVenueScoredPct` / `awayVenueScoredPct`
+  - `formDataAvailable`, `homeFormSampleSize`, `awayFormSampleSize`
+  - `missingDataRenormalized`, `signalsUsed`
+  - `homeGoalsAvgHome` / `awayGoalsAvgAway`
+  - `homeConcededAvgHome` / `awayConcededAvgAway`
+  - `goalsBoostApplied` / `goalsBoostAmount`
+  - `leakyDefenseBoostApplied` / `leakyDefenseBoostAmount`
+  - `xgDataAvailable`, `combinedXgMatchup` (or `combinedXg`)
+  - `xgBoostApplied` / `xgBoostAmount`
+  - `baseScore`, `appliedBoost`, `boostCapped`, `maxCombinedBoost`
+  - `calculatedScore`
 
 **Status:** `Implemented`
 
