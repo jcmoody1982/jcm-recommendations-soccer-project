@@ -1,0 +1,99 @@
+package com.jcm.recommendations.soccer.core.results;
+
+import com.jcm.recommendations.soccer.core.config.ResultsProperties;
+import com.jcm.recommendations.soccer.core.repository.RecommendationSnapshotRepository;
+import com.jcm.recommendations.soccer.domain.PickOutcome;
+import com.jcm.recommendations.soccer.domain.RecommendationSnapshot;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ResultsPerformanceServiceTest {
+
+    @Mock
+    private RecommendationSnapshotRepository snapshotRepository;
+
+    private ResultsPerformanceService service;
+
+    @BeforeEach
+    void setUp() {
+        ResultsProperties properties = new ResultsProperties();
+        properties.setTimezone("Europe/London");
+        service = new ResultsPerformanceService(snapshotRepository, properties);
+    }
+
+    @Test
+    void aggregatesOverallConfidenceAndType() {
+        LocalDate d1 = LocalDate.of(2026, 8, 1);
+        LocalDate d2 = LocalDate.of(2026, 8, 2);
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, "BTTS", "STRONG", PickOutcome.WIN),
+                snap(2L, d1, "BTTS", "MODERATE", PickOutcome.LOSS),
+                snap(3L, d2, "OVER_GOALS", "STRONG", PickOutcome.WIN),
+                snap(4L, d2, "OVER_GOALS", "MODERATE", PickOutcome.VOID),
+                snap(5L, d2, "DRAW", "MODERATE", PickOutcome.PENDING)
+        ));
+
+        ResultsPerformanceService.PerformanceView view = service.getPerformance("30d");
+
+        assertThat(view.period()).isEqualTo("30d");
+        assertThat(view.minSample()).isEqualTo(10);
+        assertThat(view.overall().wins()).isEqualTo(2);
+        assertThat(view.overall().losses()).isEqualTo(1);
+        assertThat(view.overall().voids()).isEqualTo(1);
+        assertThat(view.overall().pending()).isEqualTo(1);
+        assertThat(view.overall().sampleSize()).isEqualTo(3);
+        assertThat(view.overall().hitRate()).isEqualTo(2 * 100.0 / 3);
+        assertThat(view.overall().enoughData()).isFalse();
+
+        assertThat(view.byConfidence().get("STRONG").wins()).isEqualTo(2);
+        assertThat(view.byConfidence().get("STRONG").losses()).isEqualTo(0);
+        assertThat(view.byConfidence().get("MODERATE").wins()).isEqualTo(0);
+        assertThat(view.byConfidence().get("MODERATE").losses()).isEqualTo(1);
+
+        assertThat(view.byType()).hasSize(3);
+        ResultsPerformanceService.TypePerformance btts = view.byType().stream()
+                .filter(t -> "BTTS".equals(t.type()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(btts.overall().wins()).isEqualTo(1);
+        assertThat(btts.overall().losses()).isEqualTo(1);
+        assertThat(btts.overall().hitRate()).isEqualTo(50.0);
+    }
+
+    @Test
+    void allPeriodUsesLessThanEqualQuery() {
+        when(snapshotRepository.findBySnapshotDateLessThanEqual(any())).thenReturn(List.of(
+                snap(1L, LocalDate.of(2026, 1, 1), "BTTS", "STRONG", PickOutcome.WIN)
+        ));
+
+        ResultsPerformanceService.PerformanceView view = service.getPerformance("all");
+
+        assertThat(view.period()).isEqualTo("all");
+        assertThat(view.fromDate()).isNull();
+        assertThat(view.overall().wins()).isEqualTo(1);
+        assertThat(view.overall().sampleSize()).isEqualTo(1);
+    }
+
+    private static RecommendationSnapshot snap(
+            Long id, LocalDate date, String type, String confidence, PickOutcome outcome) {
+        return RecommendationSnapshot.builder()
+                .id(id)
+                .snapshotDate(date)
+                .fixtureId(id)
+                .type(type)
+                .confidence(confidence)
+                .outcome(outcome)
+                .build();
+    }
+}

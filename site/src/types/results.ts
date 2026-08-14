@@ -44,3 +44,38 @@ export interface DayResults {
   moderateSummary: ResultsDaySummary;
   fixtures: ResultsFixture[];
 }
+
+export type PerformancePeriod = '7d' | '30d' | '90d' | 'all';
+
+export interface PerformanceBucket {
+  wins: number;
+  losses: number;
+  voids: number;
+  pending: number;
+  unsupported: number;
+  hitRate: number | null;
+  sampleSize: number;
+  enoughData: boolean;
+}
+
+export interface TypePerformance {
+  type: string;
+  overall: PerformanceBucket;
+  byConfidence: {
+    STRONG: PerformanceBucket;
+    MODERATE: PerformanceBucket;
+  };
+}
+
+export interface ResultsPerformance {
+  period: PerformancePeriod;
+  fromDate: string | null;
+  toDate: string;
+  minSample: number;
+  overall: PerformanceBucket;
+  byConfidence: {
+    STRONG: PerformanceBucket;
+    MODERATE: PerformanceBucket;
+  };
+  byType: TypePerformance[];
+}

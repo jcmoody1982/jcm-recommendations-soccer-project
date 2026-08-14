@@ -3013,25 +3013,68 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 
 **Depends on:** UC-031–UC-033 (and preferably UC-034 as the host surface).
 
-**Statistics:**
-- Hit rate % per recommendation type (7d / 30d / 90d / all)
+**Decisions (locked):**
+| Topic | Choice |
+|-------|--------|
+| Hit rate | `wins / (wins + losses)` |
+| Excluded from denominator | VOID, PENDING, UNSUPPORTED |
+| Window basis | `snapshotDate` in `Europe/London` |
+| Periods | `7d` / `30d` / `90d` / `all` |
+| Minimum sample | Hit rate shown only when `wins + losses >= 10`; otherwise “Not enough data” / `enoughData=false` |
+| UI | Same Results page; toggle **Day board \| Performance** (no new nav item) |
+| v1 out of scope | ROI %, streaks, charts, per-league |
+
+**Statistics (v1):**
+- Overall hit rate for the period
 - Hit rate by confidence (Strong vs Moderate)
+- Hit rate by recommendation type (with Strong/Moderate breakdown)
 - Sample size per bucket
-- Optional later: ROI % from stored odds, streaks
 
-**UI (later):** tab or sub-view under Results, or dedicated `/results/performance` — design TBD.
+**UI:**
+- View toggle on Results: Day board (UC-034) | Performance (UC-035)
+- On Performance: period chips replace the day picker
+- Overall summary strip + Strong/Moderate panels + by-type table
 
-**API Endpoints (suggested):**
-- `GET /api/results/performance/summary`
-- `GET /api/results/performance/by-type`
+**API:**
+```
+GET /api/results/performance?period=7d|30d|90d|all
+```
+
+**Response (shape):**
+```json
+{
+  "period": "30d",
+  "fromDate": "2026-07-15",
+  "toDate": "2026-08-13",
+  "minSample": 10,
+  "overall": { "wins": 49, "losses": 71, "voids": 8, "pending": 0, "unsupported": 0, "hitRate": 40.8, "sampleSize": 120, "enoughData": true },
+  "byConfidence": {
+    "STRONG": { "wins": 28, "losses": 21, "voids": 0, "pending": 0, "unsupported": 0, "hitRate": 57.1, "sampleSize": 49, "enoughData": true },
+    "MODERATE": { "wins": 21, "losses": 50, "voids": 0, "pending": 0, "unsupported": 0, "hitRate": 29.6, "sampleSize": 71, "enoughData": true }
+  },
+  "byType": [
+    {
+      "type": "BTTS",
+      "wins": 15, "losses": 9, "voids": 0, "pending": 0, "unsupported": 0,
+      "hitRate": 62.5, "sampleSize": 24, "enoughData": true,
+      "byConfidence": {
+        "STRONG": { "wins": 10, "losses": 4, "voids": 0, "pending": 0, "unsupported": 0, "hitRate": 71.4, "sampleSize": 14, "enoughData": true },
+        "MODERATE": { "wins": 5, "losses": 5, "voids": 0, "pending": 0, "unsupported": 0, "hitRate": 50.0, "sampleSize": 10, "enoughData": true }
+      }
+    }
+  ]
+}
+```
 
 **Acceptance Criteria:**
-- [ ] Stats computed only from terminal outcomes (`WIN`/`LOSS`; policy for VOID exclusion documented)
-- [ ] Time period filters work
-- [ ] Minimum sample size messaging when data is sparse
-- [ ] Updates as new days settle (no manual rebuild required)
+- [ ] Stats computed only from terminal outcomes (`WIN`/`LOSS`); VOID/PENDING/UNSUPPORTED excluded from hit-rate denominator
+- [ ] Period filters work (`7d` / `30d` / `90d` / `all`) on `snapshotDate`
+- [ ] Overall + by confidence + by type returned
+- [ ] Minimum sample size messaging when graded count &lt; 10
+- [ ] Updates as new days settle (query live snapshots; no batch rebuild)
+- [ ] Results page hosts Performance via Day board / Performance toggle
 
-**Status:** Pending review
+**Status:** Reviewed
 
 ---
 

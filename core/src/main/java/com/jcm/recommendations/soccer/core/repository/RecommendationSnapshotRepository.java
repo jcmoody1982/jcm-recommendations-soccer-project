@@ -48,4 +48,12 @@ public interface RecommendationSnapshotRepository extends JpaRepository<Recommen
 
     @Query("SELECT DISTINCT s.snapshotDate FROM RecommendationSnapshot s ORDER BY s.snapshotDate DESC")
     List<LocalDate> findDistinctSnapshotDatesOrderBySnapshotDateDesc();
+
+    @Query("SELECT s FROM RecommendationSnapshot s WHERE s.snapshotDate >= :fromDate AND s.snapshotDate <= :toDate")
+    List<RecommendationSnapshot> findBySnapshotDateBetweenInclusive(
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate);
+
+    @Query("SELECT s FROM RecommendationSnapshot s WHERE s.snapshotDate <= :toDate")
+    List<RecommendationSnapshot> findBySnapshotDateLessThanEqual(@Param("toDate") LocalDate toDate);
 }

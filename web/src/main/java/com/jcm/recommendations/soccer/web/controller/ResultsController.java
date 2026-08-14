@@ -1,5 +1,6 @@
 package com.jcm.recommendations.soccer.web.controller;
 
+import com.jcm.recommendations.soccer.core.results.ResultsPerformanceService;
 import com.jcm.recommendations.soccer.core.results.ResultsQueryService;
 import com.jcm.recommendations.soccer.core.results.ResultsQueryService.DayResultsView;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +22,22 @@ import java.util.List;
 public class ResultsController {
 
     private final ResultsQueryService resultsQueryService;
+    private final ResultsPerformanceService resultsPerformanceService;
 
     @GetMapping("/dates")
     public ResponseEntity<List<LocalDate>> listDates() {
         return ResponseEntity.ok(resultsQueryService.listSnapshotDates());
+    }
+
+    @GetMapping("/performance")
+    public ResponseEntity<ResultsPerformanceService.PerformanceView> getPerformance(
+            @RequestParam(required = false, defaultValue = "30d") String period) {
+        try {
+            return ResponseEntity.ok(resultsPerformanceService.getPerformance(period));
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid performance request: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @GetMapping

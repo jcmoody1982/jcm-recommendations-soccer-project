@@ -8,6 +8,8 @@ import type {
   LeagueOverviewResponse,
   DayResults,
   PickOutcome,
+  ResultsPerformance,
+  PerformancePeriod,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -161,6 +163,13 @@ export const resultsService = {
         ...(date ? { date } : {}),
         ...(outcome && outcome !== 'ALL' ? { outcome } : {}),
       },
+    });
+    return response.data;
+  },
+
+  getPerformance: async (period: PerformancePeriod = '30d'): Promise<ResultsPerformance> => {
+    const response = await api.get<ResultsPerformance>('/results/performance', {
+      params: { period },
     });
     return response.data;
   },
