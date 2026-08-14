@@ -1292,16 +1292,16 @@ Blend of draw likelihood (40%) and attacking intent (60%):
 
 #### UC-017: Match Result Recommendations
 
-**Goal:** Predict 1X2 match outcomes (Home Win, Draw, Away Win).
+**Goal:** Predict Home Win / Away Win outcomes for upcoming fixtures. Draw picks are deferred to UC-019 (`DrawRecommendationEngine`).
 
-**User Story:** As a user, I want to see predicted match results for upcoming fixtures.
+**User Story:** As a user, I want to see predicted match winners for upcoming fixtures.
 
 **Data Required:**
 - Team PPG (home/away, season + form)
 - Win/Draw/Loss percentages
 - Goals scored/conceded
 - xG and xGA
-- odds_ft_1, odds_ft_x, odds_ft_2
+- odds_ft_1, odds_ft_2 (for value / confidence only — not in the probability model)
 - League positions
 
 **Implementation:** `MatchResultRecommendationEngine.java`
@@ -1309,52 +1309,62 @@ Blend of draw likelihood (40%) and attacking intent (60%):
 **Logic (with xG data available):**
 ```
 Home Win Probability = weighted average of:
-  - Home team home win % (season)                 × 0.15
-  - Home team home win % (last 5)                 × 0.15
-  - Away team away loss % (season)                × 0.10
-  - Away team away loss % (last 5)                × 0.10
-  - Home team home PPG normalized                 × 0.10
+  - Home team home win % (season)                 × 0.16
+  - Home team home win % (form, sample-blended)   × 0.16
+  - Away team away loss % (season)                × 0.11
+  - Away team away loss % (form, sample-blended)  × 0.11
+  - Home team home PPG normalized                 × 0.11
   - Away team away PPG inverse normalized         × 0.10
   - Home team xG vs Away team xGA comparison      × 0.15
   - Goal difference comparison                    × 0.10
-  - Implied probability from odds_ft_1 (sanity)   × 0.05
 
 Away Win Probability = (same structure inverted)
 
 Draw Probability = 100% - Home Win % - Away Win %
-  (bounded to 15-35% range)
+  (bounded to 15-35% range; tracked in factors only)
 ```
 
 **Dynamic Weights (when xG NOT available):**
 ```
 Redistributed weights (total = 1.0):
-  - Home team home win % (season)                 × 0.18
-  - Home team home win % (last 5)                 × 0.18
-  - Away team away loss % (season)                × 0.12
-  - Away team away loss % (last 5)                × 0.12
-  - Home team home PPG normalized                 × 0.12
+  - Home team home win % (season)                 × 0.20
+  - Home team home win % (form, sample-blended)   × 0.20
+  - Away team away loss % (season)                × 0.13
+  - Away team away loss % (form, sample-blended)  × 0.13
+  - Home team home PPG normalized                 × 0.13
   - Away team away PPG inverse normalized         × 0.10
-  - Goal difference comparison                    × 0.12
-  - Implied probability from odds                 × 0.06
+  - Goal difference comparison                    × 0.11
 ```
 
-**xG Comparison Factor (multiplier applied to probabilities):**
+**Odds usage (P1 — single role):**
 ```
-xG Dominance = Team xG - Opponent xGA
-  - Dominance > 0.5 = Strong advantage (× 1.25)
-  - Dominance 0.2-0.5 = Moderate advantage (× 1.10)
-  - Dominance -0.2 to 0.2 = Even (× 1.0)
-  - Dominance < -0.2 = Disadvantage (× 0.85)
+Odds are NOT an input to the probability model.
+They are used only after a Home/Away side is chosen:
+  valueVsOdds = modelProbability - impliedProbability
 ```
 
-**Form Momentum Factor (multiplier):**
+**xG (P1 — applied once):**
 ```
-Based on home/away wins and losses in last 5:
-  - 5 wins OR (4 wins + 1 draw) = Hot streak (× 1.20)
+xG comparison is included only in the base weighted average above.
+Dominance multipliers are tracked in factors for transparency but are
+NOT re-applied to probabilities (avoids double-counting).
+```
+
+**Form Momentum Factor (multiplier, sample-dampened):**
+```
+Venue form sample = wins + draws + losses at venue (home or away).
+  - sample < 3: ignore momentum (× 1.0)
+  - sample 3–4: compute raw multiplier, then dampen toward 1.0 by sample/5
+  - sample ≥ 5: apply raw multiplier fully
+
+Raw multiplier:
+  - 5 wins OR (4 wins + 1 draw) OR perfect thin sample (all wins, sample ≥ 3) = Hot streak (× 1.20)
   - 3+ wins = Good form (× 1.10)
   - Mixed results = Neutral (× 1.0)
   - 3+ losses = Poor form (× 0.85)
-  - 5 losses = Crisis (× 0.70)
+  - 5 losses OR perfect thin losing sample = Crisis (× 0.70)
+
+Form % in the base model is blended toward season % when sample < 5.
 ```
 
 **Home Advantage Factor:**
@@ -1381,24 +1391,31 @@ Position ≥ 17 (Relegation battle): × 1.15
 Other positions: × 1.0
 ```
 
-**Thresholds:**
-- **Strong:** Probability ≥ 55% AND value vs odds ≥ 5%
-- **Moderate:** Probability ≥ 45%
+**Recommendation selection (P2):**
+```
+Only Home or Away may be recommended (higher of the two win probs).
+Draw is never emitted by this engine — use UC-019 Draw engine.
+```
+
+**Thresholds (P0):**
+- **Strong:** Probability ≥ 55% AND (no outcome odds OR value vs odds ≥ 5%)
+- **Moderate:** Probability ≥ 45% (also: probability ≥ 55% with odds but no value edge)
 - **Weak (filtered):** Probability < 45%
 
 **Enhanced Factor Tracking:**
 - `homeWinProbability`, `drawProbability`, `awayWinProbability`
+- `drawsDeferredToDrawEngine` (always true)
 - `valueVsOdds`
 - `oddsFt1`, `oddsFtX`, `oddsFt2`
 - `impliedHomeWinPct`, `impliedDrawPct`, `impliedAwayWinPct`
 - `homePosition`, `awayPosition`, `positionGap`
-- `xgDataAvailable`
+- `xgDataAvailable`, `xgDominanceAppliedAsMultiplier` (false)
 - `homeXgForAvg`, `awayXgForAvg`, `homeXgAgainstAvg`, `awayXgAgainstAvg`
 - `homeXgDominance`, `awayXgDominance`
-- `homeXgDominanceMultiplier`, `awayXgDominanceMultiplier`
+- `homeXgDominanceMultiplier`, `awayXgDominanceMultiplier` (informational)
 - `homeFormMomentumMultiplier`, `awayFormMomentumMultiplier`
 - `homeFormStatus`, `awayFormStatus` (Hot streak/Good form/Neutral/Poor form/Crisis)
-- `homeFormWins`, `homeFormDraws`, `homeFormLosses` (same for away)
+- `homeFormWins`, `homeFormDraws`, `homeFormLosses`, `homeFormSampleSize` (same for away)
 - `homeAdvantageApplied` (8%)
 - `homeMotivation`, `awayMotivation` (Title race/European qualification/Relegation battle)
 - `homePpgHome`, `awayPpgAway`

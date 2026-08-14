@@ -70,8 +70,8 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze applies xG dominance multiplier")
-    void analyze_appliesXgDominanceMultiplier() {
+    @DisplayName("analyze tracks xG dominance but does not re-apply it as a probability multiplier")
+    void analyze_tracksXgDominanceWithoutReapplyingMultiplier() {
         FixtureContext context = createContextWithStrongXgDominance();
 
         Optional<Recommendation> result = engine.analyze(context);
@@ -79,6 +79,46 @@ class MatchResultRecommendationEngineTest {
         assertThat(result).isPresent();
         Double xgMultiplier = (Double) result.get().getFactors().get("homeXgDominanceMultiplier");
         assertThat(xgMultiplier).isGreaterThan(1.0);
+        assertThat(result.get().getFactors().get("xgDominanceAppliedAsMultiplier")).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("analyze never recommends Draw — deferred to Draw engine")
+    void analyze_neverRecommendsDraw() {
+        FixtureContext context = createBalancedContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isNotEqualTo("Draw");
+        assertThat(result.get().getFactors().get("drawsDeferredToDrawEngine")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("analyze can be STRONG without odds when probability is high")
+    void analyze_strongWithoutOdds_whenProbabilityHigh() {
+        FixtureContext context = createDominantHomeTeamContextWithoutOdds();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(result.get().getOdds()).isNull();
+    }
+
+    @Test
+    @DisplayName("analyze dampens form momentum with thin venue sample")
+    void analyze_dampensFormMomentumWithThinSample() {
+        FixtureContext context = createThinFormSampleHotStreakContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        Double formMultiplier = (Double) result.get().getFactors().get("homeFormMomentumMultiplier");
+        // 3-game perfect sample → hot-streak raw then dampened (1.0 + 0.20 * 3/5 = 1.12)
+        assertThat(formMultiplier).isLessThan(1.20);
+        assertThat(formMultiplier).isCloseTo(1.12, org.assertj.core.data.Offset.offset(0.001));
+        assertThat(result.get().getFactors().get("homeFormSampleSize")).isEqualTo(3);
     }
 
     @Test
@@ -222,7 +262,7 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze constrains draw probability within bounds")
+    @DisplayName("analyze still tracks draw probability within bounds for transparency")
     void analyze_constrainsDrawProbability() {
         FixtureContext context = createBalancedContext();
 
@@ -233,9 +273,48 @@ class MatchResultRecommendationEngineTest {
         assertThat(drawProb).isBetween(10.0, 40.0);
     }
 
+    @Test
+    @DisplayName("analyze with odds but no value stays MODERATE even at high probability")
+    void analyze_highProbabilityWithoutValue_isModerate() {
+        FixtureContext context = createDominantHomeTeamContextWithShortOdds();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(55.0);
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+    }
+
     // Helper methods to create test contexts
 
     private FixtureContext createDominantHomeTeamContext() {
+        return dominantHomeBuilder(101L)
+                .odds(FixtureOdds.builder()
+                        .fixtureId(101L)
+                        .oddsFt1(1.45)
+                        .oddsFtX(4.50)
+                        .oddsFt2(7.00)
+                        .build())
+                .build();
+    }
+
+    private FixtureContext createDominantHomeTeamContextWithoutOdds() {
+        return dominantHomeBuilder(121L).build();
+    }
+
+    private FixtureContext createDominantHomeTeamContextWithShortOdds() {
+        // Odds so short that model probability has no +5% value edge
+        return dominantHomeBuilder(122L)
+                .odds(FixtureOdds.builder()
+                        .fixtureId(122L)
+                        .oddsFt1(1.20)
+                        .oddsFtX(6.00)
+                        .oddsFt2(12.00)
+                        .build())
+                .build();
+    }
+
+    private FixtureContext.FixtureContextBuilder dominantHomeBuilder(long fixtureId) {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
                 .teamId(1L)
                 .seasonId(1L)
@@ -282,22 +361,68 @@ class MatchResultRecommendationEngineTest {
                 .lossesAway(3)
                 .build();
 
-        FixtureOdds odds = FixtureOdds.builder()
-                .fixtureId(101L)
-                .oddsFt1(1.45)
-                .oddsFtX(4.50)
-                .oddsFt2(7.00)
+        return FixtureContext.builder()
+                .fixture(createFixture(fixtureId))
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .homeTeamForm(homeForm)
+                .awayTeamForm(awayForm);
+    }
+
+    private FixtureContext createThinFormSampleHotStreakContext() {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .seasonWinsHome(12)
+                .seasonDrawsHome(5)
+                .seasonLossesHome(3)
+                .seasonGoalsHome(30)
+                .seasonConcededHome(14)
+                .seasonGoalDifference(16)
+                .ppgHome(2.05)
+                .position(5)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .seasonWinsAway(6)
+                .seasonDrawsAway(6)
+                .seasonLossesAway(8)
+                .seasonGoalsAway(20)
+                .seasonConcededAway(24)
+                .seasonGoalDifference(-4)
+                .ppgAway(1.2)
+                .position(12)
+                .build();
+
+        // Only 3 venue form games — all wins. Full hot streak needs 5; should dampen.
+        TeamRecentForm homeForm = TeamRecentForm.builder()
+                .teamId(1L)
+                .winsHome(3)
+                .drawsHome(0)
+                .lossesHome(0)
+                .build();
+
+        TeamRecentForm awayForm = TeamRecentForm.builder()
+                .teamId(2L)
+                .winsAway(2)
+                .drawsAway(1)
+                .lossesAway(2)
                 .build();
 
         return FixtureContext.builder()
-                .fixture(createFixture(101L))
+                .fixture(createFixture(123L))
                 .homeTeam(createTeam(1L, "Home Team"))
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
                 .homeTeamForm(homeForm)
                 .awayTeamForm(awayForm)
-                .odds(odds)
                 .build();
     }
 
