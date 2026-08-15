@@ -308,11 +308,9 @@
     display: none;
   }
 
-  /* Compact tip card: fixture + one pick line, no labeled grid */
+  /* Labeled card layout with smaller type */
   .mobileCard {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: block;
     background: var(--bg-card);
     border-radius: 5px;
     padding: 6px 8px;
@@ -321,11 +319,11 @@
 
   .mobileCardHeader {
     display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .mobileStarButton {
@@ -338,7 +336,6 @@
     line-height: 1;
     transition: color 0.2s ease;
     margin-left: auto;
-    flex-shrink: 0;
   }
 
   .mobileStarButton.starred {
@@ -346,10 +343,9 @@
   }
 
   .mobileSentiment {
+    font-size: 0.85rem;
     display: flex;
     align-items: center;
-    padding-top: 1px;
-    flex-shrink: 0;
   }
 
   .mobileLeagueIcon {
@@ -360,13 +356,11 @@
     border-radius: 3px;
     padding: 1px;
     flex-shrink: 0;
-    margin-top: 2px;
   }
 
   .mobileLeaguePlaceholder {
     font-size: 0.8rem;
     flex-shrink: 0;
-    margin-top: 1px;
   }
 
   .mobileFixtureBlock {
@@ -374,18 +368,15 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 0;
   }
 
   .mobileFixture,
   .mobileFixtureLink {
     font-weight: 600;
     color: var(--text-primary);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     line-height: 1.25;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .mobileFixtureLink {
@@ -398,96 +389,68 @@
     text-underline-offset: 2px;
   }
 
-  .mobileMetaLine {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem 0.45rem;
-    min-width: 0;
+  .mobileLeagueName {
     color: var(--text-muted);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobileCardBody {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 10px;
+  }
+
+  .mobileInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .mobileLabel {
+    font-size: 0.55rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
     line-height: 1.2;
   }
 
-  .mobileLeagueName {
-    color: var(--text-muted);
-    font-size: inherit;
+  .mobileValue {
+    font-size: 0.7rem;
+    color: var(--text-primary);
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 55%;
-  }
-
-  .mobileKickoff {
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .mobileCardFooter {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding-left: 22px;
-    min-width: 0;
-  }
-
-  .mobilePickLine {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.25rem 0.55rem;
-    flex: 1;
-    min-width: 0;
-    font-size: 0.74rem;
     line-height: 1.25;
   }
 
-  .mobileSelection {
-    color: var(--text-primary);
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-
-  .mobilePrice {
-    color: var(--text-secondary);
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
   .mobileScore {
-    font-size: 0.74rem;
-    font-weight: 700;
+    font-size: 0.72rem;
+    font-weight: 600;
     color: var(--accent-color);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    line-height: 1.25;
   }
 
   .mobileGap {
-    font-size: 0.74rem;
+    font-size: 0.72rem;
     font-weight: 700;
     color: var(--accent-color);
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    line-height: 1.25;
   }
 
   .mobileWhyButton {
-    margin-top: 0;
-    width: auto;
-    flex-shrink: 0;
-    padding: 0.2rem 0.4rem;
+    margin-top: 5px;
+    width: 100%;
+    padding: 0.28rem 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    font-size: 0.65rem;
+    font-weight: 600;
     cursor: pointer;
   }
 
@@ -499,9 +462,8 @@
   }
 
   .details {
-    margin: 0 0 4px;
+    margin: -2px 0 4px;
     border-radius: 0 0 5px 5px;
-    padding: 0.55rem 0.7rem 0.65rem;
   }
 
   .factorList {

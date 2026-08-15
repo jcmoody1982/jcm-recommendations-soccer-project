@@ -217,17 +217,9 @@ export function RecommendationRow({
             ) : (
               <span className={styles.mobileFixture}>{fixtureLabel}</span>
             )}
-            <div className={styles.mobileMetaLine}>
-              {recommendation.leagueName && (
-                <span className={styles.mobileLeagueName}>{recommendation.leagueName}</span>
-              )}
-              <span
-                className={`${styles.mobileKickoff} ${styles[`urgency_${kickoff.urgency}`] || ''}`}
-                title={kickoff.title}
-              >
-                {kickoff.primaryLabel} {kickoff.timeLabel}
-              </span>
-            </div>
+            {recommendation.leagueName && (
+              <span className={styles.mobileLeagueName}>{recommendation.leagueName}</span>
+            )}
           </div>
           <button
             className={`${styles.mobileStarButton} ${isInShortlist ? styles.starred : ''}`}
@@ -237,31 +229,50 @@ export function RecommendationRow({
             {isInShortlist ? '★' : '☆'}
           </button>
         </div>
-        <div className={styles.mobileCardFooter}>
-          <div className={styles.mobilePickLine}>
-            <span className={styles.mobileSelection}>{selectionLabel}</span>
-            {showPositionGap && gapLabel && (
-              <span className={styles.mobileGap}>{gapLabel}</span>
-            )}
-            {showPrice && recommendation.odds != null && (
-              <span className={styles.mobilePrice}>{recommendation.odds.toFixed(2)}</span>
-            )}
-            <span className={styles.mobileScore} title={scoreLabel}>
+        <div className={styles.mobileCardBody}>
+          <div className={styles.mobileInfo}>
+            <span className={styles.mobileLabel}>When</span>
+            <span
+              className={`${styles.mobileValue} ${styles[`urgency_${kickoff.urgency}`] || ''}`}
+              title={kickoff.title}
+            >
+              {kickoff.primaryLabel} {kickoff.timeLabel}
+            </span>
+          </div>
+          <div className={styles.mobileInfo}>
+            <span className={styles.mobileLabel}>Selection</span>
+            <span className={styles.mobileValue}>{selectionLabel}</span>
+          </div>
+          {showPositionGap && (
+            <div className={styles.mobileInfo}>
+              <span className={styles.mobileLabel}>Pos gap</span>
+              <span className={styles.mobileGap}>{gapLabel ?? '—'}</span>
+            </div>
+          )}
+          {showPrice && recommendation.odds && (
+            <div className={styles.mobileInfo}>
+              <span className={styles.mobileLabel}>Price</span>
+              <span className={styles.mobileValue}>{recommendation.odds.toFixed(2)}</span>
+            </div>
+          )}
+          <div className={styles.mobileInfo}>
+            <span className={styles.mobileLabel}>{scoreLabel}</span>
+            <span className={styles.mobileScore}>
               {score}
               {scoreUnit}
             </span>
           </div>
-          {hasWhy && (
-            <button
-              type="button"
-              className={`${styles.mobileWhyButton} ${expanded ? styles.whyButtonOpen : ''}`}
-              onClick={toggleExpanded}
-              aria-expanded={expanded}
-            >
-              {expanded ? 'Hide' : 'Why'}
-            </button>
-          )}
         </div>
+        {hasWhy && (
+          <button
+            type="button"
+            className={`${styles.mobileWhyButton} ${expanded ? styles.whyButtonOpen : ''}`}
+            onClick={toggleExpanded}
+            aria-expanded={expanded}
+          >
+            {expanded ? 'Hide why' : 'Why this pick'}
+          </button>
+        )}
       </div>
 
       {details}
