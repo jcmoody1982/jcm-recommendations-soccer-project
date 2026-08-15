@@ -51,7 +51,7 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
     icon: '🎲',
     scoreLabel: 'Probability',
     scoreUnit: '%',
-    showPrice: false,
+    showPrice: true,
   },
   RESULT_BTTS: {
     title: 'Result + BTTS',
