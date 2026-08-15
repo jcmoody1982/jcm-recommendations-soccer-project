@@ -23,14 +23,14 @@ const DEFAULT_HORIZON = 3;
 const KICKOFF_WINDOWS: KickoffWindow[] = ['all', 'soon', 'today', 'tomorrow'];
 const SORT_OPTIONS: KickoffSort[] = ['score', 'kickoff'];
 
-/** tipped = Strong + Moderate (hides WEAK by default). */
+/** tipped = Strong + Moderate (excludes WEAK). Default chip is Strong only. */
 type ConfidenceFilter = 'tipped' | 'strong' | 'moderate' | 'all';
 
 const CONFIDENCE_OPTIONS: Array<{ value: ConfidenceFilter; label: string }> = [
-  { value: 'tipped', label: 'Strong + Moderate' },
   { value: 'strong', label: 'Strong' },
   { value: 'moderate', label: 'Moderate' },
-  { value: 'all', label: 'All (incl. Weak)' },
+  { value: 'tipped', label: 'Strong + Moderate' },
+  { value: 'all', label: 'All' },
 ];
 
 function parseHorizon(value: string | null): number {
@@ -63,7 +63,7 @@ function parseConfidence(value: string | null): ConfidenceFilter {
   if (value === 'strong' || value === 'moderate' || value === 'all' || value === 'tipped') {
     return value;
   }
-  return 'tipped';
+  return 'strong';
 }
 
 function parseType(value: string | null): RecommendationType | 'ALL' {
@@ -111,7 +111,7 @@ export default function Recommendations() {
               || (key === 'league' && (value == null || value === 'all'))
               || (key === 'kickoff' && (value == null || value === 'all'))
               || (key === 'sort' && (value == null || value === 'score'))
-              || (key === 'confidence' && (value == null || value === 'tipped'))
+              || (key === 'confidence' && (value == null || value === 'strong'))
               || (key === 'type' && (value == null || value === 'ALL'));
             if (value == null || value === '' || isDefault) {
               next.delete(key);
@@ -338,7 +338,7 @@ export default function Recommendations() {
     || selectedLeague !== 'all'
     || kickoffWindow !== 'all'
     || (kickoffWindow === 'all' && horizon !== DEFAULT_HORIZON)
-    || confidenceFilter !== 'tipped'
+    || confidenceFilter !== 'strong'
     || typeFilter !== 'ALL';
 
   const setKickoffWindow = (value: KickoffWindow) => {
@@ -458,16 +458,6 @@ export default function Recommendations() {
             ))}
           </div>
         )}
-
-        <select
-          value={sortBy}
-          onChange={(e) => updateParams({ sort: e.target.value })}
-          className={styles.select}
-          aria-label="Sort recommendations"
-        >
-          <option value="score">Sort: Best score</option>
-          <option value="kickoff">Sort: Soonest kickoff</option>
-        </select>
 
         {hasActiveFilters && (
           <button className={styles.clearFilters} onClick={clearFilters}>
