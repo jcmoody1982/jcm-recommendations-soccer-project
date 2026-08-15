@@ -88,7 +88,7 @@ site/
 |-------|------|-------------|
 | `/` | Login | Brand homepage + beta access password |
 | `/recommendations` | Recommendations | Filterable list of all recommendations |
-| `/results` | Results | Settled Strong/Moderate picks by day |
+| `/results` | Results | Daily Dashboard of graded picks + Performance view |
 | `/shortlist` | Shortlist | Saved picks |
 | `/fixtures` | Fixtures | Upcoming fixtures grouped by date |
 
