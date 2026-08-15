@@ -342,6 +342,12 @@ export default function Recommendations() {
     || confidenceFilter !== 'strong'
     || typeFilter !== 'ALL';
 
+  /** Filters that live inside the mobile-collapsed panel. */
+  const hasCollapsedFiltersActive =
+    selectedLeague !== 'all'
+    || kickoffWindow !== 'all'
+    || (kickoffWindow === 'all' && horizon !== DEFAULT_HORIZON);
+
   const setKickoffWindow = (value: KickoffWindow) => {
     const patch: Record<string, string | null> = { kickoff: value };
     // Keep `days` so returning to "All kickoffs" restores the chosen horizon.
@@ -396,14 +402,14 @@ export default function Recommendations() {
       <div className={styles.filtersShell}>
         <button
           type="button"
-          className={`${styles.filtersToggle} ${hasActiveFilters ? styles.filtersToggleActive : ''}`}
+          className={`${styles.filtersToggle} ${hasCollapsedFiltersActive ? styles.filtersToggleActive : ''}`}
           onClick={() => setFiltersOpen((open) => !open)}
           aria-expanded={filtersOpen}
           aria-controls="recommendations-filters"
         >
           <span className={styles.filtersToggleLabel}>
             Filters
-            {hasActiveFilters && <span className={styles.filtersToggleBadge}>Active</span>}
+            {hasCollapsedFiltersActive && <span className={styles.filtersToggleBadge}>Active</span>}
           </span>
           <span className={`${styles.filtersChevron} ${filtersOpen ? styles.filtersChevronOpen : ''}`} aria-hidden>
             ▼
@@ -487,55 +493,55 @@ export default function Recommendations() {
               </button>
             )}
           </div>
+        </div>
+      </div>
 
-          <div className={styles.filterBlock}>
-            <div className={styles.filterGroup}>
-              <span className={styles.filterLabel}>Confidence</span>
-              <div className={styles.filterRowScroll} role="group" aria-label="Confidence filter">
-                {CONFIDENCE_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={`${styles.chip} ${
-                      confidenceFilter === option.value ? styles.chipActive : ''
-                    }`}
-                    onClick={() => updateParams({ confidence: option.value })}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {typesWithPicks.length > 0 && (
-              <div className={styles.filterGroup}>
-                <label className={styles.filterLabel} htmlFor="market-filter">
-                  Market Filter
-                </label>
-                <select
-                  id="market-filter"
-                  value={typeFilter}
-                  onChange={(e) =>
-                    updateParams({
-                      type: e.target.value === 'ALL' ? null : e.target.value,
-                    })
-                  }
-                  className={`${styles.select} ${styles.marketSelect}`}
-                  aria-label="Market filter"
-                >
-                  <option value="ALL">
-                    All markets ({typesWithPicks.reduce((sum, t) => sum + (typeCounts[t] || 0), 0)})
-                  </option>
-                  {typesWithPicks.map((type) => (
-                    <option key={type} value={type}>
-                      {sectionTitle(type)} ({typeCounts[type]})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+      <div className={styles.filterBlock}>
+        <div className={styles.filterGroup}>
+          <span className={styles.filterLabel}>Confidence</span>
+          <div className={styles.filterRowScroll} role="group" aria-label="Confidence filter">
+            {CONFIDENCE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.chip} ${
+                  confidenceFilter === option.value ? styles.chipActive : ''
+                }`}
+                onClick={() => updateParams({ confidence: option.value })}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         </div>
+
+        {typesWithPicks.length > 0 && (
+          <div className={styles.filterGroup}>
+            <label className={styles.filterLabel} htmlFor="market-filter">
+              Market Filter
+            </label>
+            <select
+              id="market-filter"
+              value={typeFilter}
+              onChange={(e) =>
+                updateParams({
+                  type: e.target.value === 'ALL' ? null : e.target.value,
+                })
+              }
+              className={`${styles.select} ${styles.marketSelect}`}
+              aria-label="Market filter"
+            >
+              <option value="ALL">
+                All markets ({typesWithPicks.reduce((sum, t) => sum + (typeCounts[t] || 0), 0)})
+              </option>
+              {typesWithPicks.map((type) => (
+                <option key={type} value={type}>
+                  {sectionTitle(type)} ({typeCounts[type]})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
