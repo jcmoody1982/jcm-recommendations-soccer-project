@@ -308,34 +308,37 @@
     display: none;
   }
 
-  /* Show mobile card */
+  /* Compact tip card: fixture + one pick line, no labeled grid */
   .mobileCard {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     background: var(--bg-card);
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin-bottom: 5px;
+    border-radius: 5px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
   }
 
   .mobileCardHeader {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
-    margin-bottom: 6px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
   }
 
   .mobileStarButton {
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     color: var(--text-muted);
     padding: 0;
     line-height: 1;
     transition: color 0.2s ease;
     margin-left: auto;
+    flex-shrink: 0;
   }
 
   .mobileStarButton.starred {
@@ -343,22 +346,27 @@
   }
 
   .mobileSentiment {
-    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    padding-top: 1px;
+    flex-shrink: 0;
   }
 
   .mobileLeagueIcon {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     object-fit: contain;
     background: #fff;
     border-radius: 3px;
     padding: 1px;
     flex-shrink: 0;
+    margin-top: 2px;
   }
 
   .mobileLeaguePlaceholder {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     flex-shrink: 0;
+    margin-top: 1px;
   }
 
   .mobileFixtureBlock {
@@ -366,14 +374,18 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 1px;
   }
 
   .mobileFixture,
   .mobileFixtureLink {
     font-weight: 600;
     color: var(--text-primary);
-    font-size: 0.82rem;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .mobileFixtureLink {
@@ -386,64 +398,96 @@
     text-underline-offset: 2px;
   }
 
-  .mobileLeagueName {
+  .mobileMetaLine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.45rem;
+    min-width: 0;
     color: var(--text-muted);
     font-size: 0.65rem;
-    font-weight: 500;
     line-height: 1.2;
+  }
+
+  .mobileLeagueName {
+    color: var(--text-muted);
+    font-size: inherit;
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 55%;
   }
 
-  .mobileCardBody {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 12px;
+  .mobileKickoff {
+    font-weight: 600;
+    white-space: nowrap;
   }
 
-  .mobileInfo {
+  .mobileCardFooter {
     display: flex;
-    flex-direction: column;
-    gap: 1px;
+    align-items: center;
+    gap: 0.4rem;
+    padding-left: 22px;
+    min-width: 0;
   }
 
-  .mobileLabel {
-    font-size: 0.62rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+  .mobilePickLine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.55rem;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.74rem;
+    line-height: 1.25;
   }
 
-  .mobileValue {
-    font-size: 0.78rem;
+  .mobileSelection {
     color: var(--text-primary);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .mobilePrice {
+    color: var(--text-secondary);
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .mobileScore {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--accent-color);
-  }
-
-  .mobileGap {
-    font-size: 0.82rem;
+    font-size: 0.74rem;
     font-weight: 700;
     color: var(--accent-color);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .mobileGap {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .mobileWhyButton {
-    margin-top: 6px;
-    width: 100%;
-    padding: 0.35rem 0.6rem;
+    margin-top: 0;
+    width: auto;
+    flex-shrink: 0;
+    padding: 0.2rem 0.4rem;
     border: 1px solid var(--border-color);
-    border-radius: 5px;
+    border-radius: 4px;
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
     cursor: pointer;
   }
 
@@ -455,8 +499,9 @@
   }
 
   .details {
-    margin: -4px 0 8px;
-    border-radius: 0 0 8px 8px;
+    margin: 0 0 4px;
+    border-radius: 0 0 5px 5px;
+    padding: 0.55rem 0.7rem 0.65rem;
   }
 
   .factorList {
