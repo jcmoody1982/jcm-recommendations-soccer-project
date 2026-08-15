@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { recommendationService } from '../services/api';
@@ -85,6 +85,8 @@ function matchesConfidence(confidence: string, filter: ConfidenceFilter): boolea
 
 export default function Recommendations() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchOpen, setSearchOpen] = useState(() => Boolean(searchParams.get('q')));
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const searchQuery = searchParams.get('q') || '';
   const selectedLeague = searchParams.get('league') || 'all';
@@ -92,7 +94,6 @@ export default function Recommendations() {
   const sortBy = parseSort(searchParams.get('sort'));
   const confidenceFilter = parseConfidence(searchParams.get('confidence'));
   const typeFilter = parseType(searchParams.get('type'));
-  const hideEmptySections = searchParams.get('empty') !== '0';
   const horizon = parseHorizon(searchParams.get('days'));
   // Kickoff chips own the time window; horizon only applies to "All kickoffs".
   const daysAhead =
@@ -111,8 +112,7 @@ export default function Recommendations() {
               || (key === 'kickoff' && (value == null || value === 'all'))
               || (key === 'sort' && (value == null || value === 'score'))
               || (key === 'confidence' && (value == null || value === 'tipped'))
-              || (key === 'type' && (value == null || value === 'ALL'))
-              || (key === 'empty' && (value == null || value === '1'));
+              || (key === 'type' && (value == null || value === 'ALL'));
             if (value == null || value === '' || isDefault) {
               next.delete(key);
             } else {
@@ -126,6 +126,19 @@ export default function Recommendations() {
     },
     [setSearchParams]
   );
+
+  useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    if (searchQuery) {
+      updateParams({ q: null });
+    }
+  };
 
   const { data: groupedRecommendations, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['recommendations-grouped', daysAhead],
@@ -340,35 +353,46 @@ export default function Recommendations() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Recommendations</h1>
-          <p className={styles.subtitle}>Kickoffs in Europe/London · Weak hidden by default</p>
+        <h1 className={styles.title}>Recommendations</h1>
+        <div className={styles.headerActions}>
+          {searchOpen ? (
+            <div className={styles.headerSearch}>
+              <input
+                ref={searchInputRef}
+                type="search"
+                placeholder="Search teams or leagues..."
+                value={searchQuery}
+                onChange={(e) => updateParams({ q: e.target.value || null })}
+                className={styles.headerSearchInput}
+                aria-label="Search teams or leagues"
+              />
+              <button
+                type="button"
+                className={styles.headerIconButton}
+                onClick={closeSearch}
+                aria-label="Close search"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={`${styles.headerIconButton} ${searchQuery ? styles.headerIconActive : ''}`}
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search teams or leagues"
+              title="Search"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+                <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.75" />
+                <path d="M12.5 12.5L16.5 16.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
         </div>
       </header>
 
       <div className={styles.filters}>
-        <div className={styles.searchContainer}>
-          <span className={styles.searchIcon} aria-hidden>
-            ⌕
-          </span>
-          <input
-            type="text"
-            placeholder="Search teams or leagues..."
-            value={searchQuery}
-            onChange={(e) => updateParams({ q: e.target.value || null })}
-            className={styles.searchInput}
-          />
-          {searchQuery && (
-            <button
-              className={styles.clearSearch}
-              onClick={() => updateParams({ q: null })}
-              aria-label="Clear search"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
         <select
           value={selectedLeague}
           onChange={(e) => updateParams({ league: e.target.value })}
@@ -445,16 +469,6 @@ export default function Recommendations() {
           <option value="kickoff">Sort: Soonest kickoff</option>
         </select>
 
-        <label className={styles.checkboxLabel}>
-          <input
-            type="checkbox"
-            checked={hideEmptySections}
-            onChange={(e) => updateParams({ empty: e.target.checked ? null : '0' })}
-            className={styles.checkbox}
-          />
-          <span>Hide empty sections</span>
-        </label>
-
         {hasActiveFilters && (
           <button className={styles.clearFilters} onClick={clearFilters}>
             Clear filters
@@ -484,7 +498,7 @@ export default function Recommendations() {
         {typesWithPicks.length > 0 && (
           <div className={styles.filterGroup}>
             <label className={styles.filterLabel} htmlFor="market-filter">
-              Market
+              Market Filter
             </label>
             <select
               id="market-filter"
@@ -530,7 +544,7 @@ export default function Recommendations() {
               return null;
             }
             const recommendations = filteredRecommendations[type] || [];
-            if (hideEmptySections && recommendations.length === 0) {
+            if (recommendations.length === 0) {
               return null;
             }
             return (
