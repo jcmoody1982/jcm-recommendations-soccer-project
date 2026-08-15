@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Recommendation } from '../types';
 import { useShortlist } from '../contexts/ShortlistContext';
 import {
+  EARLY_KICKOFF_STRIP,
   EARLY_KICKOFF_WARNING,
   formatKickoffDisplay,
   isEarlyKickoffUk,
@@ -80,7 +81,7 @@ function EarlyKickoffStrip() {
   return (
     <div className={styles.earlyStrip} role="status">
       <EarlyWarningIcon size={13} />
-      <span>{EARLY_KICKOFF_WARNING}</span>
+      <span>{EARLY_KICKOFF_STRIP}</span>
     </div>
   );
 }
@@ -284,7 +285,6 @@ export function RecommendationRow({
             {isInShortlist ? '★' : '☆'}
           </button>
         </div>
-        {isEarlyKickoff && <EarlyKickoffStrip />}
         <div className={styles.mobileCardBody}>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>When</span>
