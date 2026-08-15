@@ -15,6 +15,33 @@ export function getKickoffMs(matchDateUnix: number): number {
   return matchDateUnix * 1000;
 }
 
+/** Kickoffs at or before 12:30 Europe/London are treated as early. */
+export const EARLY_KICKOFF_UK_MINUTES = 12 * 60 + 30;
+
+export const EARLY_KICKOFF_WARNING =
+  'Early Kick-Off — Proceed with Extreme Caution';
+
+/**
+ * True when the fixture kicks off at or before 12:30 UK time
+ * (Europe/London, including BST/GMT).
+ */
+export function isEarlyKickoffUk(matchDateUnix: number): boolean {
+  const date = new Date(getKickoffMs(matchDateUnix));
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value);
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return false;
+  }
+  return hour * 60 + minute <= EARLY_KICKOFF_UK_MINUTES;
+}
+
 export function matchesKickoffWindow(
   matchDateUnix: number,
   window: KickoffWindow,

@@ -35,6 +35,10 @@
   --urgency-today: #1a4a7a;
   --confidence-strong: #3dba7e;
   --confidence-moderate: #e0a84a;
+  --early-kickoff: #c62828;
+  --early-kickoff-strong: #8e0000;
+  --early-kickoff-bg: rgba(198, 40, 40, 0.1);
+  --early-kickoff-border: rgba(198, 40, 40, 0.35);
   --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-body: 'Manrope', system-ui, sans-serif;
 }
@@ -71,6 +75,10 @@
   --urgency-today: #8eb6d6;
   --confidence-strong: #3dba7e;
   --confidence-moderate: #e0a84a;
+  --early-kickoff: #ff6b6b;
+  --early-kickoff-strong: #ff8a80;
+  --early-kickoff-bg: rgba(198, 40, 40, 0.18);
+  --early-kickoff-border: rgba(255, 107, 107, 0.4);
 }
 
 html {
