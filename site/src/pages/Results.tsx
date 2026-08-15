@@ -443,7 +443,7 @@ export default function Results() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Results</h1>
-          <p className={styles.subtitle}>Day board for graded picks · Performance for longer-run accuracy</p>
+          <p className={styles.subtitle}>Daily Dashboard for graded picks · Performance for longer-run accuracy</p>
         </div>
       </header>
 
@@ -455,7 +455,7 @@ export default function Results() {
           className={`${styles.viewToggleButton} ${view === 'day' ? styles.viewToggleActive : ''}`}
           onClick={() => setView('day')}
         >
-          Day board
+          Daily Dashboard
         </button>
         <button
           type="button"

@@ -3014,7 +3014,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 
 **API Endpoints:**
 - `GET /api/results/dates` — dates that have snapshots (descending)
-- `GET /api/results?date=YYYY-MM-DD&outcome=` — day board (outcome optional); omit date → latest ≤ today
+- `GET /api/results?date=YYYY-MM-DD&outcome=` — daily dashboard (outcome optional); omit date → latest ≤ today
 
 **Out of scope for this UC:** charts, ROI, long-window analytics (see UC-035).
 
@@ -3046,7 +3046,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 | Window basis | `snapshotDate` in `Europe/London` |
 | Periods | `7d` / `30d` / `90d` / `all` |
 | Minimum sample | Hit rate shown only when `wins + losses >= 10`; otherwise “Not enough data” / `enoughData=false` |
-| UI | Same Results page; toggle **Day board \| Performance** (no new nav item) |
+| UI | Same Results page; toggle **Daily Dashboard \| Performance** (no new nav item) |
 | v1 out of scope | ROI %, streaks, charts, per-league |
 
 **Statistics (v1):**
@@ -3056,7 +3056,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 - Sample size per bucket
 
 **UI:**
-- View toggle on Results: Day board (UC-034) | Performance (UC-035)
+- View toggle on Results: Daily Dashboard (UC-034) | Performance (UC-035)
 - On Performance: period chips replace the day picker
 - Overall summary strip + Strong/Moderate panels + by-type table
 
@@ -3097,7 +3097,7 @@ GET /api/results/performance?period=7d|30d|90d|all
 - [x] Overall + by confidence + by type returned
 - [x] Minimum sample size messaging when graded count &lt; 10
 - [x] Updates as new days settle (query live snapshots; no batch rebuild)
-- [x] Results page hosts Performance via Day board / Performance toggle
+- [x] Results page hosts Performance via Daily Dashboard / Performance toggle
 
 **Status:** Implemented
 
