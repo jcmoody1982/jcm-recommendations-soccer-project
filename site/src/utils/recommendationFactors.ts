@@ -63,6 +63,31 @@ function labelForFactor(
     if (!homePick && key === 'awayPosition') {
       return 'League Position';
     }
+    // Opponent decimal price (1 = home, 2 = away).
+    if (homePick && key === 'oddsFt2') {
+      return 'Opponent Price';
+    }
+    if (!homePick && key === 'oddsFt1') {
+      return 'Opponent Price';
+    }
+    if (key === 'homeFormWins') {
+      return 'Home Wins in Last 5';
+    }
+    if (key === 'homeFormDraws') {
+      return 'Home Draws in Last 5';
+    }
+    if (key === 'homeFormLosses') {
+      return 'Home Losses in Last 5';
+    }
+    if (key === 'awayFormWins') {
+      return 'Away Wins in Last 5';
+    }
+    if (key === 'awayFormDraws') {
+      return 'Away Draws in Last 5';
+    }
+    if (key === 'awayFormLosses') {
+      return 'Away Losses in Last 5';
+    }
   }
 
   if (GLOBAL_LABELS[key]) {
