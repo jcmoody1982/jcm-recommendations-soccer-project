@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Competition, FixtureSummary } from '../types';
 import {
@@ -39,17 +39,8 @@ function formatFixtureKickoff(fixture: FixtureSummary): string {
 export function CompetitionCard({ competition }: CompetitionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const earlyCount = useMemo(
-    () =>
-      competition.fixtures.reduce((count, fixture) => {
-        const input = fixtureKickoffInput(fixture);
-        return input != null && isEarlyKickoffUk(input) ? count + 1 : count;
-      }, 0),
-    [competition.fixtures]
-  );
-
   return (
-    <div className={`${styles.card} ${earlyCount > 0 ? styles.cardHasEarly : ''}`}>
+    <div className={styles.card}>
       <button
         className={styles.header}
         onClick={() => setIsExpanded(!isExpanded)}
@@ -64,17 +55,6 @@ export function CompetitionCard({ competition }: CompetitionCardProps) {
             />
           )}
           <span className={styles.name}>{competition.name}</span>
-          {earlyCount > 0 && (
-            <span
-              className={styles.headerEarly}
-              title={`${earlyCount} early kick-off${earlyCount === 1 ? '' : 's'} · ${EARLY_KICKOFF_WARNING}`}
-            >
-              <EarlyKickoffBadge />
-              {earlyCount > 1 && (
-                <span className={styles.headerEarlyCount}>×{earlyCount}</span>
-              )}
-            </span>
-          )}
         </div>
         <div className={styles.fixtureCount}>
           <span className={styles.countIcon}>📅</span>

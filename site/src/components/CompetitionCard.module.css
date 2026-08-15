@@ -6,10 +6,6 @@
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-.cardHasEarly {
-  border-left: 3px solid var(--early-kickoff);
-}
-
 .header {
   width: 100%;
   display: flex;
@@ -52,21 +48,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.headerEarly {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.headerEarlyCount {
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--early-kickoff-strong);
-  letter-spacing: 0.02em;
 }
 
 .fixtureCount {
