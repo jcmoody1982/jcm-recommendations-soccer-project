@@ -19,7 +19,9 @@ import {
 } from '../utils/recommendationSections';
 import styles from './Recommendations.module.css';
 
-const DAYS_OPTIONS = [0.5, 1, 3, 7] as const;
+/** Fetch horizon when viewing all kickoffs (Soon/Today/Tomorrow set days automatically). */
+const HORIZON_OPTIONS = [3, 7] as const;
+const DEFAULT_HORIZON = 3;
 const KICKOFF_WINDOWS: KickoffWindow[] = ['all', 'soon', 'today', 'tomorrow'];
 const SORT_OPTIONS: KickoffSort[] = ['score', 'kickoff'];
 
@@ -33,9 +35,16 @@ const CONFIDENCE_OPTIONS: Array<{ value: ConfidenceFilter; label: string }> = [
   { value: 'all', label: 'All (incl. Weak)' },
 ];
 
-function parseDays(value: string | null): number {
+function parseHorizon(value: string | null): number {
   const n = value == null ? NaN : Number(value);
-  return (DAYS_OPTIONS as readonly number[]).includes(n) ? n : 7;
+  return (HORIZON_OPTIONS as readonly number[]).includes(n) ? n : DEFAULT_HORIZON;
+}
+
+/** Minimum fetch window needed for a kickoff chip. */
+function daysForKickoff(window: KickoffWindow): number {
+  if (window === 'soon' || window === 'today') return 1;
+  if (window === 'tomorrow') return 3;
+  return DEFAULT_HORIZON;
 }
 
 function parseKickoff(value: string | null): KickoffWindow {
@@ -76,17 +85,9 @@ function matchesConfidence(confidence: string, filter: ConfidenceFilter): boolea
   return band === 'STRONG' || band === 'MODERATE';
 }
 
-function daysLabel(days: number): string {
-  if (days === 0.5) return 'Next 12 hours';
-  if (days === 1) return 'Next 24 hours';
-  if (days === 3) return 'Next 3 days';
-  return 'Next 7 days';
-}
-
 export default function Recommendations() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const daysAhead = parseDays(searchParams.get('days'));
   const searchQuery = searchParams.get('q') || '';
   const selectedLeague = searchParams.get('league') || 'all';
   const kickoffWindow = parseKickoff(searchParams.get('kickoff'));
@@ -94,6 +95,10 @@ export default function Recommendations() {
   const confidenceFilter = parseConfidence(searchParams.get('confidence'));
   const typeFilter = parseType(searchParams.get('type'));
   const hideEmptySections = searchParams.get('empty') !== '0';
+  const horizon = parseHorizon(searchParams.get('days'));
+  // Kickoff chips own the time window; horizon only applies to "All kickoffs".
+  const daysAhead =
+    kickoffWindow === 'all' ? horizon : daysForKickoff(kickoffWindow);
 
   const updateParams = useCallback(
     (patch: Record<string, string | null | undefined>) => {
@@ -102,7 +107,7 @@ export default function Recommendations() {
           const next = new URLSearchParams(prev);
           for (const [key, value] of Object.entries(patch)) {
             const isDefault =
-              (key === 'days' && (value == null || value === '7'))
+              (key === 'days' && (value == null || value === String(DEFAULT_HORIZON)))
               || (key === 'q' && (value == null || value === ''))
               || (key === 'league' && (value == null || value === 'all'))
               || (key === 'kickoff' && (value == null || value === 'all'))
@@ -310,6 +315,7 @@ export default function Recommendations() {
       q: null,
       league: null,
       kickoff: null,
+      days: null,
       sort: null,
       confidence: null,
       type: null,
@@ -320,6 +326,7 @@ export default function Recommendations() {
     Boolean(searchQuery)
     || selectedLeague !== 'all'
     || kickoffWindow !== 'all'
+    || (kickoffWindow === 'all' && horizon !== DEFAULT_HORIZON)
     || confidenceFilter !== 'tipped'
     || typeFilter !== 'ALL';
 
@@ -328,26 +335,21 @@ export default function Recommendations() {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const setKickoffWindow = (value: KickoffWindow) => {
+    const patch: Record<string, string | null> = { kickoff: value };
+    // Keep `days` so returning to "All kickoffs" restores the chosen horizon.
+    if (value !== 'all' && sortBy === 'score') {
+      patch.sort = 'kickoff';
+    }
+    updateParams(patch);
+  };
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Recommendations</h1>
           <p className={styles.subtitle}>Kickoffs in Europe/London · Weak hidden by default</p>
-        </div>
-        <div className={styles.headerRight}>
-          <select
-            value={daysAhead}
-            onChange={(e) => updateParams({ days: e.target.value })}
-            className={styles.select}
-            aria-label="Days ahead"
-          >
-            {DAYS_OPTIONS.map((days) => (
-              <option key={days} value={days}>
-                {daysLabel(days)}
-              </option>
-            ))}
-          </select>
         </div>
       </header>
 
@@ -391,23 +393,23 @@ export default function Recommendations() {
         <div className={styles.kickoffGroup} role="group" aria-label="Kickoff window">
           {(
             [
-              { value: 'all', label: 'All kickoffs' },
               {
-                value: 'soon',
+                value: 'soon' as const,
                 label: kickoffCounts.soon > 0 ? `Soon (${kickoffCounts.soon})` : 'Soon',
               },
               {
-                value: 'today',
+                value: 'today' as const,
                 label: kickoffCounts.today > 0 ? `Today (${kickoffCounts.today})` : 'Today',
               },
               {
-                value: 'tomorrow',
+                value: 'tomorrow' as const,
                 label:
                   kickoffCounts.tomorrow > 0
                     ? `Tomorrow (${kickoffCounts.tomorrow})`
                     : 'Tomorrow',
               },
-            ] as const
+              { value: 'all' as const, label: 'All kickoffs' },
+            ]
           ).map((option) => (
             <button
               key={option.value}
@@ -415,18 +417,30 @@ export default function Recommendations() {
               className={`${styles.kickoffChip} ${
                 kickoffWindow === option.value ? styles.kickoffChipActive : ''
               }`}
-              onClick={() => {
-                const patch: Record<string, string | null> = { kickoff: option.value };
-                if (option.value !== 'all' && sortBy === 'score') {
-                  patch.sort = 'kickoff';
-                }
-                updateParams(patch);
-              }}
+              onClick={() => setKickoffWindow(option.value)}
             >
               {option.label}
             </button>
           ))}
         </div>
+
+        {kickoffWindow === 'all' && (
+          <div className={styles.horizonGroup} role="group" aria-label="Look-ahead horizon">
+            <span className={styles.horizonLabel}>Horizon</span>
+            {HORIZON_OPTIONS.map((days) => (
+              <button
+                key={days}
+                type="button"
+                className={`${styles.kickoffChip} ${
+                  horizon === days ? styles.kickoffChipActive : ''
+                }`}
+                onClick={() => updateParams({ days: String(days) })}
+              >
+                {days}d
+              </button>
+            ))}
+          </div>
+        )}
 
         <select
           value={sortBy}
