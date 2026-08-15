@@ -8,7 +8,7 @@
   align-items: center;
   margin-bottom: 1.25rem;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--font-size-md);
   transition: color 0.2s ease;
 }
 
@@ -57,7 +57,7 @@
   flex-wrap: wrap;
   gap: 0.5rem 1.25rem;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
 }
 
 .kickoff {
@@ -84,13 +84,13 @@
 
 .sectionTitle {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: var(--font-size-section);
   color: var(--text-primary);
 }
 
 .pickCount {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--font-size-md);
 }
 
 .sections {
@@ -110,13 +110,13 @@
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--font-size-section);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .typeIcon {
-  font-size: 1.1rem;
+  font-size: var(--font-size-section);
 }
 
 .typeTitle {
@@ -124,7 +124,7 @@
 }
 
 .typeCount {
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--text-muted);
 }
