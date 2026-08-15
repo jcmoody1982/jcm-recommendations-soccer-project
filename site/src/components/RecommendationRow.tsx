@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Recommendation } from '../types';
 import { useShortlist } from '../contexts/ShortlistContext';
-import { formatKickoffDisplay } from '../utils/kickoff';
+import {
+  EARLY_KICKOFF_WARNING,
+  formatKickoffDisplay,
+  isEarlyKickoffUk,
+} from '../utils/kickoff';
 import { formatFactorEntries } from '../utils/recommendationFactors';
 import { SECTION_CONFIG } from '../utils/recommendationSections';
 import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
@@ -41,6 +45,45 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
     </svg>
   );
 };
+
+const EarlyWarningIcon = ({ size = 12 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 20 20"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden
+  >
+    <path
+      d="M10 2.5L18 17H2L10 2.5Z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinejoin="round"
+    />
+    <path d="M10 8V12" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+    <circle cx="10" cy="14.5" r="1" fill="white" />
+  </svg>
+);
+
+function EarlyKickoffBadge() {
+  return (
+    <span className={styles.earlyBadge} title={EARLY_KICKOFF_WARNING}>
+      <EarlyWarningIcon size={10} />
+      EARLY KO
+    </span>
+  );
+}
+
+function EarlyKickoffStrip() {
+  return (
+    <div className={styles.earlyStrip} role="status">
+      <EarlyWarningIcon size={13} />
+      <span>{EARLY_KICKOFF_WARNING}</span>
+    </div>
+  );
+}
 
 function rowClassName(showPrice: boolean, showPositionGap: boolean): string {
   if (showPrice && showPositionGap) return styles.rowPriceGap;
@@ -82,6 +125,10 @@ export function RecommendationRow({
 
   const fixturePath = `/fixtures/${recommendation.fixtureId}`;
   const kickoff = formatKickoffDisplay(recommendation.matchDateUnix);
+  const isEarlyKickoff = isEarlyKickoffUk(recommendation.matchDateUnix);
+  const kickoffTitle = isEarlyKickoff
+    ? `${kickoff.title} · ${EARLY_KICKOFF_WARNING}`
+    : kickoff.title;
 
   const config = SECTION_CONFIG[recommendation.type];
   const score = Number(recommendation.score || 0).toFixed(0);
@@ -116,7 +163,7 @@ export function RecommendationRow({
   );
 
   return (
-    <div className={styles.item}>
+    <div className={`${styles.item} ${isEarlyKickoff ? styles.itemEarly : ''}`}>
       {/* Desktop row layout */}
       <div className={rowClass}>
         <span className={styles.sentiment} title={recommendation.confidence}>
@@ -139,11 +186,16 @@ export function RecommendationRow({
           )}
         </span>
         <span
-          className={`${styles.datetime} ${styles[`urgency_${kickoff.urgency}`] || ''}`}
-          title={kickoff.title}
+          className={`${styles.datetime} ${styles[`urgency_${kickoff.urgency}`] || ''} ${
+            isEarlyKickoff ? styles.datetimeEarly : ''
+          }`}
+          title={kickoffTitle}
         >
           <span className={styles.date}>{kickoff.primaryLabel}</span>
-          <span className={styles.time}>{kickoff.timeLabel}</span>
+          <span className={styles.timeRow}>
+            <span className={styles.time}>{kickoff.timeLabel}</span>
+            {isEarlyKickoff && <EarlyKickoffBadge />}
+          </span>
         </span>
         <div className={styles.fixtureBlock}>
           {linkToFixture ? (
@@ -232,14 +284,20 @@ export function RecommendationRow({
             {isInShortlist ? '★' : '☆'}
           </button>
         </div>
+        {isEarlyKickoff && <EarlyKickoffStrip />}
         <div className={styles.mobileCardBody}>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>When</span>
             <span
-              className={`${styles.mobileValue} ${styles[`urgency_${kickoff.urgency}`] || ''}`}
-              title={kickoff.title}
+              className={`${styles.mobileValue} ${styles[`urgency_${kickoff.urgency}`] || ''} ${
+                isEarlyKickoff ? styles.mobileValueEarly : ''
+              }`}
+              title={kickoffTitle}
             >
-              {kickoff.primaryLabel} {kickoff.timeLabel}
+              <span>
+                {kickoff.primaryLabel} {kickoff.timeLabel}
+              </span>
+              {isEarlyKickoff && <EarlyKickoffBadge />}
             </span>
           </div>
           <div className={styles.mobileInfo}>
@@ -277,6 +335,12 @@ export function RecommendationRow({
           </button>
         )}
       </div>
+
+      {isEarlyKickoff && (
+        <div className={styles.earlyStripDesktop}>
+          <EarlyKickoffStrip />
+        </div>
+      )}
 
       {details}
     </div>
