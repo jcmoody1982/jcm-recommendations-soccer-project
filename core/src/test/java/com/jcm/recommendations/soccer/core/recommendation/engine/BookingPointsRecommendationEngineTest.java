@@ -26,77 +26,121 @@ class BookingPointsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze returns recommendation for high cards context")
-    void analyze_withHighCardsTeams_returnsRecommendation() {
+    @DisplayName("analyze returns Over recommendation for high cards with edge")
+    void analyze_withHighCardsTeams_returnsOverRecommendation() {
         FixtureContext context = createVeryHighCardsContext();
-        
+
         Optional<Recommendation> result = engine.analyze(context);
-        
+
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.BOOKING_POINTS);
         assertThat(result.get().getMarket()).contains("Over");
+        assertThat(result.get().getFactors().get("cardsPotentialIsCardCount")).isEqualTo(true);
+        assertThat((Double) result.get().getFactors().get("marketEdge")).isGreaterThanOrEqualTo(8.0);
     }
 
     @Test
-    @DisplayName("analyze returns under recommendation for low cards context")
+    @DisplayName("analyze returns Under recommendation for low cards with edge")
     void analyze_withLowCardsTeams_returnsUnderRecommendation() {
         FixtureContext context = createLowCardsContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
-        if (result.isPresent()) {
-            assertThat(result.get().getMarket()).contains("Under");
-        }
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).contains("Under");
+    }
+
+    @Test
+    @DisplayName("analyze returns empty when expected points lack edge vs line")
+    void analyze_midRange_returnsEmpty() {
+        FixtureContext context = createMidRangeCardsContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("analyze treats cards_potential as card count × 10")
+    void analyze_convertsCardsPotentialAsCardCount() {
+        FixtureContext context = createVeryHighCardsContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("apiCardsPotential")).isEqualTo(6.5);
+        assertThat(result.get().getFactors().get("apiCardsPotentialAsPoints")).isEqualTo(65.0);
+    }
+
+    @Test
+    @DisplayName("analyze omits missing cards_potential and renormalizes")
+    void analyze_missingApiPotential_renormalizes() {
+        FixtureContext context = createVeryHighCardsContextWithoutApi();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors()).doesNotContainKey("apiCardsPotential");
+        assertThat(result.get().getFactors().get("missingDataRenormalized")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("analyze without referee never returns STRONG")
+    void analyze_withoutReferee_capsAtModerate() {
+        FixtureContext context = createVeryHighCardsContextWithoutReferee();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(result.get().getFactors().get("refereeDataAvailable")).isEqualTo(false);
+        assertThat(result.get().getFactors().get("refereeRequiredForStrong")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("analyze with referee and large edge can be STRONG")
+    void analyze_withRefereeAndLargeEdge_canBeStrong() {
+        FixtureContext context = createExtremeHighCardsContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(result.get().getFactors().get("refereeDataAvailable")).isEqualTo(true);
+        assertThat((Double) result.get().getFactors().get("refereeReliability")).isEqualTo(1.0);
     }
 
     @Test
     @DisplayName("analyze tracks formDataAvailable correctly")
     void analyze_tracksFormDataAvailable() {
-        FixtureContext contextWithForm = createHighCardsContextWithForm();
-        FixtureContext contextWithoutForm = createHighCardsContext();
+        FixtureContext contextWithForm = createVeryHighCardsContextWithForm();
+        FixtureContext contextWithoutForm = createVeryHighCardsContext();
 
         Optional<Recommendation> resultWithForm = engine.analyze(contextWithForm);
         Optional<Recommendation> resultWithoutForm = engine.analyze(contextWithoutForm);
 
-        if (resultWithForm.isPresent()) {
-            assertThat(resultWithForm.get().getFactors().get("formDataAvailable")).isEqualTo(true);
-        }
-        if (resultWithoutForm.isPresent()) {
-            assertThat(resultWithoutForm.get().getFactors().get("formDataAvailable")).isEqualTo(false);
-        }
+        assertThat(resultWithForm).isPresent();
+        assertThat(resultWithoutForm).isPresent();
+        assertThat(resultWithForm.get().getFactors().get("formDataAvailable")).isEqualTo(true);
+        assertThat(resultWithoutForm.get().getFactors().get("formDataAvailable")).isEqualTo(false);
     }
 
     @Test
-    @DisplayName("analyze tracks refereeDataAvailable correctly")
-    void analyze_tracksRefereeDataAvailable() {
-        FixtureContext contextWithRef = createHighCardsContext();
-        FixtureContext contextWithoutRef = createContextWithoutReferee();
-
-        Optional<Recommendation> resultWithRef = engine.analyze(contextWithRef);
-        Optional<Recommendation> resultWithoutRef = engine.analyze(contextWithoutRef);
-
-        if (resultWithRef.isPresent()) {
-            assertThat(resultWithRef.get().getFactors().get("refereeDataAvailable")).isEqualTo(true);
-        }
-        if (resultWithoutRef.isPresent()) {
-            assertThat(resultWithoutRef.get().getFactors().get("refereeDataAvailable")).isEqualTo(false);
-        }
-    }
-
-    @Test
-    @DisplayName("analyze with high cards teams applies high-cards boost")
-    void analyze_withHighCardsTeams_appliesHighCardsBoost() {
+    @DisplayName("analyze applies graded high-cards boost capped with strictness")
+    void analyze_withHighCardsTeams_appliesGradedBoost() {
         FixtureContext context = createVeryHighCardsContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("highCardsBoostApplied")).isEqualTo(true);
-        assertThat(result.get().getFactors().get("highCardsBoostAmount")).isEqualTo(5.0);
+        Double boost = (Double) result.get().getFactors().get("highCardsBoostAmount");
+        assertThat(boost).isGreaterThan(0.0).isLessThanOrEqualTo(3.0);
+        assertThat(result.get().getFactors()).containsKey("maxCombinedBoost");
     }
 
     @Test
-    @DisplayName("analyze with strict referee applies strictness boost")
+    @DisplayName("analyze with strict referee applies graded strictness boost")
     void analyze_withStrictReferee_appliesStrictnessBoost() {
         FixtureContext context = createContextWithStrictReferee();
 
@@ -104,33 +148,21 @@ class BookingPointsRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("refereeStrictnessBoostApplied")).isEqualTo(true);
-        assertThat(result.get().getFactors().get("refereeStrictnessBoostAmount")).isEqualTo(5.0);
+        Double boost = (Double) result.get().getFactors().get("refereeStrictnessBoostAmount");
+        assertThat(boost).isGreaterThan(0.0).isLessThanOrEqualTo(3.0);
     }
 
     @Test
-    @DisplayName("analyze tracks referee over 3.5 cards percentage")
-    void analyze_tracksRefereeOver35CardsPct() {
-        FixtureContext context = createHighCardsContext();
+    @DisplayName("analyze uses additive intensity points not multiplier")
+    void analyze_tracksMatchIntensityPoints() {
+        FixtureContext context = createClosePositionsHighCardsContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getFactors()).containsKey("refereeOver35CardsPct");
-    }
-
-    @Test
-    @DisplayName("analyze tracks match intensity based on positions")
-    void analyze_tracksMatchIntensity() {
-        FixtureContext context = createClosePositionsContext();
-
-        Optional<Recommendation> result = engine.analyze(context);
-
-        if (result.isPresent()) {
-            assertThat(result.get().getFactors()).containsKey("matchIntensityFactor");
-            assertThat(result.get().getFactors()).containsKey("positionDifference");
-            Double intensity = (Double) result.get().getFactors().get("matchIntensityFactor");
-            assertThat(intensity).isGreaterThan(1.0);
-        }
+        assertThat(result.get().getFactors().get("matchIntensityPoints")).isEqualTo(4.0);
+        assertThat(result.get().getFactors().get("positionDifference")).isEqualTo(2);
+        assertThat(result.get().getFactors()).doesNotContainKey("matchIntensityFactor");
     }
 
     @Test
@@ -150,7 +182,7 @@ class BookingPointsRecommendationEngineTest {
     @Test
     @DisplayName("analyze includes expected booking points in factors")
     void analyze_includesExpectedBookingPoints() {
-        FixtureContext context = createHighCardsContext();
+        FixtureContext context = createVeryHighCardsContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
@@ -158,337 +190,111 @@ class BookingPointsRecommendationEngineTest {
         assertThat(result.get().getFactors()).containsKey("expectedBookingPoints");
         assertThat(result.get().getFactors()).containsKey("homeCardsSeasonAvg");
         assertThat(result.get().getFactors()).containsKey("awayCardsSeasonAvg");
+        assertThat(result.get().getFactors()).containsKey("marketLine");
     }
 
-    private FixtureContext createHighCardsContext() {
-        int matches = 10;
-
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.5)
-                .cardsAvgAway(2.0)
-                .position(5)
+    private FixtureContext createVeryHighCardsContext() {
+        return highCardsBuilder(3.2, 3.4, 5.5, 6.5, 3, 4, 70.0, 20)
                 .build();
+    }
 
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.2)
-                .cardsAvgAway(2.8)
-                .position(8)
+    private FixtureContext createVeryHighCardsContextWithoutApi() {
+        // Slightly higher season/ref cards so edge still clears without API signal
+        return highCardsBuilder(3.5, 3.6, 5.8, null, 3, 4, 72.0, 20)
                 .build();
+    }
 
-        RefereeStats refereeStats = RefereeStats.builder()
-                .refereeId(100L)
-                .seasonId(100L)
-                .appearancesOverall(15)
-                .cardsPerMatchOverall(4.5)
-                .yellowCardsOverall(60)
-                .redCardsOverall(3)
-                .over35CardsPercentageOverall(55.0)
-                .build();
-
-        FixturePotentials potentials = FixturePotentials.builder()
-                .fixtureId(1000L)
-                .cardsPotential(65.0)
-                .build();
-
+    private FixtureContext createVeryHighCardsContextWithoutReferee() {
         return FixtureContext.builder()
                 .fixture(createFixture())
                 .homeTeam(createTeam(1L, "Home Team"))
                 .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .refereeStats(refereeStats)
-                .potentials(potentials)
+                .homeTeamStats(teamStats(1L, 3.5, 3, 4))
+                .awayTeamStats(teamStats(2L, 3.6, 4, 5))
+                .potentials(potentials(7.0))
                 .build();
     }
 
-    private FixtureContext createHighCardsContextWithForm() {
-        int matches = 10;
-
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.5)
-                .cardsAvgAway(2.0)
-                .position(5)
+    private FixtureContext createExtremeHighCardsContext() {
+        return highCardsBuilder(3.8, 4.0, 6.0, 7.0, 2, 3, 80.0, 25)
                 .build();
+    }
 
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.2)
-                .cardsAvgAway(2.8)
-                .position(8)
-                .build();
-
-        TeamRecentForm homeForm = TeamRecentForm.builder()
-                .teamId(1L)
-                .cardsAvgHome(3.0)
-                .cardsAvgAway(2.2)
-                .build();
-
-        TeamRecentForm awayForm = TeamRecentForm.builder()
-                .teamId(2L)
-                .cardsAvgHome(2.4)
-                .cardsAvgAway(3.2)
-                .build();
-
-        RefereeStats refereeStats = RefereeStats.builder()
-                .refereeId(100L)
-                .seasonId(100L)
-                .appearancesOverall(15)
-                .cardsPerMatchOverall(4.5)
-                .yellowCardsOverall(60)
-                .redCardsOverall(3)
-                .over35CardsPercentageOverall(55.0)
-                .build();
-
-        FixturePotentials potentials = FixturePotentials.builder()
-                .fixtureId(1000L)
-                .cardsPotential(65.0)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture())
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .homeTeamForm(homeForm)
-                .awayTeamForm(awayForm)
-                .refereeStats(refereeStats)
-                .potentials(potentials)
+    private FixtureContext createVeryHighCardsContextWithForm() {
+        return highCardsBuilder(3.2, 3.4, 5.5, 6.5, 3, 4, 70.0, 20)
+                .homeTeamForm(TeamRecentForm.builder().teamId(1L).cardsAvgHome(3.5).build())
+                .awayTeamForm(TeamRecentForm.builder().teamId(2L).cardsAvgAway(3.6).build())
                 .build();
     }
 
     private FixtureContext createLowCardsContext() {
-        int matches = 10;
-
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(1.0)
-                .cardsAvgAway(0.8)
-                .position(10)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(0.9)
-                .cardsAvgAway(1.2)
-                .position(15)
-                .build();
-
-        RefereeStats refereeStats = RefereeStats.builder()
-                .refereeId(100L)
-                .seasonId(100L)
-                .appearancesOverall(12)
-                .cardsPerMatchOverall(2.5)
-                .yellowCardsOverall(28)
-                .redCardsOverall(1)
-                .over35CardsPercentageOverall(25.0)
-                .build();
-
-        FixturePotentials potentials = FixturePotentials.builder()
-                .fixtureId(1000L)
-                .cardsPotential(35.0)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture())
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .refereeStats(refereeStats)
-                .potentials(potentials)
+        return highCardsBuilder(0.9, 1.0, 2.0, 2.0, 10, 18, 25.0, 12)
                 .build();
     }
 
-    private FixtureContext createVeryHighCardsContext() {
-        int matches = 10;
-
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.5)  // >= 2.0 threshold
-                .cardsAvgAway(2.2)
-                .position(3)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.3)
-                .cardsAvgAway(2.8)  // >= 2.0 threshold
-                .position(4)
-                .build();
-
-        RefereeStats refereeStats = RefereeStats.builder()
-                .refereeId(100L)
-                .seasonId(100L)
-                .appearancesOverall(20)
-                .cardsPerMatchOverall(5.0)
-                .yellowCardsOverall(90)
-                .redCardsOverall(5)
-                .over35CardsPercentageOverall(70.0)
-                .build();
-
-        FixturePotentials potentials = FixturePotentials.builder()
-                .fixtureId(1000L)
-                .cardsPotential(75.0)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture())
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .refereeStats(refereeStats)
-                .potentials(potentials)
+    private FixtureContext createMidRangeCardsContext() {
+        // Target ~36 expected — no ±8 edge vs 30/40/50 lines
+        return highCardsBuilder(2.5, 2.5, 4.5, 4.5, 10, 18, 50.0, 15)
                 .build();
     }
 
     private FixtureContext createContextWithStrictReferee() {
-        int matches = 10;
-
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.0)
-                .cardsAvgAway(1.8)
-                .position(6)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(1.9)
-                .cardsAvgAway(2.2)
-                .position(9)
-                .build();
-
-        RefereeStats refereeStats = RefereeStats.builder()
-                .refereeId(100L)
-                .seasonId(100L)
-                .appearancesOverall(18)
-                .cardsPerMatchOverall(5.5)
-                .yellowCardsOverall(95)
-                .redCardsOverall(4)
-                .over35CardsPercentageOverall(65.0)  // >= 60% threshold
-                .build();
-
-        FixturePotentials potentials = FixturePotentials.builder()
-                .fixtureId(1000L)
-                .cardsPotential(70.0)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture())
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .refereeStats(refereeStats)
-                .potentials(potentials)
+        return highCardsBuilder(3.0, 3.1, 5.5, 6.0, 5, 8, 75.0, 18)
                 .build();
     }
 
-    private FixtureContext createContextWithoutReferee() {
-        int matches = 10;
-
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.0)
-                .cardsAvgAway(1.8)
-                .position(6)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(1.9)
-                .cardsAvgAway(2.2)
-                .position(9)
-                .build();
-
-        FixturePotentials potentials = FixturePotentials.builder()
-                .fixtureId(1000L)
-                .cardsPotential(55.0)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture())
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .potentials(potentials)
+    private FixtureContext createClosePositionsHighCardsContext() {
+        return highCardsBuilder(3.2, 3.3, 5.2, 6.2, 5, 7, 55.0, 15)
                 .build();
     }
 
-    private FixtureContext createClosePositionsContext() {
-        int matches = 10;
-
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(2.0)
-                .cardsAvgAway(1.8)
-                .position(5)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(100L)
-                .matchesPlayed(matches)
-                .cardsAvgHome(1.9)
-                .cardsAvgAway(2.2)
-                .position(7)  // Position diff = 2, triggers 1.2x intensity
-                .build();
-
-        RefereeStats refereeStats = RefereeStats.builder()
-                .refereeId(100L)
-                .seasonId(100L)
-                .appearancesOverall(15)
-                .cardsPerMatchOverall(4.0)
-                .yellowCardsOverall(55)
-                .redCardsOverall(2)
-                .over35CardsPercentageOverall(50.0)
-                .build();
-
-        FixturePotentials potentials = FixturePotentials.builder()
-                .fixtureId(1000L)
-                .cardsPotential(60.0)
-                .build();
-
-        return FixtureContext.builder()
+    private FixtureContext.FixtureContextBuilder highCardsBuilder(
+            double homeCardsHome,
+            double awayCardsAway,
+            double refCardsPerMatch,
+            Double apiCardsCount,
+            int homePos,
+            int awayPos,
+            double o35Pct,
+            int appearances) {
+        var builder = FixtureContext.builder()
                 .fixture(createFixture())
                 .homeTeam(createTeam(1L, "Home Team"))
                 .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .refereeStats(refereeStats)
-                .potentials(potentials)
+                .homeTeamStats(teamStats(1L, homeCardsHome, homePos, awayPos))
+                .awayTeamStats(teamStats(2L, awayCardsAway, awayPos, homePos))
+                .refereeStats(RefereeStats.builder()
+                        .refereeId(100L)
+                        .seasonId(100L)
+                        .appearancesOverall(appearances)
+                        .cardsPerMatchOverall(refCardsPerMatch)
+                        .yellowCardsOverall((int) (refCardsPerMatch * appearances * 0.9))
+                        .redCardsOverall(Math.max(1, appearances / 5))
+                        .over35CardsPercentageOverall(o35Pct)
+                        .build());
+        if (apiCardsCount != null) {
+            builder.potentials(potentials(apiCardsCount));
+        }
+        return builder;
+    }
+
+    private TeamSeasonStats teamStats(long teamId, double venueCards, int position, int otherPos) {
+        // home team uses cardsAvgHome; away uses cardsAvgAway — set both sensibly
+        boolean homeSide = teamId == 1L;
+        return TeamSeasonStats.builder()
+                .teamId(teamId)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .cardsAvgHome(homeSide ? venueCards : venueCards - 0.2)
+                .cardsAvgAway(homeSide ? venueCards - 0.2 : venueCards)
+                .position(position)
+                .build();
+    }
+
+    private FixturePotentials potentials(double cardsCount) {
+        return FixturePotentials.builder()
+                .fixtureId(1000L)
+                .cardsPotential(cardsCount)
                 .build();
     }
 

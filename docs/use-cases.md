@@ -531,87 +531,85 @@ If xG data available:
 **User Story:** As a user, I want to see expected booking points for matches so I can bet on cards markets.
 
 **Data Required:**
-- Team cards averages (season + form)
-- Referee cards per match stats
+- Team cards averages (season + form) — card counts, converted ×10 to points
+- Referee cards per match stats (reliability-weighted by appearances)
 - Referee over 3.5 cards percentage
-- Referee yellow/red card breakdown
-- API cards potential
+- Referee yellow/red card breakdown (red-card risk)
+- API `cards_potential` as **expected card count** (not 0–100)
+
+**Implementation:** `BookingPointsRecommendationEngine.java`
 
 **Logic:**
 
-*Base Weights (when referee AND form data available):*
+*Base model (preferred weights; renormalized when signals missing):*
 ```
-Expected Booking Points = weighted sum of:
-  - Home team cards avg (season, home) × 10       × 0.12
-  - Away team cards avg (season, away) × 10      × 0.12
-  - Home team cards avg (form, home) × 10        × 0.10
-  - Away team cards avg (form, away) × 10        × 0.10
-  - Referee cards per match avg × 10             × 0.20
-  - Referee over 3.5 cards % (scaled)            × 0.08
-  - Red card risk                                × 0.06
-  - API cards potential (scaled)                 × 0.10
-  × Match intensity multiplier                   × 0.12 weight
-```
-
-*Redistributed Weights (when no referee data):*
-```
-  - Home team cards avg (season) × 10            × 0.20
-  - Away team cards avg (season) × 10            × 0.20
-  - Home team cards avg (form) × 10              × 0.15
-  - Away team cards avg (form) × 10              × 0.15
-  - API cards potential (scaled)                 × 0.18
-  × Match intensity multiplier
+Expected Booking Points = weighted average of available signals (all in points):
+  - Home cards avg (season, home) × 10            × 0.14
+  - Away cards avg (season, away) × 10            × 0.14
+  - Home cards avg (form, home) × 10              × 0.10
+  - Away cards avg (form, away) × 10              × 0.10
+  - Referee cards/match × 10 × reliability        × 0.20
+  - Referee O3.5% → soft points × reliability     × 0.08
+  - Red card risk (ref rate × 25) × reliability   × 0.06
+  - API cards_potential × 10                      × 0.18
++ Match intensity points (additive, not multiplier)
++ Graded boosts (capped)
 ```
 
-*Redistributed Weights (when no form data):*
+**P0 — `cards_potential` scale:**
 ```
-  - Home team cards avg (season) × 10            × 0.18
-  - Away team cards avg (season) × 10            × 0.18
-  - Referee cards + O3.5% + red card risk        (normal weights)
-  - API cards potential (scaled)                 × 0.14
-  × Match intensity multiplier
+FootyStats cards_potential = expected card COUNT for the match (~3–7).
+Convert to points: count × 10.
+Never default missing potential to 40 — omit signal and renormalize.
 ```
 
-**High-Cards Matchup Boost:**
+**P0 — Selectivity (edge vs line):**
 ```
-When both teams average ≥ 2.0 cards per game, add +5 points.
-```
-
-**Referee Strictness Boost:**
-```
-When referee's Over 3.5 cards percentage ≥ 60%, add +5 points.
-```
-
-**Match Intensity Multiplier:**
-```
-Position difference ≤ 3: × 1.2 (close rivals)
-Position difference 4-6: × 1.1 (competitive)
-Position difference > 6: × 1.0 (normal)
+Only tip when |expected − line| ≥ 8:
+  - Over 50 if expected ≥ 58
+  - Over 40 if expected ≥ 48
+  - Under 30 if expected ≤ 22
+  - Under 40 if expected ≤ 32
+Pick the qualifying market with the largest edge.
+Mid-range fixtures (no edge) → no recommendation.
 ```
 
-**Thresholds (for Over/Under booking points markets):**
-- **Strong Over:** Expected ≥ 50 points → "Over 50 Booking Points"
-- **Moderate Over:** Expected 40-49 points → "Over 40 Booking Points"
-- **Moderate Under:** Expected 30-39 points → "Under 40 Booking Points"
-- **Strong Under:** Expected < 30 points → "Under 30 Booking Points"
+**P1 — Units + boosts + intensity:**
+```
+Score is expected booking points (card-count ×10 + red risk).
+High-cards boost: graded, max +3 (both teams ≥ ~2.0 cards/game).
+Referee strictness boost: graded, max +3 (O3.5% ≥ ~60%).
+Combined boost cap: +5.
+Match intensity: +4 pts if position gap ≤ 3; +2 if gap 4–6; else 0.
+```
 
-**Output:**
-- Ranked list by expected booking points
-- Include: team card stats, referee stats, intensity flag, confidence level
-- Factors tracked:
-  - `formDataAvailable` / `refereeDataAvailable` - data availability
-  - `homeCardsSeasonAvg` / `awayCardsSeasonAvg` - season cards averages
-  - `homeCardsFormAvg` / `awayCardsFormAvg` - form cards averages
-  - `refereeCardsAvg` - referee's cards per match
-  - `refereeOver35CardsPct` - referee's over 3.5 cards percentage
-  - `refereeYellowCards` / `refereeRedCards` - referee card breakdown
-  - `refereeAppearances` / `refereeReliability` - referee data quality
-  - `apiCardsPotential` - FootyStats cards potential
-  - `matchIntensityFactor` - intensity multiplier
-  - `homePosition` / `awayPosition` / `positionDifference` - league standings
-  - `highCardsBoostApplied` / `highCardsBoostAmount` - high-cards boost
-  - `refereeStrictnessBoostApplied` / `refereeStrictnessBoostAmount` - strictness boost
-  - `redCardRisk` - calculated red card risk
+**P1 — Push on exact line (settlement):**
+```
+When actual booking points == market line → VOID (push), not LOSS.
+```
+
+**P2 — Referee:**
+```
+Referee reliability by appearances: ≥10 → 1.0, ≥5 → 0.8, else 0.5.
+Reliability scales referee signal weights.
+Without referee data: confidence capped at MODERATE (never STRONG).
+STRONG requires edge ≥ 12 AND referee present.
+MODERATE requires edge ≥ 8.
+```
+
+**Thresholds:**
+- **Strong:** edge ≥ 12 and referee present
+- **Moderate:** edge ≥ 8 (including no-referee tips)
+- **No tip:** edge < 8 vs all lines
+
+**Output / factors:**
+- `expectedBookingPoints`, `basePoints`, `marketLine`, `marketEdge`, `minEdgeRequired`
+- `cardsPotentialIsCardCount`, `apiCardsPotential`, `apiCardsPotentialAsPoints`
+- `missingDataRenormalized`, `signalsUsed`
+- `refereeDataAvailable`, `refereeReliability`, `refereeRequiredForStrong`
+- `matchIntensityPoints` (not a multiplier)
+- `highCardsBoostApplied` / amount, `refereeStrictnessBoostApplied` / amount
+- `appliedBoost`, `boostCapped`, `maxCombinedBoost`
 
 **Status:** `Implemented`
 

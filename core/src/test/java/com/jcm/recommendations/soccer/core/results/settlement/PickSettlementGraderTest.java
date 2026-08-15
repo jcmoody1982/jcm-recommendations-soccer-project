@@ -125,6 +125,20 @@ class PickSettlementGraderTest {
     }
 
     @Test
+    void bookingPointsExactLineIsPushVoid() {
+        CompletedMatch match = complete(1, 0);
+        match.setHomeYellowCards(2);
+        match.setAwayYellowCards(2);
+        match.setHomeRedCards(0);
+        match.setAwayRedCards(0);
+        // 40 points exact → void (push) for Over/Under 40
+        assertThat(grader.grade(snapshot("BOOKING_POINTS", "Over 40 Booking Points"), match).outcome())
+                .isEqualTo(PickOutcome.VOID);
+        assertThat(grader.grade(snapshot("BOOKING_POINTS", "Under 40 Booking Points"), match).outcome())
+                .isEqualTo(PickOutcome.VOID);
+    }
+
+    @Test
     void bookingPointsPendingWithoutCards() {
         assertThat(grader.grade(snapshot("BOOKING_POINTS", "Over 40 Booking Points"), complete(1, 0)).outcome())
                 .isEqualTo(PickOutcome.PENDING);

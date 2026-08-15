@@ -8,53 +8,61 @@ import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
+/**
+ * UC-008: Booking Points recommendations (Yellow=10, Red=25).
+ *
+ * P0–P2 (no form-sample dampening):
+ * - {@code cards_potential} is expected <em>card count</em> → convert ×10; omit if missing
+ * - Require edge vs line before tipping; mid-range fixtures return empty
+ * - Model units are expected booking points (card-count ×10 + red risk)
+ * - Prefer lines with buffer via min edge; settlement voids exact line (push)
+ * - Soften boosts + additive intensity (not ×1.2 multiplier)
+ * - Without referee: never STRONG; apply referee reliability to ref signals
+ */
 @Component
 @Slf4j
 public class BookingPointsRecommendationEngine implements RecommendationEngine {
 
-private static final int YELLOW_CARD_POINTS = 10;
+    private static final int YELLOW_CARD_POINTS = 10;
     private static final int RED_CARD_POINTS = 25;
 
-    // Base weights when referee data IS available (total for weighted calculation)
-    private static final double WEIGHT_HOME_CARDS_SEASON = 0.10;
-    private static final double WEIGHT_AWAY_CARDS_SEASON = 0.10;
-    private static final double WEIGHT_HOME_CARDS_FORM = 0.08;
-    private static final double WEIGHT_AWAY_CARDS_FORM = 0.08;
-    private static final double WEIGHT_REFEREE_CARDS = 0.18;
+    // Preferred weights (renormalized when signals missing)
+    private static final double WEIGHT_HOME_CARDS_SEASON = 0.14;
+    private static final double WEIGHT_AWAY_CARDS_SEASON = 0.14;
+    private static final double WEIGHT_HOME_CARDS_FORM = 0.10;
+    private static final double WEIGHT_AWAY_CARDS_FORM = 0.10;
+    private static final double WEIGHT_REFEREE_CARDS = 0.20;
     private static final double WEIGHT_REFEREE_O35_CARDS = 0.08;
     private static final double WEIGHT_RED_CARD_RISK = 0.06;
-    private static final double WEIGHT_API_POTENTIAL = 0.15;
-    private static final double WEIGHT_MATCH_INTENSITY = 0.10;
-    private static final double WEIGHT_REFEREE_RELIABILITY = 0.07;
+    private static final double WEIGHT_API_POTENTIAL = 0.18;
 
-    // Redistributed weights when referee data is NOT available
-    private static final double WEIGHT_CARDS_SEASON_NO_REF = 0.18;
-    private static final double WEIGHT_CARDS_FORM_NO_REF = 0.12;
-    private static final double WEIGHT_API_POTENTIAL_NO_REF = 0.20;
-    private static final double WEIGHT_MATCH_INTENSITY_NO_REF = 0.12;
-
-    // Redistributed weights when form data is NOT available (but referee is)
-    private static final double WEIGHT_CARDS_SEASON_NO_FORM = 0.16;
-    private static final double WEIGHT_API_POTENTIAL_NO_FORM = 0.18;
-
-    // High-cards matchup boost
+    // Graded boosts (capped in combination)
     private static final double HIGH_CARDS_TEAM_THRESHOLD = 2.0;
-    private static final double HIGH_CARDS_BOOST_POINTS = 5.0;
-
-    // Referee strictness boost
+    private static final double HIGH_CARDS_BOOST_MAX = 3.0;
     private static final double REFEREE_STRICT_O35_THRESHOLD = 60.0;
-    private static final double REFEREE_STRICT_BOOST_POINTS = 5.0;
+    private static final double REFEREE_STRICT_BOOST_MAX = 3.0;
+    private static final double MAX_COMBINED_BOOST = 5.0;
 
-    private static final double THRESHOLD_STRONG_OVER = 50.0;
-    private static final double THRESHOLD_MODERATE_OVER = 40.0;
-    private static final double THRESHOLD_MODERATE_UNDER = 39.0;
-    private static final double THRESHOLD_STRONG_UNDER = 30.0;
+    // Additive intensity (points), not a multiplier
+    private static final double INTENSITY_CLOSE_POINTS = 4.0;   // position gap ≤ 3
+    private static final double INTENSITY_COMPETITIVE_POINTS = 2.0; // gap 4–6
+
+    // Selectivity vs over/under lines
+    private static final double MIN_EDGE = 8.0;
+    private static final double STRONG_EDGE = 12.0;
+    private static final double LINE_OVER_50 = 50.0;
+    private static final double LINE_OVER_40 = 40.0;
+    private static final double LINE_UNDER_40 = 40.0;
+    private static final double LINE_UNDER_30 = 30.0;
 
     @Override
     public RecommendationType getType() {
@@ -67,163 +75,221 @@ private static final int YELLOW_CARD_POINTS = 10;
             return Optional.empty();
         }
 
-        log.debug("Analyzing Booking Points for fixture: fixtureId={}, {} vs {}", 
+        log.debug("Analyzing Booking Points for fixture: fixtureId={}, {} vs {}",
                 context.getFixture().getId(),
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
 
-        double expectedBookingPoints = calculateExpectedBookingPoints(context);
-        ConfidenceLevel confidence = determineConfidence(expectedBookingPoints);
-        String market = determineMarket(expectedBookingPoints);
-
-        if (confidence == ConfidenceLevel.WEAK) {
+        ScoreBreakdown breakdown = calculateExpectedBookingPoints(context);
+        Optional<MarketPick> marketPick = selectMarket(breakdown.expectedPoints());
+        if (marketPick.isEmpty()) {
+            log.debug("No booking-points market with sufficient edge: fixtureId={}, expected={}",
+                    context.getFixture().getId(), String.format("%.1f", breakdown.expectedPoints()));
             return Optional.empty();
         }
 
-        Map<String, Object> factors = buildFactors(context, expectedBookingPoints);
+        MarketPick pick = marketPick.get();
+        boolean hasReferee = context.hasRefereeStats();
+        ConfidenceLevel confidence = determineConfidence(pick.edge(), hasReferee);
+
+        Map<String, Object> factors = buildFactors(context, breakdown, pick);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.BOOKING_POINTS)
                 .confidence(confidence)
-                .score(expectedBookingPoints)
-                .market(market)
+                .score(breakdown.expectedPoints())
+                .market(pick.market())
                 .odds(null)
-                .description(buildDescription(context, confidence, expectedBookingPoints, market))
+                .description(buildDescription(context, confidence, breakdown.expectedPoints(), pick))
                 .factors(factors)
                 .build();
 
-        log.info("Booking Points recommendation generated: fixtureId={}, expectedPoints={}, confidence={}, market={}", 
-                context.getFixture().getId(), String.format("%.1f", expectedBookingPoints), confidence, market);
+        log.info("Booking Points recommendation generated: fixtureId={}, expectedPoints={}, edge={}, confidence={}, market={}",
+                context.getFixture().getId(),
+                String.format("%.1f", breakdown.expectedPoints()),
+                String.format("%.1f", pick.edge()),
+                confidence,
+                pick.market());
 
         return Optional.of(recommendation);
     }
 
     @Override
     public boolean isApplicable(FixtureContext context) {
-        return context.hasCompleteData() 
-            && context.getHomeTeamStats() != null 
-            && context.getAwayTeamStats() != null;
+        return context.hasCompleteData()
+                && context.getHomeTeamStats() != null
+                && context.getAwayTeamStats() != null;
     }
 
-    private double calculateExpectedBookingPoints(FixtureContext context) {
+    private ScoreBreakdown calculateExpectedBookingPoints(FixtureContext context) {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        // Season cards (converted to points)
-        double homeCardsSeason = safeDouble(homeStats.getCardsAvgHome()) * YELLOW_CARD_POINTS;
-        double awayCardsSeason = safeDouble(awayStats.getCardsAvgAway()) * YELLOW_CARD_POINTS;
+        List<WeightedSignal> signals = new ArrayList<>();
 
-// API potential
-        double apiPotential = 40.0; // Default neutral
+        Double homeCardsSeason = homeStats.getCardsAvgHome();
+        Double awayCardsSeason = awayStats.getCardsAvgAway();
+        if (homeCardsSeason != null) {
+            signals.add(new WeightedSignal("homeCardsSeason", homeCardsSeason * YELLOW_CARD_POINTS, WEIGHT_HOME_CARDS_SEASON));
+        }
+        if (awayCardsSeason != null) {
+            signals.add(new WeightedSignal("awayCardsSeason", awayCardsSeason * YELLOW_CARD_POINTS, WEIGHT_AWAY_CARDS_SEASON));
+        }
+
+        if (context.hasRecentForm()) {
+            Double homeForm = context.getHomeTeamForm().getCardsAvgHome();
+            Double awayForm = context.getAwayTeamForm().getCardsAvgAway();
+            if (homeForm != null) {
+                signals.add(new WeightedSignal("homeCardsForm", homeForm * YELLOW_CARD_POINTS, WEIGHT_HOME_CARDS_FORM));
+            }
+            if (awayForm != null) {
+                signals.add(new WeightedSignal("awayCardsForm", awayForm * YELLOW_CARD_POINTS, WEIGHT_AWAY_CARDS_FORM));
+            }
+        }
+
+        double refereeReliability = 0.0;
+        if (context.hasRefereeStats()) {
+            RefereeStats refStats = context.getRefereeStats();
+            refereeReliability = calculateRefereeReliability(refStats);
+
+            if (refStats.getCardsPerMatchOverall() != null) {
+                double refPoints = refStats.getCardsPerMatchOverall() * YELLOW_CARD_POINTS;
+                signals.add(new WeightedSignal(
+                        "refereeCards",
+                        refPoints,
+                        WEIGHT_REFEREE_CARDS * refereeReliability));
+            }
+            if (refStats.getOver35CardsPercentageOverall() != null) {
+                // Map O3.5% to a soft expected-points prior (~30–50 pts)
+                double o35Points = clampScore(refStats.getOver35CardsPercentageOverall() * 0.5, 0, 50);
+                signals.add(new WeightedSignal(
+                        "refereeO35",
+                        o35Points,
+                        WEIGHT_REFEREE_O35_CARDS * refereeReliability));
+            }
+
+            double redRisk = calculateRedCardRisk(context);
+            if (redRisk > 0) {
+                signals.add(new WeightedSignal("redCardRisk", redRisk, WEIGHT_RED_CARD_RISK * refereeReliability));
+            }
+        }
+
+        Double apiCardsCount = null;
         if (context.hasPotentials() && context.getPotentials().getCardsPotential() != null) {
-            apiPotential = context.getPotentials().getCardsPotential();
+            apiCardsCount = context.getPotentials().getCardsPotential();
+            // P0: cards_potential is expected card COUNT, not a 0–100 score
+            signals.add(new WeightedSignal(
+                    "apiCardsPotential",
+                    apiCardsCount * YELLOW_CARD_POINTS,
+                    WEIGHT_API_POTENTIAL));
         }
 
-        // Match intensity multiplier
-        double matchIntensity = calculateMatchIntensity(context);
-
-        double basePoints;
-        boolean hasRefereeData = context.hasRefereeStats();
-        boolean hasFormData = context.hasRecentForm();
-
-        if (hasRefereeData && hasFormData) {
-            // Full calculation with all data
-            RefereeStats refStats = context.getRefereeStats();
-            double refereeCardsAvg = safeDouble(refStats.getCardsPerMatchOverall()) * YELLOW_CARD_POINTS;
-            double refereeO35Pct = safePercentage(refStats.getOver35CardsPercentageOverall());
-            double redCardRisk = calculateRedCardRisk(context);
-
-            double homeCardsForm = safeDouble(context.getHomeTeamForm().getCardsAvgHome()) * YELLOW_CARD_POINTS;
-            double awayCardsForm = safeDouble(context.getAwayTeamForm().getCardsAvgAway()) * YELLOW_CARD_POINTS;
-
-            basePoints = (homeCardsSeason * WEIGHT_HOME_CARDS_SEASON)
-                    + (awayCardsSeason * WEIGHT_AWAY_CARDS_SEASON)
-                    + (homeCardsForm * WEIGHT_HOME_CARDS_FORM)
-                    + (awayCardsForm * WEIGHT_AWAY_CARDS_FORM)
-                    + (refereeCardsAvg * WEIGHT_REFEREE_CARDS)
-                    + (refereeO35Pct * 0.5 * WEIGHT_REFEREE_O35_CARDS) // Scale O35% to points
-                    + (redCardRisk * WEIGHT_RED_CARD_RISK)
-                    + (apiPotential * 0.5 * WEIGHT_API_POTENTIAL); // Scale API to points
-        } else if (hasRefereeData) {
-            // Referee data but no form
-            log.debug("No form data available, using redistributed weights for fixture: {}", 
-                    context.getFixture().getId());
-            
-            RefereeStats refStats = context.getRefereeStats();
-            double refereeCardsAvg = safeDouble(refStats.getCardsPerMatchOverall()) * YELLOW_CARD_POINTS;
-            double refereeO35Pct = safePercentage(refStats.getOver35CardsPercentageOverall());
-            double redCardRisk = calculateRedCardRisk(context);
-
-            basePoints = (homeCardsSeason * WEIGHT_CARDS_SEASON_NO_FORM)
-                    + (awayCardsSeason * WEIGHT_CARDS_SEASON_NO_FORM)
-                    + (refereeCardsAvg * WEIGHT_REFEREE_CARDS)
-                    + (refereeO35Pct * 0.5 * WEIGHT_REFEREE_O35_CARDS)
-                    + (redCardRisk * WEIGHT_RED_CARD_RISK)
-                    + (apiPotential * 0.5 * WEIGHT_API_POTENTIAL_NO_FORM);
-        } else if (hasFormData) {
-            // Form data but no referee
-            log.debug("No referee data available, using redistributed weights for fixture: {}", 
-                    context.getFixture().getId());
-            
-            double homeCardsForm = safeDouble(context.getHomeTeamForm().getCardsAvgHome()) * YELLOW_CARD_POINTS;
-            double awayCardsForm = safeDouble(context.getAwayTeamForm().getCardsAvgAway()) * YELLOW_CARD_POINTS;
-
-            basePoints = (homeCardsSeason * WEIGHT_CARDS_SEASON_NO_REF)
-                    + (awayCardsSeason * WEIGHT_CARDS_SEASON_NO_REF)
-                    + (homeCardsForm * WEIGHT_CARDS_FORM_NO_REF)
-                    + (awayCardsForm * WEIGHT_CARDS_FORM_NO_REF)
-                    + (apiPotential * 0.5 * WEIGHT_API_POTENTIAL_NO_REF);
-        } else {
-            // Neither referee nor form data
-            log.debug("No referee or form data available for fixture: {}", context.getFixture().getId());
-            
-            basePoints = (homeCardsSeason * 0.35)
-                    + (awayCardsSeason * 0.35)
-                    + (apiPotential * 0.5 * 0.30);
-        }
-
-        // Apply match intensity multiplier
-        double points = basePoints * matchIntensity;
-
-        // Apply high-cards matchup boost
+        double basePoints = renormalizedAverage(signals);
+        double intensityPoints = calculateMatchIntensityPoints(context);
         double highCardsBoost = calculateHighCardsBoost(homeStats, awayStats);
-        if (highCardsBoost > 0) {
-            log.debug("Applying high-cards boost of {} for fixture: {}", highCardsBoost, context.getFixture().getId());
-        }
-        points += highCardsBoost;
-
-        // Apply referee strictness boost
         double strictnessBoost = calculateRefereeStrictnessBoost(context);
-        if (strictnessBoost > 0) {
-            log.debug("Applying referee strictness boost of {} for fixture: {}", strictnessBoost, context.getFixture().getId());
-        }
-        points += strictnessBoost;
+        double rawBoost = highCardsBoost + strictnessBoost;
+        double appliedBoost = Math.min(MAX_COMBINED_BOOST, rawBoost);
 
-        return points;
+        double expected = basePoints + intensityPoints + appliedBoost;
+
+        return new ScoreBreakdown(
+                expected,
+                basePoints,
+                intensityPoints,
+                highCardsBoost,
+                strictnessBoost,
+                appliedBoost,
+                rawBoost > MAX_COMBINED_BOOST,
+                refereeReliability,
+                apiCardsCount,
+                signals.size());
+    }
+
+    private double renormalizedAverage(List<WeightedSignal> signals) {
+        if (signals.isEmpty()) {
+            return 0.0;
+        }
+        double weightSum = signals.stream().mapToDouble(WeightedSignal::weight).sum();
+        if (weightSum <= 0) {
+            return 0.0;
+        }
+        double total = 0.0;
+        for (WeightedSignal signal : signals) {
+            total += signal.value() * (signal.weight() / weightSum);
+        }
+        return total;
+    }
+
+    private Optional<MarketPick> selectMarket(double expectedPoints) {
+        List<MarketPick> candidates = new ArrayList<>();
+
+        if (expectedPoints >= LINE_OVER_50 + MIN_EDGE) {
+            candidates.add(new MarketPick(
+                    "Over 50 Booking Points", LINE_OVER_50, true, expectedPoints - LINE_OVER_50));
+        }
+        if (expectedPoints >= LINE_OVER_40 + MIN_EDGE) {
+            candidates.add(new MarketPick(
+                    "Over 40 Booking Points", LINE_OVER_40, true, expectedPoints - LINE_OVER_40));
+        }
+        if (expectedPoints <= LINE_UNDER_30 - MIN_EDGE) {
+            candidates.add(new MarketPick(
+                    "Under 30 Booking Points", LINE_UNDER_30, false, LINE_UNDER_30 - expectedPoints));
+        }
+        if (expectedPoints <= LINE_UNDER_40 - MIN_EDGE) {
+            candidates.add(new MarketPick(
+                    "Under 40 Booking Points", LINE_UNDER_40, false, LINE_UNDER_40 - expectedPoints));
+        }
+
+        // Prefer stronger lines (Over 50 > Over 40, Under 30 > Under 40), then larger edge
+        return candidates.stream().max(Comparator
+                .comparingDouble((MarketPick p) -> p.over() ? p.line() : -p.line())
+                .thenComparingDouble(MarketPick::edge));
+    }
+
+    private ConfidenceLevel determineConfidence(double edge, boolean hasReferee) {
+        if (edge >= STRONG_EDGE && hasReferee) {
+            return ConfidenceLevel.STRONG;
+        }
+        if (edge >= MIN_EDGE) {
+            return ConfidenceLevel.MODERATE;
+        }
+        return ConfidenceLevel.WEAK;
     }
 
     private double calculateHighCardsBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
         double homeCardsAvg = safeDouble(homeStats.getCardsAvgHome());
         double awayCardsAvg = safeDouble(awayStats.getCardsAvgAway());
-        
-        if (homeCardsAvg >= HIGH_CARDS_TEAM_THRESHOLD && awayCardsAvg >= HIGH_CARDS_TEAM_THRESHOLD) {
-            return HIGH_CARDS_BOOST_POINTS;
-        }
-        return 0.0;
+        double homeStrength = gradedStrength(homeCardsAvg, HIGH_CARDS_TEAM_THRESHOLD);
+        double awayStrength = gradedStrength(awayCardsAvg, HIGH_CARDS_TEAM_THRESHOLD);
+        return HIGH_CARDS_BOOST_MAX * Math.sqrt(homeStrength * awayStrength);
     }
 
     private double calculateRefereeStrictnessBoost(FixtureContext context) {
         if (!context.hasRefereeStats()) {
             return 0.0;
         }
-        
-        RefereeStats refStats = context.getRefereeStats();
-        double o35Pct = safePercentage(refStats.getOver35CardsPercentageOverall());
-        
-        if (o35Pct >= REFEREE_STRICT_O35_THRESHOLD) {
-            return REFEREE_STRICT_BOOST_POINTS;
+        Double o35Pct = context.getRefereeStats().getOver35CardsPercentageOverall();
+        if (o35Pct == null) {
+            return 0.0;
         }
-        return 0.0;
+        double strength = gradedStrength(o35Pct, REFEREE_STRICT_O35_THRESHOLD);
+        return REFEREE_STRICT_BOOST_MAX * strength;
+    }
+
+    /** 0 below threshold−0.25 (or −5 for %), 1 at threshold+0.5 (or +10 for %). */
+    private double gradedStrength(double value, double threshold) {
+        double ramp = threshold >= 20 ? 10.0 : 0.5; // percentage vs cards-avg scale
+        double startPad = threshold >= 20 ? 5.0 : 0.25;
+        double start = threshold - startPad;
+        double end = threshold + ramp;
+        if (value <= start) {
+            return 0.0;
+        }
+        if (value >= end) {
+            return 1.0;
+        }
+        return (value - start) / (end - start);
     }
 
     private double calculateRefereeReliability(RefereeStats refStats) {
@@ -240,140 +306,133 @@ private static final int YELLOW_CARD_POINTS = 10;
     }
 
     private double calculateRedCardRisk(FixtureContext context) {
-        double risk = 0.0;
-        
-        if (context.hasRefereeStats()) {
-            RefereeStats refStats = context.getRefereeStats();
-            if (refStats.getRedCardsOverall() != null && refStats.getAppearancesOverall() != null 
-                    && refStats.getAppearancesOverall() > 0) {
-                double redCardRate = refStats.getRedCardsOverall() / (double) refStats.getAppearancesOverall();
-                risk = redCardRate * RED_CARD_POINTS;
-            }
+        if (!context.hasRefereeStats()) {
+            return 0.0;
         }
-        
-        return risk;
+        RefereeStats refStats = context.getRefereeStats();
+        if (refStats.getRedCardsOverall() == null || refStats.getAppearancesOverall() == null
+                || refStats.getAppearancesOverall() <= 0) {
+            return 0.0;
+        }
+        double redCardRate = refStats.getRedCardsOverall() / (double) refStats.getAppearancesOverall();
+        return redCardRate * RED_CARD_POINTS;
     }
 
-    private double calculateMatchIntensity(FixtureContext context) {
+    private double calculateMatchIntensityPoints(FixtureContext context) {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
-
         if (homeStats.getPosition() == null || awayStats.getPosition() == null) {
-            return 1.0;
+            return 0.0;
         }
-
         int positionDiff = Math.abs(homeStats.getPosition() - awayStats.getPosition());
-        
         if (positionDiff <= 3) {
-            return 1.2;
-        } else if (positionDiff <= 6) {
-            return 1.1;
+            return INTENSITY_CLOSE_POINTS;
         }
-        
-        return 1.0;
+        if (positionDiff <= 6) {
+            return INTENSITY_COMPETITIVE_POINTS;
+        }
+        return 0.0;
     }
 
-    private ConfidenceLevel determineConfidence(double expectedPoints) {
-        if (expectedPoints >= THRESHOLD_STRONG_OVER || expectedPoints < THRESHOLD_STRONG_UNDER) {
-            return ConfidenceLevel.STRONG;
-        } else if (expectedPoints >= THRESHOLD_MODERATE_OVER || expectedPoints <= THRESHOLD_MODERATE_UNDER) {
-            return ConfidenceLevel.MODERATE;
-        }
-        return ConfidenceLevel.WEAK;
-    }
-
-    private String determineMarket(double expectedPoints) {
-        if (expectedPoints >= THRESHOLD_STRONG_OVER) {
-            return "Over 50 Booking Points";
-        } else if (expectedPoints >= THRESHOLD_MODERATE_OVER) {
-            return "Over 40 Booking Points";
-        } else if (expectedPoints < THRESHOLD_STRONG_UNDER) {
-            return "Under 30 Booking Points";
-        } else {
-            return "Under 40 Booking Points";
-        }
-    }
-
-    private Map<String, Object> buildFactors(FixtureContext context, double expectedPoints) {
+    private Map<String, Object> buildFactors(FixtureContext context, ScoreBreakdown breakdown, MarketPick pick) {
         Map<String, Object> factors = new HashMap<>();
-        
+
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        // Expected booking points
-        factors.put("expectedBookingPoints", expectedPoints);
+        factors.put("expectedBookingPoints", breakdown.expectedPoints());
+        factors.put("basePoints", breakdown.basePoints());
+        factors.put("marketLine", pick.line());
+        factors.put("marketEdge", pick.edge());
+        factors.put("minEdgeRequired", MIN_EDGE);
+        factors.put("cardsPotentialIsCardCount", true);
+        factors.put("missingDataRenormalized", true);
 
-        // Season cards averages
-        double homeCardsAvg = safeDouble(homeStats.getCardsAvgHome());
-        double awayCardsAvg = safeDouble(awayStats.getCardsAvgAway());
-        factors.put("homeCardsSeasonAvg", homeCardsAvg);
-        factors.put("awayCardsSeasonAvg", awayCardsAvg);
+        if (homeStats.getCardsAvgHome() != null) {
+            factors.put("homeCardsSeasonAvg", homeStats.getCardsAvgHome());
+        }
+        if (awayStats.getCardsAvgAway() != null) {
+            factors.put("awayCardsSeasonAvg", awayStats.getCardsAvgAway());
+        }
 
-        // Form data availability
         factors.put("formDataAvailable", context.hasRecentForm());
         if (context.hasRecentForm()) {
-            factors.put("homeCardsFormAvg", safeDouble(context.getHomeTeamForm().getCardsAvgHome()));
-            factors.put("awayCardsFormAvg", safeDouble(context.getAwayTeamForm().getCardsAvgAway()));
+            if (context.getHomeTeamForm().getCardsAvgHome() != null) {
+                factors.put("homeCardsFormAvg", context.getHomeTeamForm().getCardsAvgHome());
+            }
+            if (context.getAwayTeamForm().getCardsAvgAway() != null) {
+                factors.put("awayCardsFormAvg", context.getAwayTeamForm().getCardsAvgAway());
+            }
         }
 
-        // Referee data availability
         factors.put("refereeDataAvailable", context.hasRefereeStats());
+        factors.put("refereeRequiredForStrong", true);
         if (context.hasRefereeStats()) {
             RefereeStats refStats = context.getRefereeStats();
             factors.put("refereeCardsAvg", safeDouble(refStats.getCardsPerMatchOverall()));
             factors.put("refereeAppearances", refStats.getAppearancesOverall());
-            factors.put("refereeReliability", calculateRefereeReliability(refStats));
+            factors.put("refereeReliability", breakdown.refereeReliability());
             factors.put("refereeYellowCards", refStats.getYellowCardsOverall());
             factors.put("refereeRedCards", refStats.getRedCardsOverall());
-            factors.put("refereeOver35CardsPct", safePercentage(refStats.getOver35CardsPercentageOverall()));
+            if (refStats.getOver35CardsPercentageOverall() != null) {
+                factors.put("refereeOver35CardsPct", refStats.getOver35CardsPercentageOverall());
+            }
+            factors.put("redCardRisk", calculateRedCardRisk(context));
         }
 
-        // API potential
-        if (context.hasPotentials() && context.getPotentials().getCardsPotential() != null) {
-            factors.put("apiCardsPotential", context.getPotentials().getCardsPotential());
+        if (breakdown.apiCardsCount() != null) {
+            factors.put("apiCardsPotential", breakdown.apiCardsCount());
+            factors.put("apiCardsPotentialAsPoints", breakdown.apiCardsCount() * YELLOW_CARD_POINTS);
         }
 
-        // Match intensity
-        double matchIntensity = calculateMatchIntensity(context);
-        factors.put("matchIntensityFactor", matchIntensity);
+        factors.put("matchIntensityPoints", breakdown.intensityPoints());
         if (homeStats.getPosition() != null && awayStats.getPosition() != null) {
             factors.put("homePosition", homeStats.getPosition());
             factors.put("awayPosition", awayStats.getPosition());
             factors.put("positionDifference", Math.abs(homeStats.getPosition() - awayStats.getPosition()));
         }
 
-        // High-cards boost
-        double highCardsBoost = calculateHighCardsBoost(homeStats, awayStats);
-        factors.put("highCardsBoostApplied", highCardsBoost > 0);
-        if (highCardsBoost > 0) {
-            factors.put("highCardsBoostAmount", highCardsBoost);
+        factors.put("highCardsBoostApplied", breakdown.highCardsBoost() > 0.01);
+        if (breakdown.highCardsBoost() > 0.01) {
+            factors.put("highCardsBoostAmount", breakdown.highCardsBoost());
         }
-
-        // Referee strictness boost
-        double strictnessBoost = calculateRefereeStrictnessBoost(context);
-        factors.put("refereeStrictnessBoostApplied", strictnessBoost > 0);
-        if (strictnessBoost > 0) {
-            factors.put("refereeStrictnessBoostAmount", strictnessBoost);
+        factors.put("refereeStrictnessBoostApplied", breakdown.strictnessBoost() > 0.01);
+        if (breakdown.strictnessBoost() > 0.01) {
+            factors.put("refereeStrictnessBoostAmount", breakdown.strictnessBoost());
         }
-
-        // Red card risk
-        if (context.hasRefereeStats()) {
-            factors.put("redCardRisk", calculateRedCardRisk(context));
-        }
-
-        if (context.hasPotentials() && context.getPotentials().getCardsPotential() != null) {
-            factors.put("apiCardsPotential", context.getPotentials().getCardsPotential());
-        }
+        factors.put("appliedBoost", breakdown.appliedBoost());
+        factors.put("boostCapped", breakdown.boostCapped());
+        factors.put("maxCombinedBoost", MAX_COMBINED_BOOST);
+        factors.put("signalsUsed", breakdown.signalsUsed());
 
         return factors;
     }
 
-    private String buildDescription(FixtureContext context, ConfidenceLevel confidence, double expectedPoints, String market) {
-        return String.format("%s confidence %s recommendation (%.1f expected points) - %s vs %s",
+    private String buildDescription(FixtureContext context, ConfidenceLevel confidence,
+            double expectedPoints, MarketPick pick) {
+        return String.format(
+                "%s confidence %s recommendation (%.1f expected points, +%.1f edge) - %s vs %s",
                 confidence.getDisplayName(),
-                market,
+                pick.market(),
                 expectedPoints,
+                pick.edge(),
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
     }
+
+    private record WeightedSignal(String name, double value, double weight) {}
+
+    private record MarketPick(String market, double line, boolean over, double edge) {}
+
+    private record ScoreBreakdown(
+            double expectedPoints,
+            double basePoints,
+            double intensityPoints,
+            double highCardsBoost,
+            double strictnessBoost,
+            double appliedBoost,
+            boolean boostCapped,
+            double refereeReliability,
+            Double apiCardsCount,
+            int signalsUsed) {}
 }

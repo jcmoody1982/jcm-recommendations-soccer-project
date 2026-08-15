@@ -59,14 +59,6 @@ public class PickSettlementGrader {
         }
     }
 
-    private GradeResult gradeCorners(String market, CompletedMatch match) {
-        if (match.getHomeCorners() == null || match.getAwayCorners() == null) {
-            return GradeResult.pending("Missing corners");
-        }
-        int total = match.getHomeCorners() + match.getAwayCorners();
-        return gradeOverUnderLine(market, total);
-    }
-
     private GradeResult gradeBookingPoints(String market, CompletedMatch match) {
         if (match.getHomeYellowCards() == null || match.getAwayYellowCards() == null
                 || match.getHomeRedCards() == null || match.getAwayRedCards() == null) {
@@ -74,7 +66,15 @@ public class PickSettlementGrader {
         }
         int points = (match.getHomeYellowCards() + match.getAwayYellowCards()) * YELLOW_CARD_POINTS
                 + (match.getHomeRedCards() + match.getAwayRedCards()) * RED_CARD_POINTS;
-        return gradeOverUnderLine(market, points);
+        return gradeOverUnderLine(market, points, true);
+    }
+
+    private GradeResult gradeCorners(String market, CompletedMatch match) {
+        if (match.getHomeCorners() == null || match.getAwayCorners() == null) {
+            return GradeResult.pending("Missing corners");
+        }
+        int total = match.getHomeCorners() + match.getAwayCorners();
+        return gradeOverUnderLine(market, total, false);
     }
 
     private GradeResult gradeBtts(String market, CompletedMatch match) {
@@ -97,7 +97,7 @@ public class PickSettlementGrader {
             return GradeResult.pending("Missing FT goals");
         }
         int total = ft.get()[0] + ft.get()[1];
-        return gradeOverUnderLine(market, total);
+        return gradeOverUnderLine(market, total, false);
     }
 
     private GradeResult gradeHalfGoals(String market, CompletedMatch match, boolean firstHalf) {
@@ -113,16 +113,23 @@ public class PickSettlementGrader {
                 return GradeResult.pending("Missing 2H goals");
             }
         }
-        return gradeOverUnderLine(market, total);
+        return gradeOverUnderLine(market, total, false);
     }
 
     private GradeResult gradeOverUnderLine(String market, int total) {
+        return gradeOverUnderLine(market, total, false);
+    }
+
+    private GradeResult gradeOverUnderLine(String market, int total, boolean voidOnExactLine) {
         Matcher matcher = OVER_UNDER_LINE.matcher(safe(market));
         if (!matcher.find()) {
             return GradeResult.unsupported("Unparseable over/under market: " + market);
         }
         boolean over = matcher.group(1).equalsIgnoreCase("Over");
         double line = Double.parseDouble(matcher.group(2));
+        if (voidOnExactLine && Math.abs(total - line) < 1e-9) {
+            return GradeResult.voided("Push at line " + line);
+        }
         boolean hit = over ? total > line : total < line;
         return hit ? GradeResult.win() : GradeResult.loss();
     }
