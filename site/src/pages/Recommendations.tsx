@@ -459,16 +459,6 @@ export default function Recommendations() {
           </div>
         )}
 
-        <select
-          value={sortBy}
-          onChange={(e) => updateParams({ sort: e.target.value })}
-          className={styles.select}
-          aria-label="Sort recommendations"
-        >
-          <option value="score">Sort: Best score</option>
-          <option value="kickoff">Sort: Soonest kickoff</option>
-        </select>
-
         {hasActiveFilters && (
           <button className={styles.clearFilters} onClick={clearFilters}>
             Clear filters
