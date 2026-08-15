@@ -1,5 +1,6 @@
 .section {
   margin-bottom: 2.5rem;
+  scroll-margin-top: 5.5rem;
 }
 
 .header {
@@ -31,7 +32,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 32px 55px 110px 1fr auto 60px 60px 28px;
+  grid-template-columns: 32px 55px 110px 1fr auto 60px 70px 88px;
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
@@ -47,7 +48,7 @@
 
 .tableHeaderNoPrice {
   display: grid;
-  grid-template-columns: 32px 55px 110px 1fr auto 80px 28px;
+  grid-template-columns: 32px 55px 110px 1fr auto 90px 88px;
   align-items: center;
   gap: 12px;
   padding: 8px 12px;

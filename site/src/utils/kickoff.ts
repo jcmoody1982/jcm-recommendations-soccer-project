@@ -2,13 +2,17 @@ export type KickoffWindow = 'all' | 'soon' | 'today' | 'tomorrow';
 export type KickoffSort = 'score' | 'kickoff';
 
 const SOON_MS = 3 * 60 * 60 * 1000;
+const LONDON = 'Europe/London';
 
-function startOfLocalDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+/** Calendar day key in Europe/London, e.g. "2026-08-15". */
+export function londonDayKey(ms: number = Date.now()): string {
+  return new Date(ms).toLocaleDateString('en-CA', { timeZone: LONDON });
 }
 
-function addLocalDays(date: Date, days: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+function addCalendarDays(dayKey: string, days: number): string {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const utcNoon = Date.UTC(year, month - 1, day + days, 12, 0, 0);
+  return new Date(utcNoon).toISOString().slice(0, 10);
 }
 
 export function getKickoffMs(matchDateUnix: number): number {
@@ -23,21 +27,20 @@ export function matchesKickoffWindow(
   if (window === 'all') return true;
 
   const kickoffMs = getKickoffMs(matchDateUnix);
-  const now = new Date(nowMs);
-  const todayStart = startOfLocalDay(now);
-  const tomorrowStart = addLocalDays(todayStart, 1);
-  const dayAfterStart = addLocalDays(todayStart, 2);
 
   if (window === 'soon') {
     return kickoffMs >= nowMs && kickoffMs <= nowMs + SOON_MS;
   }
 
+  const kickoffDay = londonDayKey(kickoffMs);
+  const today = londonDayKey(nowMs);
+
   if (window === 'today') {
-    return kickoffMs >= todayStart.getTime() && kickoffMs < tomorrowStart.getTime();
+    return kickoffDay === today;
   }
 
   // tomorrow
-  return kickoffMs >= tomorrowStart.getTime() && kickoffMs < dayAfterStart.getTime();
+  return kickoffDay === addCalendarDays(today, 1);
 }
 
 export type KickoffUrgency = 'started' | 'soon' | 'today' | 'tomorrow' | 'later';
@@ -46,7 +49,7 @@ export interface KickoffDisplay {
   urgency: KickoffUrgency;
   /** Short label for the date column, e.g. "in 2h", "Today", "Sat 2 Aug" */
   primaryLabel: string;
-  /** Time of day, e.g. "15:00" */
+  /** Time of day in Europe/London, e.g. "15:00" */
   timeLabel: string;
   /** Full accessible description */
   title: string;
@@ -61,17 +64,19 @@ export function formatKickoffDisplay(
   const diffMs = kickoffMs - nowMs;
 
   const timeLabel = matchDate.toLocaleTimeString('en-GB', {
+    timeZone: LONDON,
     hour: '2-digit',
     minute: '2-digit',
   });
 
   const absoluteDate = matchDate.toLocaleDateString('en-GB', {
+    timeZone: LONDON,
     weekday: 'short',
     day: 'numeric',
     month: 'short',
   });
 
-  const title = `${absoluteDate} ${timeLabel}`;
+  const title = `${absoluteDate} ${timeLabel} (UK)`;
 
   if (diffMs < 0) {
     return {
@@ -96,12 +101,11 @@ export function formatKickoffDisplay(
     };
   }
 
-  const now = new Date(nowMs);
-  const todayStart = startOfLocalDay(now);
-  const tomorrowStart = addLocalDays(todayStart, 1);
-  const dayAfterStart = addLocalDays(todayStart, 2);
+  const kickoffDay = londonDayKey(kickoffMs);
+  const today = londonDayKey(nowMs);
+  const tomorrow = addCalendarDays(today, 1);
 
-  if (kickoffMs >= todayStart.getTime() && kickoffMs < tomorrowStart.getTime()) {
+  if (kickoffDay === today) {
     return {
       urgency: 'today',
       primaryLabel: 'Today',
@@ -110,7 +114,7 @@ export function formatKickoffDisplay(
     };
   }
 
-  if (kickoffMs >= tomorrowStart.getTime() && kickoffMs < dayAfterStart.getTime()) {
+  if (kickoffDay === tomorrow) {
     return {
       urgency: 'tomorrow',
       primaryLabel: 'Tomorrow',
@@ -127,10 +131,7 @@ export function formatKickoffDisplay(
   };
 }
 
-export function compareByKickoff(
-  aUnix: number,
-  bUnix: number
-): number {
+export function compareByKickoff(aUnix: number, bUnix: number): number {
   return aUnix - bUnix;
 }
 
