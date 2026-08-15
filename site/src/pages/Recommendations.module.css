@@ -386,7 +386,7 @@
 
   .filterBlock {
     gap: 0.6rem;
-    margin-bottom: 0;
+    margin-bottom: 0.85rem;
   }
 
   .clearFilters {
