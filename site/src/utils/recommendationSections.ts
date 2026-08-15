@@ -8,6 +8,8 @@ export interface SectionConfig {
   /** Unit suffix shown next to the score value */
   scoreUnit: string;
   showPrice: boolean;
+  /** Show league position gap after Selection (Top vs Bottom). */
+  showPositionGap?: boolean;
 }
 
 export const SECTION_ORDER: RecommendationType[] = [
@@ -66,6 +68,7 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
     scoreLabel: 'Quality',
     scoreUnit: '%',
     showPrice: false,
+    showPositionGap: true,
   },
   DRAW: {
     title: 'Draw',

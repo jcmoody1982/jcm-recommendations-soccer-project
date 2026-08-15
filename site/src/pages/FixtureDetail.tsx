@@ -192,6 +192,7 @@ export default function FixtureDetail() {
                         key={`${rec.fixtureId}-${rec.type}`}
                         recommendation={rec}
                         showPrice={config.showPrice}
+                        showPositionGap={Boolean(config.showPositionGap)}
                         linkToFixture={false}
                       />
                     ))}
