@@ -29,8 +29,34 @@
   transition: background 0.3s ease;
 }
 
+.rowGap {
+  display: grid;
+  grid-template-columns: 32px 55px 110px 1fr auto 48px 90px 88px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: background 0.3s ease;
+}
+
+.rowPriceGap {
+  display: grid;
+  grid-template-columns: 32px 55px 110px 1fr auto 48px 60px 70px 88px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: background 0.3s ease;
+}
+
 .row:hover,
-.rowNoPrice:hover {
+.rowNoPrice:hover,
+.rowGap:hover,
+.rowPriceGap:hover {
   background: var(--bg-option-hover);
 }
 
@@ -248,6 +274,14 @@
   text-align: right;
 }
 
+.positionGap {
+  font-weight: 700;
+  color: var(--accent-color);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .price {
   font-weight: 500;
   color: var(--text-primary);
@@ -268,7 +302,9 @@
 @media (max-width: 640px) {
   /* Hide desktop row on mobile */
   .row,
-  .rowNoPrice {
+  .rowNoPrice,
+  .rowGap,
+  .rowPriceGap {
     display: none;
   }
 
@@ -389,6 +425,13 @@
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--accent-color);
+  }
+
+  .mobileGap {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    font-variant-numeric: tabular-nums;
   }
 
   .mobileWhyButton {

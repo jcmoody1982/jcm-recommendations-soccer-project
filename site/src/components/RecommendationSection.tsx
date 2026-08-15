@@ -11,6 +11,20 @@ interface Props {
   incrementBy?: number;
 }
 
+function headerClassName(showPrice: boolean, showPositionGap: boolean): string {
+  if (showPrice && showPositionGap) return styles.tableHeaderPriceGap;
+  if (showPositionGap) return styles.tableHeaderGap;
+  if (showPrice) return styles.tableHeader;
+  return styles.tableHeaderNoPrice;
+}
+
+function listClassName(showPrice: boolean, showPositionGap: boolean): string {
+  if (showPrice && showPositionGap) return styles.listPriceGap;
+  if (showPositionGap) return styles.listGap;
+  if (showPrice) return styles.list;
+  return styles.listNoPrice;
+}
+
 export function RecommendationSection({
   type,
   recommendations,
@@ -25,7 +39,11 @@ export function RecommendationSection({
     scoreLabel: 'Score',
     scoreUnit: '',
     showPrice: true,
+    showPositionGap: false,
   };
+
+  const showPrice = config.showPrice;
+  const showPositionGap = Boolean(config.showPositionGap);
 
   const visibleRecommendations = recommendations.slice(0, visibleCount);
   const hasMore = recommendations.length > visibleCount;
@@ -44,9 +62,6 @@ export function RecommendationSection({
     setVisibleCount((prev) => Math.max(initialItems, prev - incrementBy));
   };
 
-  const headerClass = config.showPrice ? styles.tableHeader : styles.tableHeaderNoPrice;
-  const listClass = config.showPrice ? styles.list : styles.listNoPrice;
-
   return (
     <section className={styles.section} id={sectionDomId(type)}>
       <h2 className={styles.header}>
@@ -56,22 +71,24 @@ export function RecommendationSection({
           {visibleRecommendations.length} of {recommendations.length} picks
         </span>
       </h2>
-      <div className={headerClass}>
+      <div className={headerClassName(showPrice, showPositionGap)}>
         <span></span>
         <span>League</span>
         <span>Date / Time</span>
         <span>Fixture</span>
         <span>Selection</span>
-        {config.showPrice && <span>Price</span>}
+        {showPositionGap && <span>Gap</span>}
+        {showPrice && <span>Price</span>}
         <span>{config.scoreLabel}</span>
         <span></span>
       </div>
-      <div className={listClass}>
+      <div className={listClassName(showPrice, showPositionGap)}>
         {visibleRecommendations.map((rec) => (
           <RecommendationRow
             key={`${rec.fixtureId}-${rec.type}`}
             recommendation={rec}
-            showPrice={config.showPrice}
+            showPrice={showPrice}
+            showPositionGap={showPositionGap}
           />
         ))}
       </div>

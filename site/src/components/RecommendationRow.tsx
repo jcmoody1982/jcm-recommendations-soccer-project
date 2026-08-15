@@ -5,11 +5,13 @@ import { useShortlist } from '../contexts/ShortlistContext';
 import { formatKickoffDisplay } from '../utils/kickoff';
 import { formatFactorEntries } from '../utils/recommendationFactors';
 import { SECTION_CONFIG } from '../utils/recommendationSections';
+import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
 import styles from './RecommendationRow.module.css';
 
 interface Props {
   recommendation: Recommendation;
   showPrice?: boolean;
+  showPositionGap?: boolean;
   /** When false, fixture names are plain text (e.g. already on the fixture page). */
   linkToFixture?: boolean;
 }
@@ -40,9 +42,17 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
   );
 };
 
+function rowClassName(showPrice: boolean, showPositionGap: boolean): string {
+  if (showPrice && showPositionGap) return styles.rowPriceGap;
+  if (showPositionGap) return styles.rowGap;
+  if (showPrice) return styles.row;
+  return styles.rowNoPrice;
+}
+
 export function RecommendationRow({
   recommendation,
   showPrice = true,
+  showPositionGap = false,
   linkToFixture = true,
 }: Props) {
   const { isShortlisted, toggleShortlist } = useShortlist();
@@ -59,7 +69,17 @@ export function RecommendationRow({
     setExpanded((prev) => !prev);
   };
 
-  const fixtureLabel = `${recommendation.homeTeamName} vs ${recommendation.awayTeamName}`;
+  const topVsBottom =
+    showPositionGap || recommendation.type === 'TOP_VS_BOTTOM'
+      ? formatTopVsBottomDisplay(recommendation)
+      : null;
+
+  const fixtureLabel =
+    topVsBottom?.fixtureLabel
+    ?? `${recommendation.homeTeamName} vs ${recommendation.awayTeamName}`;
+  const selectionLabel = topVsBottom?.selectionLabel ?? recommendation.market;
+  const gapLabel = topVsBottom?.gapLabel ?? null;
+
   const fixturePath = `/fixtures/${recommendation.fixtureId}`;
   const kickoff = formatKickoffDisplay(recommendation.matchDateUnix);
 
@@ -72,7 +92,7 @@ export function RecommendationRow({
   const hasWhy =
     Boolean(recommendation.description?.trim()) || factorEntries.length > 0;
 
-  const rowClass = showPrice ? styles.row : styles.rowNoPrice;
+  const rowClass = rowClassName(showPrice, showPositionGap);
 
   const details = expanded && hasWhy && (
     <div className={styles.details} id={`why-${recommendation.fixtureId}-${recommendation.type}`}>
@@ -134,7 +154,12 @@ export function RecommendationRow({
             <span className={styles.leagueName}>{recommendation.leagueName}</span>
           )}
         </div>
-        <span className={styles.market}>{recommendation.market}</span>
+        <span className={styles.market}>{selectionLabel}</span>
+        {showPositionGap && (
+          <span className={styles.positionGap} title="League position gap">
+            {gapLabel ?? '—'}
+          </span>
+        )}
         {showPrice && (
           <span className={styles.price}>
             {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
@@ -216,8 +241,14 @@ export function RecommendationRow({
           </div>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>Selection</span>
-            <span className={styles.mobileValue}>{recommendation.market}</span>
+            <span className={styles.mobileValue}>{selectionLabel}</span>
           </div>
+          {showPositionGap && (
+            <div className={styles.mobileInfo}>
+              <span className={styles.mobileLabel}>Pos gap</span>
+              <span className={styles.mobileGap}>{gapLabel ?? '—'}</span>
+            </div>
+          )}
           {showPrice && recommendation.odds && (
             <div className={styles.mobileInfo}>
               <span className={styles.mobileLabel}>Price</span>
