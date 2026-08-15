@@ -16,12 +16,13 @@ const BRAND_KEY = 'accabaccaglory-brand';
 /** Bump when the brand identity / default theme changes so returning users see it once. */
 const BRAND_VERSION = 'daylight-default-1';
 const DEFAULT_THEME: Theme = 'light';
+const DEFAULT_RESOLVED: ResolvedTheme = 'light';
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window !== 'undefined' && window.matchMedia) {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
-  return DEFAULT_THEME;
+  return DEFAULT_RESOLVED;
 }
 
 function resolveTheme(theme: Theme): ResolvedTheme {
