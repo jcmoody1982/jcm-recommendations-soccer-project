@@ -99,15 +99,20 @@ export function RecommendationRow({
         <span className={styles.sentiment} title={recommendation.confidence}>
           <ConfidenceIcon level={recommendation.confidence} />
         </span>
-        <span className={styles.league}>
+        <span
+          className={styles.league}
+          title={recommendation.leagueName || undefined}
+        >
           {recommendation.leagueImage ? (
             <img
               src={recommendation.leagueImage}
-              alt={recommendation.leagueName || 'League'}
+              alt=""
               className={styles.leagueIcon}
             />
           ) : (
-            <span className={styles.leaguePlaceholder}>⚽</span>
+            <span className={styles.leaguePlaceholder} aria-hidden>
+              ⚽
+            </span>
           )}
         </span>
         <span
@@ -117,13 +122,18 @@ export function RecommendationRow({
           <span className={styles.date}>{kickoff.primaryLabel}</span>
           <span className={styles.time}>{kickoff.timeLabel}</span>
         </span>
-        {linkToFixture ? (
-          <Link to={fixturePath} className={styles.fixtureLink}>
-            {fixtureLabel}
-          </Link>
-        ) : (
-          <span className={styles.fixture}>{fixtureLabel}</span>
-        )}
+        <div className={styles.fixtureBlock}>
+          {linkToFixture ? (
+            <Link to={fixturePath} className={styles.fixtureLink}>
+              {fixtureLabel}
+            </Link>
+          ) : (
+            <span className={styles.fixture}>{fixtureLabel}</span>
+          )}
+          {recommendation.leagueName && (
+            <span className={styles.leagueName}>{recommendation.leagueName}</span>
+          )}
+        </div>
         <span className={styles.market}>{recommendation.market}</span>
         {showPrice && (
           <span className={styles.price}>
@@ -166,19 +176,26 @@ export function RecommendationRow({
           {recommendation.leagueImage ? (
             <img
               src={recommendation.leagueImage}
-              alt={recommendation.leagueName || 'League'}
+              alt=""
               className={styles.mobileLeagueIcon}
             />
           ) : (
-            <span className={styles.mobileLeaguePlaceholder}>⚽</span>
+            <span className={styles.mobileLeaguePlaceholder} aria-hidden>
+              ⚽
+            </span>
           )}
-          {linkToFixture ? (
-            <Link to={fixturePath} className={styles.mobileFixtureLink}>
-              {fixtureLabel}
-            </Link>
-          ) : (
-            <span className={styles.mobileFixture}>{fixtureLabel}</span>
-          )}
+          <div className={styles.mobileFixtureBlock}>
+            {linkToFixture ? (
+              <Link to={fixturePath} className={styles.mobileFixtureLink}>
+                {fixtureLabel}
+              </Link>
+            ) : (
+              <span className={styles.mobileFixture}>{fixtureLabel}</span>
+            )}
+            {recommendation.leagueName && (
+              <span className={styles.mobileLeagueName}>{recommendation.leagueName}</span>
+            )}
+          </div>
           <button
             className={`${styles.mobileStarButton} ${isInShortlist ? styles.starred : ''}`}
             onClick={handleToggleShortlist}
