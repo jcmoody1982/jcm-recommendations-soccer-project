@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { resultsService } from '../services/api';
 import type {
@@ -23,9 +23,15 @@ const OUTCOME_FILTERS: Array<PickOutcome | 'ALL'> = [
 ];
 
 const PERIODS: PerformancePeriod[] = ['7d', '30d', '90d', 'all'];
+const OUTCOME_SET = new Set<string>(OUTCOME_FILTERS);
+const PERIOD_SET = new Set<string>(PERIODS);
 
 type ConfidenceBand = 'STRONG' | 'MODERATE';
 type ResultsView = 'day' | 'performance';
+
+function londonToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+}
 
 function formatKickoff(unix: number | null | undefined): string {
   if (!unix) return '';
@@ -47,6 +53,11 @@ function outcomeLabel(outcome: string): string {
   return outcome.charAt(0) + outcome.slice(1).toLowerCase();
 }
 
+function formatScore(score: number | null | undefined): string {
+  if (score == null || Number.isNaN(score)) return '—';
+  return Number.isInteger(score) ? String(score) : score.toFixed(1);
+}
+
 function formatHitRate(summary?: { hitRate: number | null } | null): string {
   if (summary?.hitRate == null) return '—';
   return `${summary.hitRate.toFixed(0)}%`;
@@ -65,13 +76,92 @@ function hitBadgeClass(bucket?: PerformanceBucket | null): string {
   return styles.hitLow;
 }
 
-function fixturesForConfidence(fixtures: ResultsFixture[], confidence: ConfidenceBand): ResultsFixture[] {
+function parseView(value: string | null): ResultsView {
+  return value === 'performance' ? 'performance' : 'day';
+}
+
+function parsePeriod(value: string | null): PerformancePeriod {
+  if (value && PERIOD_SET.has(value)) return value as PerformancePeriod;
+  return '30d';
+}
+
+function parseOutcome(value: string | null): PickOutcome | 'ALL' {
+  if (value && OUTCOME_SET.has(value)) return value as PickOutcome | 'ALL';
+  return 'ALL';
+}
+
+function confidenceClass(confidence: string | null | undefined): string {
+  const band = confidence?.toUpperCase();
+  if (band === 'STRONG') return styles.confidenceStrong;
+  if (band === 'MODERATE') return styles.confidenceModerate;
+  return styles.confidenceOther;
+}
+
+function fixturesForConfidence(
+  fixtures: ResultsFixture[],
+  confidence: ConfidenceBand,
+  typeFilter: string,
+): ResultsFixture[] {
   return fixtures
     .map((fixture) => ({
       ...fixture,
-      picks: fixture.picks.filter((pick) => pick.confidence?.toUpperCase() === confidence),
+      picks: fixture.picks.filter((pick) => {
+        if (pick.confidence?.toUpperCase() !== confidence) return false;
+        if (typeFilter !== 'ALL' && pick.type !== typeFilter) return false;
+        return true;
+      }),
     }))
     .filter((fixture) => fixture.picks.length > 0);
+}
+
+function collectTypes(fixtures: ResultsFixture[]): string[] {
+  const types = new Set<string>();
+  for (const fixture of fixtures) {
+    for (const pick of fixture.picks) {
+      if (pick.type) types.add(pick.type);
+    }
+  }
+  return Array.from(types).sort((a, b) => a.localeCompare(b));
+}
+
+function summaryFromFixtures(fixtures: ResultsFixture[]): ResultsDaySummary {
+  let wins = 0;
+  let losses = 0;
+  let voids = 0;
+  let pending = 0;
+  let unsupported = 0;
+
+  for (const fixture of fixtures) {
+    for (const pick of fixture.picks) {
+      switch (pick.outcome) {
+        case 'WIN':
+          wins += 1;
+          break;
+        case 'LOSS':
+          losses += 1;
+          break;
+        case 'VOID':
+          voids += 1;
+          break;
+        case 'PENDING':
+          pending += 1;
+          break;
+        default:
+          unsupported += 1;
+          break;
+      }
+    }
+  }
+
+  const graded = wins + losses;
+  return {
+    wins,
+    losses,
+    voids,
+    pending,
+    unsupported,
+    hitRate: graded > 0 ? (wins * 100) / graded : null,
+  };
 }
 
 function SummaryStrip({
@@ -202,7 +292,15 @@ function FixtureList({
               <li key={pick.id} className={styles.pickRow}>
                 <div className={styles.pickMain}>
                   <span className={styles.pickMarket}>{pick.market}</span>
-                  <span className={styles.pickType}>{formatType(pick.type)}</span>
+                  <div className={styles.pickMeta}>
+                    <span className={styles.pickType}>{formatType(pick.type)}</span>
+                    <span className={`${styles.confidenceBadge} ${confidenceClass(pick.confidence)}`}>
+                      {pick.confidence ? outcomeLabel(pick.confidence) : '—'}
+                    </span>
+                    <span className={styles.pickScore} title="Model score">
+                      {formatScore(pick.score)}
+                    </span>
+                  </div>
                 </div>
                 <div className={styles.pickSide}>
                   <span className={`${styles.outcome} ${styles[`outcome${pick.outcome}`]}`}>
@@ -223,28 +321,19 @@ function ConfidenceSection({
   tone,
   summary,
   fixtures,
-  outcomeFilter,
-  snapshotDate,
 }: {
   title: string;
   tone: 'strong' | 'moderate';
   summary: ResultsDaySummary;
   fixtures: ResultsFixture[];
-  outcomeFilter: PickOutcome | 'ALL';
-  snapshotDate: string;
 }) {
-  const emptyBody =
-    outcomeFilter === 'ALL'
-      ? `No ${title.toLowerCase()} picks for ${snapshotDate}.`
-      : `No ${outcomeLabel(outcomeFilter).toLowerCase()} ${title.toLowerCase()} picks on ${snapshotDate}.`;
-
   return (
     <section className={styles.confidenceSection}>
       <SummaryStrip title={title} summary={summary} tone={tone} />
       <FixtureList
         fixtures={fixtures}
         emptyTitle={`No ${title.toLowerCase()} picks`}
-        emptyBody={emptyBody}
+        emptyBody={`No ${title.toLowerCase()} picks for this filter.`}
       />
     </section>
   );
@@ -282,7 +371,7 @@ function PerformancePanel({
 }) {
   return (
     <>
-      <div className={styles.outcomeFilters}>
+      <div className={styles.filterRow}>
         {PERIODS.map((p) => (
           <button
             key={p}
@@ -375,10 +464,32 @@ function PerformancePanel({
 }
 
 export default function Results() {
-  const [view, setView] = useState<ResultsView>('day');
-  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
-  const [outcomeFilter, setOutcomeFilter] = useState<PickOutcome | 'ALL'>('ALL');
-  const [period, setPeriod] = useState<PerformancePeriod>('30d');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const view = parseView(searchParams.get('view'));
+  const selectedDate = searchParams.get('date') || undefined;
+  const outcomeFilter = parseOutcome(searchParams.get('outcome'));
+  const typeFilter = searchParams.get('type') || 'ALL';
+  const period = parsePeriod(searchParams.get('period'));
+
+  const updateParams = useCallback((patch: Record<string, string | null | undefined>) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [key, value] of Object.entries(patch)) {
+        const isDefault =
+          (key === 'view' && (value == null || value === 'day'))
+          || (key === 'outcome' && (value == null || value === 'ALL'))
+          || (key === 'type' && (value == null || value === 'ALL'))
+          || (key === 'period' && (value == null || value === '30d'));
+        if (value == null || value === '' || isDefault) {
+          next.delete(key);
+        } else {
+          next.set(key, value);
+        }
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const { data: dates = [] } = useQuery({
     queryKey: ['results-dates'],
@@ -387,11 +498,14 @@ export default function Results() {
 
   useEffect(() => {
     if (!selectedDate && dates.length > 0) {
-      setSelectedDate(dates[0]);
+      updateParams({ date: dates[0] });
     }
-  }, [dates, selectedDate]);
+  }, [dates, selectedDate, updateParams]);
 
   const dateIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
+  const today = londonToday();
+  const todayTarget = dates.includes(today) ? today : dates[0];
+  const isOnToday = Boolean(todayTarget) && selectedDate === todayTarget;
 
   const {
     data: rawData,
@@ -419,23 +533,53 @@ export default function Results() {
 
   const data = withConfidenceDefaults(rawData);
 
-  const strongFixtures = useMemo(
-    () => fixturesForConfidence(data?.fixtures ?? [], 'STRONG'),
-    [data?.fixtures],
-  );
-  const moderateFixtures = useMemo(
-    () => fixturesForConfidence(data?.fixtures ?? [], 'MODERATE'),
+  const availableTypes = useMemo(
+    () => collectTypes(data?.fixtures ?? []),
     [data?.fixtures],
   );
 
+  useEffect(() => {
+    if (typeFilter !== 'ALL' && availableTypes.length > 0 && !availableTypes.includes(typeFilter)) {
+      updateParams({ type: null });
+    }
+  }, [typeFilter, availableTypes, updateParams]);
+
+  const strongFixtures = useMemo(
+    () => fixturesForConfidence(data?.fixtures ?? [], 'STRONG', typeFilter),
+    [data?.fixtures, typeFilter],
+  );
+  const moderateFixtures = useMemo(
+    () => fixturesForConfidence(data?.fixtures ?? [], 'MODERATE', typeFilter),
+    [data?.fixtures, typeFilter],
+  );
+
+  const strongSummary = useMemo(
+    () => (typeFilter === 'ALL' ? data?.strongSummary : summaryFromFixtures(strongFixtures)),
+    [typeFilter, data?.strongSummary, strongFixtures],
+  );
+  const moderateSummary = useMemo(
+    () => (typeFilter === 'ALL' ? data?.moderateSummary : summaryFromFixtures(moderateFixtures)),
+    [typeFilter, data?.moderateSummary, moderateFixtures],
+  );
+  const allSummary = useMemo(() => {
+    if (!data) return undefined;
+    if (typeFilter === 'ALL') return data.summary;
+    return summaryFromFixtures([...strongFixtures, ...moderateFixtures]);
+  }, [data, typeFilter, strongFixtures, moderateFixtures]);
+
   const goPrev = () => {
     if (dateIndex < 0 || dateIndex >= dates.length - 1) return;
-    setSelectedDate(dates[dateIndex + 1]);
+    updateParams({ date: dates[dateIndex + 1] });
   };
 
   const goNext = () => {
     if (dateIndex <= 0) return;
-    setSelectedDate(dates[dateIndex - 1]);
+    updateParams({ date: dates[dateIndex - 1] });
+  };
+
+  const goToday = () => {
+    if (!todayTarget) return;
+    updateParams({ date: todayTarget, view: 'day' });
   };
 
   return (
@@ -453,7 +597,7 @@ export default function Results() {
           role="tab"
           aria-selected={view === 'day'}
           className={`${styles.viewToggleButton} ${view === 'day' ? styles.viewToggleActive : ''}`}
-          onClick={() => setView('day')}
+          onClick={() => updateParams({ view: 'day' })}
         >
           Daily Dashboard
         </button>
@@ -462,7 +606,7 @@ export default function Results() {
           role="tab"
           aria-selected={view === 'performance'}
           className={`${styles.viewToggleButton} ${view === 'performance' ? styles.viewToggleActive : ''}`}
-          onClick={() => setView('performance')}
+          onClick={() => updateParams({ view: 'performance' })}
         >
           Performance
         </button>
@@ -472,7 +616,12 @@ export default function Results() {
         <>
           <div className={styles.controls}>
             <div className={styles.dateNav}>
-              <button type="button" className={styles.navButton} onClick={goPrev} disabled={dateIndex < 0 || dateIndex >= dates.length - 1}>
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={goPrev}
+                disabled={dateIndex < 0 || dateIndex >= dates.length - 1}
+              >
                 ← Older
               </button>
               <label className={styles.dateLabel}>
@@ -480,7 +629,7 @@ export default function Results() {
                 <select
                   className={styles.select}
                   value={selectedDate ?? ''}
-                  onChange={(e) => setSelectedDate(e.target.value || undefined)}
+                  onChange={(e) => updateParams({ date: e.target.value || null })}
                   disabled={dates.length === 0}
                 >
                   {dates.length === 0 && <option value="">No snapshots yet</option>}
@@ -489,27 +638,71 @@ export default function Results() {
                   ))}
                 </select>
               </label>
-              <button type="button" className={styles.navButton} onClick={goNext} disabled={dateIndex <= 0}>
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={goNext}
+                disabled={dateIndex <= 0}
+              >
                 Newer →
               </button>
-            </div>
-
-            <div className={styles.outcomeFilters}>
-              {OUTCOME_FILTERS.map((outcome) => (
-                <button
-                  key={outcome}
-                  type="button"
-                  className={`${styles.chip} ${outcomeFilter === outcome ? styles.chipActive : ''}`}
-                  onClick={() => setOutcomeFilter(outcome)}
-                >
-                  {outcome === 'ALL' ? 'All' : outcomeLabel(outcome)}
-                </button>
-              ))}
+              <button
+                type="button"
+                className={`${styles.navButton} ${isOnToday ? styles.navButtonActive : ''}`}
+                onClick={goToday}
+                disabled={!todayTarget || isOnToday}
+                title={dates.includes(today) ? `Jump to ${today}` : 'Jump to latest snapshot'}
+              >
+                Today
+              </button>
             </div>
           </div>
 
-          {data?.summary && data.snapshotDate && (
-            <SummaryStrip title="All picks" summary={data.summary} tone="all" />
+          <div className={styles.filterBlock}>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>Outcome</span>
+              <div className={styles.filterRow}>
+                {OUTCOME_FILTERS.map((outcome) => (
+                  <button
+                    key={outcome}
+                    type="button"
+                    className={`${styles.chip} ${outcomeFilter === outcome ? styles.chipActive : ''}`}
+                    onClick={() => updateParams({ outcome })}
+                  >
+                    {outcome === 'ALL' ? 'All' : outcomeLabel(outcome)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {availableTypes.length > 0 && (
+              <div className={styles.filterGroup}>
+                <span className={styles.filterLabel}>Type</span>
+                <div className={styles.filterRow}>
+                  <button
+                    type="button"
+                    className={`${styles.chip} ${typeFilter === 'ALL' ? styles.chipActive : ''}`}
+                    onClick={() => updateParams({ type: 'ALL' })}
+                  >
+                    All
+                  </button>
+                  {availableTypes.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      className={`${styles.chip} ${typeFilter === type ? styles.chipActive : ''}`}
+                      onClick={() => updateParams({ type })}
+                    >
+                      {formatType(type)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {allSummary && data?.snapshotDate && (
+            <SummaryStrip title="All picks" summary={allSummary} tone="all" />
           )}
 
           {isLoading && <div className={styles.message}>Loading results…</div>}
@@ -529,24 +722,36 @@ export default function Results() {
             </div>
           )}
 
-          {!isLoading && !isError && data?.snapshotDate && (
+          {!isLoading && !isError && data?.snapshotDate && strongFixtures.length === 0 && moderateFixtures.length === 0 && (
+            <div className={styles.empty}>
+              <h2>No picks for this filter</h2>
+              <p>
+                Nothing matched
+                {outcomeFilter !== 'ALL' ? ` ${outcomeLabel(outcomeFilter).toLowerCase()}` : ''}
+                {typeFilter !== 'ALL' ? ` ${formatType(typeFilter)}` : ''}
+                {' '}on {data.snapshotDate}.
+              </p>
+            </div>
+          )}
+
+          {!isLoading && !isError && data?.snapshotDate && (strongFixtures.length > 0 || moderateFixtures.length > 0) && (
             <div className={styles.splitSections}>
-              <ConfidenceSection
-                title="Strong"
-                tone="strong"
-                summary={data.strongSummary}
-                fixtures={strongFixtures}
-                outcomeFilter={outcomeFilter}
-                snapshotDate={data.snapshotDate}
-              />
-              <ConfidenceSection
-                title="Moderate"
-                tone="moderate"
-                summary={data.moderateSummary}
-                fixtures={moderateFixtures}
-                outcomeFilter={outcomeFilter}
-                snapshotDate={data.snapshotDate}
-              />
+              {strongFixtures.length > 0 && strongSummary && (
+                <ConfidenceSection
+                  title="Strong"
+                  tone="strong"
+                  summary={strongSummary}
+                  fixtures={strongFixtures}
+                />
+              )}
+              {moderateFixtures.length > 0 && moderateSummary && (
+                <ConfidenceSection
+                  title="Moderate"
+                  tone="moderate"
+                  summary={moderateSummary}
+                  fixtures={moderateFixtures}
+                />
+              )}
             </div>
           )}
         </>
@@ -556,7 +761,7 @@ export default function Results() {
         <PerformancePanel
           data={performance}
           period={period}
-          onPeriodChange={setPeriod}
+          onPeriodChange={(next) => updateParams({ period: next })}
           isLoading={perfLoading}
           isError={perfError}
           error={perfErr instanceof Error ? perfErr : null}
