@@ -19,7 +19,7 @@ interface Props {
 const ConfidenceIcon = ({ level }: { level: string }) => {
   if (level === 'STRONG') {
     return (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="10" cy="10" r="9" fill="var(--confidence-strong)" stroke="var(--confidence-strong)" strokeWidth="1"/>
         <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
@@ -27,7 +27,7 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
   }
   if (level === 'MODERATE') {
     return (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="10" cy="10" r="9" fill="var(--confidence-moderate)" stroke="var(--confidence-moderate)" strokeWidth="1"/>
         <path d="M10 6V10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
         <circle cx="10" cy="13" r="1" fill="white"/>
@@ -35,7 +35,7 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
     );
   }
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="10" cy="10" r="9" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
       <path d="M7 7L13 13M13 7L7 13" stroke="white" strokeWidth="2" strokeLinecap="round"/>
     </svg>
