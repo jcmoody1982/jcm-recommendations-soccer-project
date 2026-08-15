@@ -86,6 +86,7 @@ function matchesConfidence(confidence: string, filter: ConfidenceFilter): boolea
 export default function Recommendations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchOpen, setSearchOpen] = useState(() => Boolean(searchParams.get('q')));
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const searchQuery = searchParams.get('q') || '';
@@ -392,126 +393,149 @@ export default function Recommendations() {
         </div>
       </header>
 
-      <div className={styles.filters}>
-        <select
-          value={selectedLeague}
-          onChange={(e) => updateParams({ league: e.target.value })}
-          className={styles.select}
-          aria-label="League filter"
+      <div className={styles.filtersShell}>
+        <button
+          type="button"
+          className={`${styles.filtersToggle} ${hasActiveFilters ? styles.filtersToggleActive : ''}`}
+          onClick={() => setFiltersOpen((open) => !open)}
+          aria-expanded={filtersOpen}
+          aria-controls="recommendations-filters"
         >
-          <option value="all">All Leagues</option>
-          {availableLeagues.map((league) => (
-            <option key={league.id} value={league.id}>
-              {league.name}
-            </option>
-          ))}
-        </select>
+          <span className={styles.filtersToggleLabel}>
+            Filters
+            {hasActiveFilters && <span className={styles.filtersToggleBadge}>Active</span>}
+          </span>
+          <span className={`${styles.filtersChevron} ${filtersOpen ? styles.filtersChevronOpen : ''}`} aria-hidden>
+            ▼
+          </span>
+        </button>
 
-        <div className={styles.kickoffGroup} role="group" aria-label="Kickoff window">
-          {(
-            [
-              {
-                value: 'soon' as const,
-                label: kickoffCounts.soon > 0 ? `Soon (${kickoffCounts.soon})` : 'Soon',
-              },
-              {
-                value: 'today' as const,
-                label: kickoffCounts.today > 0 ? `Today (${kickoffCounts.today})` : 'Today',
-              },
-              {
-                value: 'tomorrow' as const,
-                label:
-                  kickoffCounts.tomorrow > 0
-                    ? `Tomorrow (${kickoffCounts.tomorrow})`
-                    : 'Tomorrow',
-              },
-              { value: 'all' as const, label: 'All kickoffs' },
-            ]
-          ).map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`${styles.kickoffChip} ${
-                kickoffWindow === option.value ? styles.kickoffChipActive : ''
-              }`}
-              onClick={() => setKickoffWindow(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        {kickoffWindow === 'all' && (
-          <div className={styles.horizonGroup} role="group" aria-label="Look-ahead horizon">
-            <span className={styles.horizonLabel}>Horizon</span>
-            {HORIZON_OPTIONS.map((days) => (
-              <button
-                key={days}
-                type="button"
-                className={`${styles.kickoffChip} ${
-                  horizon === days ? styles.kickoffChipActive : ''
-                }`}
-                onClick={() => updateParams({ days: String(days) })}
-              >
-                {days}d
-              </button>
-            ))}
-          </div>
-        )}
-
-        {hasActiveFilters && (
-          <button className={styles.clearFilters} onClick={clearFilters}>
-            Clear filters
-          </button>
-        )}
-      </div>
-
-      <div className={styles.filterBlock}>
-        <div className={styles.filterGroup}>
-          <span className={styles.filterLabel}>Confidence</span>
-          <div className={styles.filterRowScroll} role="group" aria-label="Confidence filter">
-            {CONFIDENCE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`${styles.chip} ${
-                  confidenceFilter === option.value ? styles.chipActive : ''
-                }`}
-                onClick={() => updateParams({ confidence: option.value })}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {typesWithPicks.length > 0 && (
-          <div className={styles.filterGroup}>
-            <label className={styles.filterLabel} htmlFor="market-filter">
-              Market Filter
-            </label>
+        <div
+          id="recommendations-filters"
+          className={`${styles.filtersPanel} ${filtersOpen ? styles.filtersPanelOpen : ''}`}
+        >
+          <div className={styles.filters}>
             <select
-              id="market-filter"
-              value={typeFilter}
-              onChange={(e) =>
-                updateParams({
-                  type: e.target.value === 'ALL' ? null : e.target.value,
-                })
-              }
-              className={`${styles.select} ${styles.marketSelect}`}
-              aria-label="Market filter"
+              value={selectedLeague}
+              onChange={(e) => updateParams({ league: e.target.value })}
+              className={styles.select}
+              aria-label="League filter"
             >
-              <option value="ALL">
-                All markets ({typesWithPicks.reduce((sum, t) => sum + (typeCounts[t] || 0), 0)})
-              </option>
-              {typesWithPicks.map((type) => (
-                <option key={type} value={type}>
-                  {sectionTitle(type)} ({typeCounts[type]})
+              <option value="all">All Leagues</option>
+              {availableLeagues.map((league) => (
+                <option key={league.id} value={league.id}>
+                  {league.name}
                 </option>
               ))}
             </select>
+
+            <div className={styles.kickoffGroup} role="group" aria-label="Kickoff window">
+              {(
+                [
+                  {
+                    value: 'soon' as const,
+                    label: kickoffCounts.soon > 0 ? `Soon (${kickoffCounts.soon})` : 'Soon',
+                  },
+                  {
+                    value: 'today' as const,
+                    label: kickoffCounts.today > 0 ? `Today (${kickoffCounts.today})` : 'Today',
+                  },
+                  {
+                    value: 'tomorrow' as const,
+                    label:
+                      kickoffCounts.tomorrow > 0
+                        ? `Tomorrow (${kickoffCounts.tomorrow})`
+                        : 'Tomorrow',
+                  },
+                  { value: 'all' as const, label: 'All kickoffs' },
+                ]
+              ).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.kickoffChip} ${
+                    kickoffWindow === option.value ? styles.kickoffChipActive : ''
+                  }`}
+                  onClick={() => setKickoffWindow(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {kickoffWindow === 'all' && (
+              <div className={styles.horizonGroup} role="group" aria-label="Look-ahead horizon">
+                <span className={styles.horizonLabel}>Horizon</span>
+                {HORIZON_OPTIONS.map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    className={`${styles.kickoffChip} ${
+                      horizon === days ? styles.kickoffChipActive : ''
+                    }`}
+                    onClick={() => updateParams({ days: String(days) })}
+                  >
+                    {days}d
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {hasActiveFilters && (
+              <button className={styles.clearFilters} onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
           </div>
-        )}
+
+          <div className={styles.filterBlock}>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>Confidence</span>
+              <div className={styles.filterRowScroll} role="group" aria-label="Confidence filter">
+                {CONFIDENCE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`${styles.chip} ${
+                      confidenceFilter === option.value ? styles.chipActive : ''
+                    }`}
+                    onClick={() => updateParams({ confidence: option.value })}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {typesWithPicks.length > 0 && (
+              <div className={styles.filterGroup}>
+                <label className={styles.filterLabel} htmlFor="market-filter">
+                  Market Filter
+                </label>
+                <select
+                  id="market-filter"
+                  value={typeFilter}
+                  onChange={(e) =>
+                    updateParams({
+                      type: e.target.value === 'ALL' ? null : e.target.value,
+                    })
+                  }
+                  className={`${styles.select} ${styles.marketSelect}`}
+                  aria-label="Market filter"
+                >
+                  <option value="ALL">
+                    All markets ({typesWithPicks.reduce((sum, t) => sum + (typeCounts[t] || 0), 0)})
+                  </option>
+                  {typesWithPicks.map((type) => (
+                    <option key={type} value={type}>
+                      {sectionTitle(type)} ({typeCounts[type]})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
