@@ -11,7 +11,7 @@ const SKIP_KEYS = new Set([
   'signalsUsed',
   'formDataAvailable',
   'refereeDataAvailable',
-  'xgDataAvailable',
+  'xgDataAvailable', // all markets — not useful in the customer Info panel
   'drawsDeferredToDrawEngine',
   'xgDominanceAppliedAsMultiplier',
 ]);
@@ -137,8 +137,6 @@ export function formatFactorEntries(
   for (const [key, raw] of Object.entries(factors)) {
     if (SKIP_KEYS.has(key)) continue;
     if (typeof raw === 'boolean' && raw === false) continue;
-    // Match Result: never show the xG-available flag (covered by skip list too).
-    if (options?.type === 'MATCH_RESULT' && key === 'xgDataAvailable') continue;
 
     const value = formatFactorValue(raw);
     if (value == null) continue;
