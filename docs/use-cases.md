@@ -2918,7 +2918,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 | Team-to-win + draw | **LOSS** |
 | Past 7-day lookback still unresolved | **VOID** (expired) |
 | Half-goal markets in v1 | **Yes**; stay PENDING until HT/2H available |
-| Corners / booking points | **Yes**; Yellow=10, Red=25; missing stats → PENDING |
+| Corners / booking points | **Yes**; Yellow=10, Red=25; missing stats → PENDING; booking exact line → VOID (push) |
 | VALUE_BET | Settle when `market` parses as a supported shape; else UNSUPPORTED |
 | Re-settle terminal rows | **No** for WIN/LOSS/VOID; **yes** for corners/bookings previously marked UNSUPPORTED (catch-up) |
 | Selection encoding | v1 parses `type` + `market` with unit tests; structured selection is a follow-up |
