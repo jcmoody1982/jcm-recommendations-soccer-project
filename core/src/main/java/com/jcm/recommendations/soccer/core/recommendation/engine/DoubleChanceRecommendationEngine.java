@@ -162,7 +162,7 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        // Get odds for selected market
+        // Synthesize double-chance price from 1+X or X+2 match-result odds.
         Double odds = null;
         if (context.hasOdds()) {
             if (market.contains("1X")) {
@@ -471,10 +471,12 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
         if (implied1X != null) {
             factors.put("implied1X", implied1X);
             factors.put("value1X", value1X);
+            factors.put("combined1XOdds", 100.0 / implied1X);
         }
         if (impliedX2 != null) {
             factors.put("impliedX2", impliedX2);
             factors.put("valueX2", valueX2);
+            factors.put("combinedX2Odds", 100.0 / impliedX2);
         }
 
         // Team characteristics
