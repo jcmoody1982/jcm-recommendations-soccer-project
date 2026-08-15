@@ -88,14 +88,17 @@ export function RecommendationRow({
   const scoreUnit = config?.scoreUnit ?? '%';
   const scoreLabel = config?.scoreLabel ?? 'Score';
 
-  const factorEntries = formatFactorEntries(recommendation.factors);
-  const hasWhy =
+  const factorEntries = formatFactorEntries(recommendation.factors, undefined, {
+    type: recommendation.type,
+    recommendation,
+  });
+  const hasInfo =
     Boolean(recommendation.description?.trim()) || factorEntries.length > 0;
 
   const rowClass = rowClassName(showPrice, showPositionGap);
 
-  const details = expanded && hasWhy && (
-    <div className={styles.details} id={`why-${recommendation.fixtureId}-${recommendation.type}`}>
+  const details = expanded && hasInfo && (
+    <div className={styles.details} id={`info-${recommendation.fixtureId}-${recommendation.type}`}>
       {recommendation.description?.trim() && (
         <p className={styles.detailsSummary}>{recommendation.description.trim()}</p>
       )}
@@ -170,16 +173,16 @@ export function RecommendationRow({
           {scoreUnit}
         </span>
         <div className={styles.actions}>
-          {hasWhy && (
+          {hasInfo && (
             <button
               type="button"
               className={`${styles.whyButton} ${expanded ? styles.whyButtonOpen : ''}`}
               onClick={toggleExpanded}
               aria-expanded={expanded}
-              aria-controls={`why-${recommendation.fixtureId}-${recommendation.type}`}
-              title={expanded ? 'Hide why' : 'Why this pick'}
+              aria-controls={`info-${recommendation.fixtureId}-${recommendation.type}`}
+              title={expanded ? 'Hide info' : 'Show info'}
             >
-              Why
+              Info
             </button>
           )}
           <button
@@ -263,14 +266,14 @@ export function RecommendationRow({
             </span>
           </div>
         </div>
-        {hasWhy && (
+        {hasInfo && (
           <button
             type="button"
             className={`${styles.mobileWhyButton} ${expanded ? styles.whyButtonOpen : ''}`}
             onClick={toggleExpanded}
             aria-expanded={expanded}
           >
-            {expanded ? 'Hide why' : 'Why this pick'}
+            {expanded ? 'Hide info' : 'Info'}
           </button>
         )}
       </div>

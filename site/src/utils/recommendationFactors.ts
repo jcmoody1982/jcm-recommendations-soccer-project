@@ -1,3 +1,5 @@
+import type { Recommendation, RecommendationType } from '../types';
+
 /** Keys that are internal engine flags and rarely help tip reading. */
 const SKIP_KEYS = new Set([
   'missingDataRenormalized',
@@ -9,13 +11,24 @@ const SKIP_KEYS = new Set([
   'signalsUsed',
   'formDataAvailable',
   'refereeDataAvailable',
+  'xgDataAvailable', // all markets — not useful in the customer Info panel
+  'drawsDeferredToDrawEngine',
+  'xgDominanceAppliedAsMultiplier',
 ]);
+
+/** Friendly labels for specific factor keys (all markets). */
+const GLOBAL_LABELS: Record<string, string> = {};
 
 const MAX_FACTORS = 8;
 
 export interface FactorEntry {
   label: string;
   value: string;
+}
+
+export interface FormatFactorOptions {
+  type?: RecommendationType;
+  recommendation?: Recommendation;
 }
 
 export function humanizeFactorKey(key: string): string {
@@ -26,6 +39,62 @@ export function humanizeFactorKey(key: string): string {
     .replace(/\bAvg\b/gi, 'avg')
     .replace(/\bId\b/gi, 'ID')
     .replace(/^./, (c) => c.toUpperCase());
+}
+
+function labelForFactor(
+  key: string,
+  options?: FormatFactorOptions
+): string {
+  const type = options?.type;
+  const rec = options?.recommendation;
+
+  if (type === 'MATCH_RESULT' && rec) {
+    const homePick = rec.market === rec.homeTeamName;
+    // Opponent's table place is the side we are not backing.
+    if (homePick && key === 'awayPosition') {
+      return 'Opponents League Position';
+    }
+    if (homePick && key === 'homePosition') {
+      return 'League Position';
+    }
+    if (!homePick && key === 'homePosition') {
+      return 'Opponents League Position';
+    }
+    if (!homePick && key === 'awayPosition') {
+      return 'League Position';
+    }
+    // Opponent decimal price (1 = home, 2 = away).
+    if (homePick && key === 'oddsFt2') {
+      return 'Opponent Price';
+    }
+    if (!homePick && key === 'oddsFt1') {
+      return 'Opponent Price';
+    }
+    if (key === 'homeFormWins') {
+      return 'Home Wins in Last 5';
+    }
+    if (key === 'homeFormDraws') {
+      return 'Home Draws in Last 5';
+    }
+    if (key === 'homeFormLosses') {
+      return 'Home Losses in Last 5';
+    }
+    if (key === 'awayFormWins') {
+      return 'Away Wins in Last 5';
+    }
+    if (key === 'awayFormDraws') {
+      return 'Away Draws in Last 5';
+    }
+    if (key === 'awayFormLosses') {
+      return 'Away Losses in Last 5';
+    }
+  }
+
+  if (GLOBAL_LABELS[key]) {
+    return GLOBAL_LABELS[key];
+  }
+
+  return humanizeFactorKey(key);
 }
 
 function formatFactorValue(value: unknown): string | null {
@@ -59,7 +128,8 @@ function formatFactorValue(value: unknown): string | null {
  */
 export function formatFactorEntries(
   factors: Record<string, unknown> | null | undefined,
-  limit: number = MAX_FACTORS
+  limit: number = MAX_FACTORS,
+  options?: FormatFactorOptions
 ): FactorEntry[] {
   if (!factors) return [];
 
@@ -67,9 +137,10 @@ export function formatFactorEntries(
   for (const [key, raw] of Object.entries(factors)) {
     if (SKIP_KEYS.has(key)) continue;
     if (typeof raw === 'boolean' && raw === false) continue;
+
     const value = formatFactorValue(raw);
     if (value == null) continue;
-    entries.push({ label: humanizeFactorKey(key), value });
+    entries.push({ label: labelForFactor(key, options), value });
     if (entries.length >= limit) break;
   }
   return entries;
