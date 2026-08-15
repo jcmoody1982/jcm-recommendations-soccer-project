@@ -26,8 +26,9 @@ export const EARLY_KICKOFF_WARNING =
 /** Desktop strip copy — badge already says Early KO. */
 export const EARLY_KICKOFF_STRIP = 'Proceed with Extreme Caution';
 
-/** Accepts unix seconds, unix ms, ISO strings, or Date. */
-export function toKickoffDate(input: number | string | Date): Date | null {
+/** Accepts unix seconds, unix ms, ISO strings, Date, or Jackson Instant timestamp arrays. */
+export function toKickoffDate(input: number | string | Date | unknown): Date | null {
+  if (input == null) return null;
   if (input instanceof Date) {
     return Number.isNaN(input.getTime()) ? null : input;
   }
@@ -38,15 +39,36 @@ export function toKickoffDate(input: number | string | Date): Date | null {
     const date = new Date(ms);
     return Number.isNaN(date.getTime()) ? null : date;
   }
-  const date = new Date(input);
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    // Numeric strings (epoch seconds/ms)
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return toKickoffDate(Number(trimmed));
+    }
+    const date = new Date(trimmed);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  // Jackson Instant-as-timestamp: [epochSeconds, nano] or LocalDateTime-style arrays
+  if (Array.isArray(input) && input.length >= 1 && typeof input[0] === 'number') {
+    if (input.length === 2 && input[0] > 1e9) {
+      return toKickoffDate(input[0]);
+    }
+    if (input.length >= 5) {
+      const [year, month, day, hour = 0, minute = 0, second = 0] = input as number[];
+      // Jackson months are 1-based; JS Date UTC months are 0-based.
+      const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+  }
+  return null;
 }
 
 /**
  * True when the fixture kicks off between 08:00 and 12:30 UK time
  * inclusive (Europe/London, including BST/GMT).
  */
-export function isEarlyKickoffUk(input: number | string | Date): boolean {
+export function isEarlyKickoffUk(input: number | string | Date | unknown): boolean {
   const date = toKickoffDate(input);
   if (!date) return false;
 

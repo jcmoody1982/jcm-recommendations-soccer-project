@@ -6,6 +6,10 @@
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
+.cardHasEarly {
+  border-left: 3px solid var(--early-kickoff);
+}
+
 .header {
   width: 100%;
   display: flex;
@@ -27,6 +31,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .logo {
@@ -36,17 +42,38 @@
   border-radius: 4px;
   background: #fff;
   padding: 2px;
+  flex-shrink: 0;
 }
 
 .name {
   font-weight: 500;
   font-size: 0.95rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerEarly {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.headerEarlyCount {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--early-kickoff-strong);
+  letter-spacing: 0.02em;
 }
 
 .fixtureCount {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .countIcon {
@@ -90,10 +117,15 @@
 .fixtureEarly {
   border-left: 3px solid var(--early-kickoff);
   padding-left: 13px;
+  background: var(--early-kickoff-bg);
 }
 
 .fixture:hover {
   background: var(--bg-option-hover);
+}
+
+.fixtureEarly:hover {
+  background: var(--early-kickoff-bg);
 }
 
 .fixture:hover .fixtureCue {
@@ -111,6 +143,7 @@
 
 .teams {
   flex: 1;
+  min-width: 0;
 }
 
 .vs {
@@ -123,6 +156,7 @@
   color: var(--text-muted);
   font-size: var(--font-size-md);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .dateEarly {
@@ -133,6 +167,7 @@
   gap: 4px;
   color: var(--early-kickoff-strong);
   font-weight: 700;
+  max-width: 46%;
 }
 
 .noFixtures {

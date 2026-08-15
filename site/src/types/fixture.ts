@@ -39,6 +39,8 @@ export interface FixtureSummary {
   homeTeam: string;
   awayTeam: string;
   matchDate: string;
+  /** Unix seconds when provided by the API (preferred for early-kickoff checks). */
+  matchDateUnix?: number | null;
 }
 
 export interface Competition {

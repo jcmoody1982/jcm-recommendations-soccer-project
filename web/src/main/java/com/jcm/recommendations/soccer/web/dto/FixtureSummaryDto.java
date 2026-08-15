@@ -12,4 +12,6 @@ public class FixtureSummaryDto {
     private String homeTeam;
     private String awayTeam;
     private Instant matchDate;
+    /** Unix seconds — preferred for timezone-safe early-kickoff checks on the site. */
+    private Long matchDateUnix;
 }
