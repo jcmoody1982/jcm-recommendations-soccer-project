@@ -12,9 +12,7 @@ import {
   type KickoffWindow,
 } from '../utils/kickoff';
 import {
-  SECTION_CONFIG,
   SECTION_ORDER,
-  sectionDomId,
   sectionTitle,
 } from '../utils/recommendationSections';
 import styles from './Recommendations.module.css';
@@ -330,11 +328,6 @@ export default function Recommendations() {
     || confidenceFilter !== 'tipped'
     || typeFilter !== 'ALL';
 
-  const jumpToSection = (type: RecommendationType) => {
-    const el = document.getElementById(sectionDomId(type));
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   const setKickoffWindow = (value: KickoffWindow) => {
     const patch: Record<string, string | null> = { kickoff: value };
     // Keep `days` so returning to "All kickoffs" restores the chosen horizon.
@@ -472,7 +465,7 @@ export default function Recommendations() {
       <div className={styles.filterBlock}>
         <div className={styles.filterGroup}>
           <span className={styles.filterLabel}>Confidence</span>
-          <div className={styles.filterRow} role="group" aria-label="Confidence filter">
+          <div className={styles.filterRowScroll} role="group" aria-label="Confidence filter">
             {CONFIDENCE_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -490,47 +483,32 @@ export default function Recommendations() {
 
         {typesWithPicks.length > 0 && (
           <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>Market</span>
-            <div className={styles.filterRow} role="group" aria-label="Market filter">
-              <button
-                type="button"
-                className={`${styles.chip} ${typeFilter === 'ALL' ? styles.chipActive : ''}`}
-                onClick={() => updateParams({ type: null })}
-              >
-                All markets
-              </button>
+            <label className={styles.filterLabel} htmlFor="market-filter">
+              Market
+            </label>
+            <select
+              id="market-filter"
+              value={typeFilter}
+              onChange={(e) =>
+                updateParams({
+                  type: e.target.value === 'ALL' ? null : e.target.value,
+                })
+              }
+              className={`${styles.select} ${styles.marketSelect}`}
+              aria-label="Market filter"
+            >
+              <option value="ALL">
+                All markets ({typesWithPicks.reduce((sum, t) => sum + (typeCounts[t] || 0), 0)})
+              </option>
               {typesWithPicks.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`${styles.chip} ${typeFilter === type ? styles.chipActive : ''}`}
-                  onClick={() => updateParams({ type })}
-                >
+                <option key={type} value={type}>
                   {sectionTitle(type)} ({typeCounts[type]})
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
         )}
       </div>
-
-      {typeFilter === 'ALL' && typesWithPicks.length > 1 && !isLoading && (
-        <nav className={styles.jumpNav} aria-label="Jump to market">
-          <span className={styles.jumpLabel}>Jump</span>
-          <div className={styles.jumpRow}>
-            {typesWithPicks.map((type) => (
-              <button
-                key={type}
-                type="button"
-                className={styles.jumpChip}
-                onClick={() => jumpToSection(type)}
-              >
-                {SECTION_CONFIG[type].icon} {sectionTitle(type)}
-              </button>
-            ))}
-          </div>
-        </nav>
-      )}
 
       {isLoading ? (
         <RecommendationsPageSkeleton />
