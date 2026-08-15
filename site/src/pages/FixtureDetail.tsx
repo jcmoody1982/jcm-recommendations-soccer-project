@@ -2,8 +2,12 @@ import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fixtureService, recommendationService } from '../services/api';
-import { RecommendationRow } from '../components';
+import { EarlyKickoffBadge, EarlyKickoffStrip, RecommendationRow } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
+import {
+  EARLY_KICKOFF_WARNING,
+  isEarlyKickoffUk,
+} from '../utils/kickoff';
 import { SECTION_CONFIG } from '../utils/recommendationSections';
 import styles from './FixtureDetail.module.css';
 
@@ -117,6 +121,7 @@ export default function FixtureDetail() {
     minute: '2-digit',
   });
   const stadium = fixture.stadiumName || fixture.stadium;
+  const isEarlyKickoff = isEarlyKickoffUk(fixture.dateUnix);
 
   return (
     <div className={styles.page}>
@@ -124,7 +129,7 @@ export default function FixtureDetail() {
         ← Back to fixtures
       </Link>
 
-      <header className={styles.header}>
+      <header className={`${styles.header} ${isEarlyKickoff ? styles.headerEarly : ''}`}>
         <div className={styles.matchup}>
           <h1 className={styles.title}>
             <span className={styles.team}>{fixture.homeTeamName}</span>
@@ -133,14 +138,29 @@ export default function FixtureDetail() {
           </h1>
         </div>
         <div className={styles.meta}>
-          <span className={styles.kickoff}>
-            {formattedDate} · {formattedTime}
+          <span
+            className={`${styles.kickoff} ${isEarlyKickoff ? styles.kickoffEarly : ''}`}
+            title={
+              isEarlyKickoff
+                ? `${formattedDate} · ${formattedTime} · ${EARLY_KICKOFF_WARNING}`
+                : undefined
+            }
+          >
+            <span>
+              {formattedDate} · {formattedTime}
+            </span>
+            {isEarlyKickoff && <EarlyKickoffBadge />}
           </span>
           {stadium && <span className={styles.stadium}>{stadium}</span>}
           {fixture.gameWeek != null && (
             <span className={styles.gameweek}>Gameweek {fixture.gameWeek}</span>
           )}
         </div>
+        {isEarlyKickoff && (
+          <div className={styles.earlyStripWrap}>
+            <EarlyKickoffStrip />
+          </div>
+        )}
       </header>
 
       <section className={styles.recommendations}>

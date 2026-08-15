@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import type { Recommendation } from '../types';
+import {
+  EARLY_KICKOFF_STRIP,
+  EARLY_KICKOFF_WARNING,
+  isEarlyKickoffUk,
+} from '../utils/kickoff';
+import { EarlyKickoffBadge } from './EarlyKickoffWarning';
 import styles from './ExportModal.module.css';
 
 interface ExportModalProps {
@@ -37,7 +43,11 @@ function generateTextExport(recommendations: Recommendation[]): string {
   const lines = ['🎯 AccaBaccaGlory Picks', ''];
   
   recommendations.forEach((rec) => {
-    lines.push(`📅 ${formatDate(rec.matchDateUnix)}`);
+    const early = isEarlyKickoffUk(rec.matchDateUnix);
+    lines.push(`📅 ${formatDate(rec.matchDateUnix)}${early ? ' ⚠️ EARLY KO' : ''}`);
+    if (early) {
+      lines.push(`⚠️ ${EARLY_KICKOFF_WARNING}`);
+    }
     lines.push(`⚽ ${rec.homeTeamName} vs ${rec.awayTeamName}`);
     const oddsStr = rec.odds ? ` @ ${rec.odds.toFixed(2)}` : '';
     const confStr = rec.confidence === 'STRONG' ? '🔥' : '⚡';
@@ -156,32 +166,47 @@ export function ExportModal({ isOpen, onClose, recommendations }: ExportModalPro
                 </div>
                 
                 <div className={styles.exportPicks}>
-                  {recommendations.map((rec, index) => (
-                    <div key={`${rec.fixtureId}-${rec.type}-${index}`} className={styles.exportPick}>
-                      <div className={styles.exportPickHeader}>
-                        {rec.leagueImage && (
-                          <div className={styles.exportLeagueIcon}>
-                            <img src={rec.leagueImage} alt="" />
+                  {recommendations.map((rec, index) => {
+                    const isEarlyKickoff = isEarlyKickoffUk(rec.matchDateUnix);
+                    return (
+                      <div
+                        key={`${rec.fixtureId}-${rec.type}-${index}`}
+                        className={`${styles.exportPick} ${isEarlyKickoff ? styles.exportPickEarly : ''}`}
+                      >
+                        <div className={styles.exportPickHeader}>
+                          {rec.leagueImage && (
+                            <div className={styles.exportLeagueIcon}>
+                              <img src={rec.leagueImage} alt="" />
+                            </div>
+                          )}
+                          <div className={styles.exportPickInfo}>
+                            <span
+                              className={`${styles.exportDate} ${isEarlyKickoff ? styles.exportDateEarly : ''}`}
+                              title={isEarlyKickoff ? EARLY_KICKOFF_WARNING : undefined}
+                            >
+                              <span>{formatDate(rec.matchDateUnix)}</span>
+                              {isEarlyKickoff && <EarlyKickoffBadge />}
+                            </span>
+                            <span className={styles.exportFixture}>
+                              {rec.homeTeamName} vs {rec.awayTeamName}
+                            </span>
+                            {isEarlyKickoff && (
+                              <span className={styles.exportEarlyNote}>{EARLY_KICKOFF_STRIP}</span>
+                            )}
                           </div>
-                        )}
-                        <div className={styles.exportPickInfo}>
-                          <span className={styles.exportDate}>{formatDate(rec.matchDateUnix)}</span>
-                          <span className={styles.exportFixture}>
-                            {rec.homeTeamName} vs {rec.awayTeamName}
+                        </div>
+                        <div className={styles.exportPickSelection}>
+                          <span className={styles.exportConfidence}>
+                            {rec.confidence === 'STRONG' ? '🔥' : '⚡'}
                           </span>
+                          <span className={styles.exportMarket}>{rec.market}</span>
+                          {rec.odds && (
+                            <span className={styles.exportOdds}>@ {rec.odds.toFixed(2)}</span>
+                          )}
                         </div>
                       </div>
-                      <div className={styles.exportPickSelection}>
-                        <span className={styles.exportConfidence}>
-                          {rec.confidence === 'STRONG' ? '🔥' : '⚡'}
-                        </span>
-                        <span className={styles.exportMarket}>{rec.market}</span>
-                        {rec.odds && (
-                          <span className={styles.exportOdds}>@ {rec.odds.toFixed(2)}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className={styles.exportFooter}>
