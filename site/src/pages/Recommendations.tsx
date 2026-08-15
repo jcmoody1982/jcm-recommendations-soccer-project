@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { recommendationService } from '../services/api';
 import { RecommendationSection, RecommendationsPageSkeleton } from '../components';
@@ -10,36 +11,123 @@ import {
   type KickoffSort,
   type KickoffWindow,
 } from '../utils/kickoff';
+import {
+  SECTION_CONFIG,
+  SECTION_ORDER,
+  sectionDomId,
+  sectionTitle,
+} from '../utils/recommendationSections';
 import styles from './Recommendations.module.css';
 
-const SECTION_ORDER: RecommendationType[] = [
-  'MATCH_RESULT',
-  'BTTS',
-  'DOUBLE_CHANCE',
-  'RESULT_BTTS',
-  'TOP_VS_BOTTOM',
-  'DRAW',
-  'FIRST_HALF_GOALS',
-  'SECOND_HALF_GOALS',
-  'VALUE_BET',
-  'OVER_GOALS',
-  'UNDER_GOALS',
-  'CLEAN_SHEET',
-  'BOOKING_POINTS',
-  'OVER_CORNERS',
-  'UNDER_CORNERS',
-  'HOME_AWAY_SPECIALIST',
-  'WINNING_FORM_MISMATCH',
-  'LOSING_FORM_MISMATCH',
+/** Fetch horizon when viewing all kickoffs (Soon/Today/Tomorrow set days automatically). */
+const HORIZON_OPTIONS = [3, 7] as const;
+const DEFAULT_HORIZON = 3;
+const KICKOFF_WINDOWS: KickoffWindow[] = ['all', 'soon', 'today', 'tomorrow'];
+const SORT_OPTIONS: KickoffSort[] = ['score', 'kickoff'];
+
+/** tipped = Strong + Moderate (hides WEAK by default). */
+type ConfidenceFilter = 'tipped' | 'strong' | 'moderate' | 'all';
+
+const CONFIDENCE_OPTIONS: Array<{ value: ConfidenceFilter; label: string }> = [
+  { value: 'tipped', label: 'Strong + Moderate' },
+  { value: 'strong', label: 'Strong' },
+  { value: 'moderate', label: 'Moderate' },
+  { value: 'all', label: 'All (incl. Weak)' },
 ];
 
+function parseHorizon(value: string | null): number {
+  const n = value == null ? NaN : Number(value);
+  return (HORIZON_OPTIONS as readonly number[]).includes(n) ? n : DEFAULT_HORIZON;
+}
+
+/** Minimum fetch window needed for a kickoff chip. */
+function daysForKickoff(window: KickoffWindow): number {
+  if (window === 'soon' || window === 'today') return 1;
+  if (window === 'tomorrow') return 3;
+  return DEFAULT_HORIZON;
+}
+
+function parseKickoff(value: string | null): KickoffWindow {
+  if (value && (KICKOFF_WINDOWS as string[]).includes(value)) {
+    return value as KickoffWindow;
+  }
+  return 'all';
+}
+
+function parseSort(value: string | null): KickoffSort {
+  if (value && (SORT_OPTIONS as string[]).includes(value)) {
+    return value as KickoffSort;
+  }
+  return 'score';
+}
+
+function parseConfidence(value: string | null): ConfidenceFilter {
+  if (value === 'strong' || value === 'moderate' || value === 'all' || value === 'tipped') {
+    return value;
+  }
+  return 'tipped';
+}
+
+function parseType(value: string | null): RecommendationType | 'ALL' {
+  if (!value || value === 'ALL') return 'ALL';
+  if ((SECTION_ORDER as string[]).includes(value)) {
+    return value as RecommendationType;
+  }
+  return 'ALL';
+}
+
+function matchesConfidence(confidence: string, filter: ConfidenceFilter): boolean {
+  const band = confidence?.toUpperCase();
+  if (filter === 'all') return true;
+  if (filter === 'strong') return band === 'STRONG';
+  if (filter === 'moderate') return band === 'MODERATE';
+  // tipped: hide WEAK
+  return band === 'STRONG' || band === 'MODERATE';
+}
+
 export default function Recommendations() {
-  const [daysAhead, setDaysAhead] = useState(7);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLeague, setSelectedLeague] = useState<string>('all');
-  const [kickoffWindow, setKickoffWindow] = useState<KickoffWindow>('all');
-  const [sortBy, setSortBy] = useState<KickoffSort>('score');
-  const [hideEmptySections, setHideEmptySections] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const searchQuery = searchParams.get('q') || '';
+  const selectedLeague = searchParams.get('league') || 'all';
+  const kickoffWindow = parseKickoff(searchParams.get('kickoff'));
+  const sortBy = parseSort(searchParams.get('sort'));
+  const confidenceFilter = parseConfidence(searchParams.get('confidence'));
+  const typeFilter = parseType(searchParams.get('type'));
+  const hideEmptySections = searchParams.get('empty') !== '0';
+  const horizon = parseHorizon(searchParams.get('days'));
+  // Kickoff chips own the time window; horizon only applies to "All kickoffs".
+  const daysAhead =
+    kickoffWindow === 'all' ? horizon : daysForKickoff(kickoffWindow);
+
+  const updateParams = useCallback(
+    (patch: Record<string, string | null | undefined>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [key, value] of Object.entries(patch)) {
+            const isDefault =
+              (key === 'days' && (value == null || value === String(DEFAULT_HORIZON)))
+              || (key === 'q' && (value == null || value === ''))
+              || (key === 'league' && (value == null || value === 'all'))
+              || (key === 'kickoff' && (value == null || value === 'all'))
+              || (key === 'sort' && (value == null || value === 'score'))
+              || (key === 'confidence' && (value == null || value === 'tipped'))
+              || (key === 'type' && (value == null || value === 'ALL'))
+              || (key === 'empty' && (value == null || value === '1'));
+            if (value == null || value === '' || isDefault) {
+              next.delete(key);
+            } else {
+              next.set(key, value);
+            }
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   const { data: groupedRecommendations, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['recommendations-grouped', daysAhead],
@@ -61,6 +149,16 @@ export default function Recommendations() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [groupedRecommendations]);
 
+  useEffect(() => {
+    if (
+      selectedLeague !== 'all'
+      && availableLeagues.length > 0
+      && !availableLeagues.some((l) => l.id === selectedLeague)
+    ) {
+      updateParams({ league: null });
+    }
+  }, [selectedLeague, availableLeagues, updateParams]);
+
   const kickoffCounts = useMemo(() => {
     if (!groupedRecommendations) {
       return { soon: 0, today: 0, tomorrow: 0 };
@@ -72,6 +170,7 @@ export default function Recommendations() {
     const seenTomorrow = new Set<number>();
 
     for (const rec of all) {
+      if (!matchesConfidence(rec.confidence, confidenceFilter)) continue;
       if (matchesKickoffWindow(rec.matchDateUnix, 'soon')) {
         seenSoon.add(rec.fixtureId);
       }
@@ -88,7 +187,7 @@ export default function Recommendations() {
       today: seenToday.size,
       tomorrow: seenTomorrow.size,
     };
-  }, [groupedRecommendations]);
+  }, [groupedRecommendations, confidenceFilter]);
 
   const filteredRecommendations = useMemo(() => {
     if (!groupedRecommendations) return null;
@@ -99,13 +198,22 @@ export default function Recommendations() {
     const nowMs = Date.now();
 
     for (const type of SECTION_ORDER) {
+      if (typeFilter !== 'ALL' && type !== typeFilter) {
+        filtered[type] = [];
+        continue;
+      }
+
       const recs = groupedRecommendations[type] || [];
       const next = recs.filter((rec: Recommendation) => {
+        if (!matchesConfidence(rec.confidence, confidenceFilter)) {
+          return false;
+        }
+
         if (searchLower) {
           const matchesSearch =
-            rec.homeTeamName.toLowerCase().includes(searchLower) ||
-            rec.awayTeamName.toLowerCase().includes(searchLower) ||
-            (rec.leagueName && rec.leagueName.toLowerCase().includes(searchLower));
+            rec.homeTeamName.toLowerCase().includes(searchLower)
+            || rec.awayTeamName.toLowerCase().includes(searchLower)
+            || (rec.leagueName && rec.leagueName.toLowerCase().includes(searchLower));
           if (!matchesSearch) return false;
         }
 
@@ -136,54 +244,131 @@ export default function Recommendations() {
     }
 
     return filtered;
-  }, [groupedRecommendations, searchQuery, selectedLeague, kickoffWindow, sortBy]);
+  }, [
+    groupedRecommendations,
+    searchQuery,
+    selectedLeague,
+    kickoffWindow,
+    sortBy,
+    confidenceFilter,
+    typeFilter,
+  ]);
+
+  const typeCounts = useMemo(() => {
+    if (!groupedRecommendations) return {} as Record<RecommendationType, number>;
+
+    const searchLower = searchQuery.toLowerCase().trim();
+    const nowMs = Date.now();
+    const counts = {} as Record<RecommendationType, number>;
+
+    for (const type of SECTION_ORDER) {
+      const recs = groupedRecommendations[type] || [];
+      counts[type] = recs.filter((rec: Recommendation) => {
+        if (!matchesConfidence(rec.confidence, confidenceFilter)) return false;
+        if (searchLower) {
+          const matchesSearch =
+            rec.homeTeamName.toLowerCase().includes(searchLower)
+            || rec.awayTeamName.toLowerCase().includes(searchLower)
+            || (rec.leagueName && rec.leagueName.toLowerCase().includes(searchLower));
+          if (!matchesSearch) return false;
+        }
+        if (selectedLeague !== 'all' && String(rec.leagueId) !== selectedLeague) {
+          return false;
+        }
+        if (!matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, nowMs)) {
+          return false;
+        }
+        return true;
+      }).length;
+    }
+
+    return counts;
+  }, [
+    groupedRecommendations,
+    searchQuery,
+    selectedLeague,
+    kickoffWindow,
+    confidenceFilter,
+  ]);
+
+  const typesWithPicks = useMemo(
+    () => SECTION_ORDER.filter((type) => (typeCounts[type] || 0) > 0),
+    [typeCounts]
+  );
+
+  useEffect(() => {
+    if (
+      typeFilter !== 'ALL'
+      && typesWithPicks.length > 0
+      && !typesWithPicks.includes(typeFilter)
+    ) {
+      updateParams({ type: null });
+    }
+  }, [typeFilter, typesWithPicks, updateParams]);
 
   const totalCount = filteredRecommendations
     ? Object.values(filteredRecommendations).reduce((sum, recs) => sum + recs.length, 0)
     : 0;
 
   const clearFilters = () => {
-    setSearchQuery('');
-    setSelectedLeague('all');
-    setKickoffWindow('all');
+    updateParams({
+      q: null,
+      league: null,
+      kickoff: null,
+      days: null,
+      sort: null,
+      confidence: null,
+      type: null,
+    });
   };
 
   const hasActiveFilters =
-    Boolean(searchQuery) || selectedLeague !== 'all' || kickoffWindow !== 'all';
+    Boolean(searchQuery)
+    || selectedLeague !== 'all'
+    || kickoffWindow !== 'all'
+    || (kickoffWindow === 'all' && horizon !== DEFAULT_HORIZON)
+    || confidenceFilter !== 'tipped'
+    || typeFilter !== 'ALL';
+
+  const jumpToSection = (type: RecommendationType) => {
+    const el = document.getElementById(sectionDomId(type));
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const setKickoffWindow = (value: KickoffWindow) => {
+    const patch: Record<string, string | null> = { kickoff: value };
+    // Keep `days` so returning to "All kickoffs" restores the chosen horizon.
+    if (value !== 'all' && sortBy === 'score') {
+      patch.sort = 'kickoff';
+    }
+    updateParams(patch);
+  };
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Recommendations</h1>
-        <div className={styles.headerRight}>
-          <select
-            value={daysAhead}
-            onChange={(e) => setDaysAhead(Number(e.target.value))}
-            className={styles.select}
-            aria-label="Days ahead"
-          >
-            <option value={0.5}>Next 12 hours</option>
-            <option value={1}>Next 24 hours</option>
-            <option value={3}>Next 3 days</option>
-            <option value={7}>Next 7 days</option>
-          </select>
+        <div>
+          <h1 className={styles.title}>Recommendations</h1>
+          <p className={styles.subtitle}>Kickoffs in Europe/London · Weak hidden by default</p>
         </div>
       </header>
 
       <div className={styles.filters}>
         <div className={styles.searchContainer}>
-          <span className={styles.searchIcon}>🔍</span>
+          <span className={styles.searchIcon} aria-hidden>
+            ⌕
+          </span>
           <input
             type="text"
             placeholder="Search teams or leagues..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => updateParams({ q: e.target.value || null })}
             className={styles.searchInput}
           />
           {searchQuery && (
             <button
               className={styles.clearSearch}
-              onClick={() => setSearchQuery('')}
+              onClick={() => updateParams({ q: null })}
               aria-label="Clear search"
             >
               ✕
@@ -193,7 +378,7 @@ export default function Recommendations() {
 
         <select
           value={selectedLeague}
-          onChange={(e) => setSelectedLeague(e.target.value)}
+          onChange={(e) => updateParams({ league: e.target.value })}
           className={styles.select}
           aria-label="League filter"
         >
@@ -208,23 +393,23 @@ export default function Recommendations() {
         <div className={styles.kickoffGroup} role="group" aria-label="Kickoff window">
           {(
             [
-              { value: 'all', label: 'All kickoffs' },
               {
-                value: 'soon',
+                value: 'soon' as const,
                 label: kickoffCounts.soon > 0 ? `Soon (${kickoffCounts.soon})` : 'Soon',
               },
               {
-                value: 'today',
+                value: 'today' as const,
                 label: kickoffCounts.today > 0 ? `Today (${kickoffCounts.today})` : 'Today',
               },
               {
-                value: 'tomorrow',
+                value: 'tomorrow' as const,
                 label:
                   kickoffCounts.tomorrow > 0
                     ? `Tomorrow (${kickoffCounts.tomorrow})`
                     : 'Tomorrow',
               },
-            ] as const
+              { value: 'all' as const, label: 'All kickoffs' },
+            ]
           ).map((option) => (
             <button
               key={option.value}
@@ -232,21 +417,34 @@ export default function Recommendations() {
               className={`${styles.kickoffChip} ${
                 kickoffWindow === option.value ? styles.kickoffChipActive : ''
               }`}
-              onClick={() => {
-                setKickoffWindow(option.value);
-                if (option.value !== 'all' && sortBy === 'score') {
-                  setSortBy('kickoff');
-                }
-              }}
+              onClick={() => setKickoffWindow(option.value)}
             >
               {option.label}
             </button>
           ))}
         </div>
 
+        {kickoffWindow === 'all' && (
+          <div className={styles.horizonGroup} role="group" aria-label="Look-ahead horizon">
+            <span className={styles.horizonLabel}>Horizon</span>
+            {HORIZON_OPTIONS.map((days) => (
+              <button
+                key={days}
+                type="button"
+                className={`${styles.kickoffChip} ${
+                  horizon === days ? styles.kickoffChipActive : ''
+                }`}
+                onClick={() => updateParams({ days: String(days) })}
+              >
+                {days}d
+              </button>
+            ))}
+          </div>
+        )}
+
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as KickoffSort)}
+          onChange={(e) => updateParams({ sort: e.target.value })}
           className={styles.select}
           aria-label="Sort recommendations"
         >
@@ -258,7 +456,7 @@ export default function Recommendations() {
           <input
             type="checkbox"
             checked={hideEmptySections}
-            onChange={(e) => setHideEmptySections(e.target.checked)}
+            onChange={(e) => updateParams({ empty: e.target.checked ? null : '0' })}
             className={styles.checkbox}
           />
           <span>Hide empty sections</span>
@@ -271,11 +469,74 @@ export default function Recommendations() {
         )}
       </div>
 
+      <div className={styles.filterBlock}>
+        <div className={styles.filterGroup}>
+          <span className={styles.filterLabel}>Confidence</span>
+          <div className={styles.filterRow} role="group" aria-label="Confidence filter">
+            {CONFIDENCE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.chip} ${
+                  confidenceFilter === option.value ? styles.chipActive : ''
+                }`}
+                onClick={() => updateParams({ confidence: option.value })}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {typesWithPicks.length > 0 && (
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Market</span>
+            <div className={styles.filterRow} role="group" aria-label="Market filter">
+              <button
+                type="button"
+                className={`${styles.chip} ${typeFilter === 'ALL' ? styles.chipActive : ''}`}
+                onClick={() => updateParams({ type: null })}
+              >
+                All markets
+              </button>
+              {typesWithPicks.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`${styles.chip} ${typeFilter === type ? styles.chipActive : ''}`}
+                  onClick={() => updateParams({ type })}
+                >
+                  {sectionTitle(type)} ({typeCounts[type]})
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {typeFilter === 'ALL' && typesWithPicks.length > 1 && !isLoading && (
+        <nav className={styles.jumpNav} aria-label="Jump to market">
+          <span className={styles.jumpLabel}>Jump</span>
+          <div className={styles.jumpRow}>
+            {typesWithPicks.map((type) => (
+              <button
+                key={type}
+                type="button"
+                className={styles.jumpChip}
+                onClick={() => jumpToSection(type)}
+              >
+                {SECTION_CONFIG[type].icon} {sectionTitle(type)}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+
       {isLoading ? (
         <RecommendationsPageSkeleton />
       ) : isError ? (
         <div className={styles.error}>
-          <div className={styles.errorIcon}>⚠️</div>
+          <div className={styles.errorIcon}>!</div>
           <h2 className={styles.errorTitle}>Failed to load recommendations</h2>
           <p className={styles.errorMessage}>
             {error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'}
@@ -287,6 +548,9 @@ export default function Recommendations() {
       ) : filteredRecommendations && totalCount > 0 ? (
         <div className={styles.sections}>
           {SECTION_ORDER.map((type) => {
+            if (typeFilter !== 'ALL' && type !== typeFilter) {
+              return null;
+            }
             const recommendations = filteredRecommendations[type] || [];
             if (hideEmptySections && recommendations.length === 0) {
               return null;
@@ -306,7 +570,9 @@ export default function Recommendations() {
           <p>
             {kickoffWindow !== 'all'
               ? 'No recommendations in that kickoff window.'
-              : 'No recommendations found.'}
+              : confidenceFilter === 'strong'
+                ? 'No Strong recommendations match these filters.'
+                : 'No recommendations found.'}
           </p>
           {hasActiveFilters && (
             <button className={styles.clearFiltersAlt} onClick={clearFilters}>
@@ -323,8 +589,7 @@ export default function Recommendations() {
             type="button"
             className={styles.soonHint}
             onClick={() => {
-              setKickoffWindow('soon');
-              setSortBy('kickoff');
+              updateParams({ kickoff: 'soon', sort: 'kickoff' });
             }}
           >
             {kickoffCounts.soon} starting within 3 hours

@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Recommendation } from '../types';
 import { useShortlist } from '../contexts/ShortlistContext';
 import { formatKickoffDisplay } from '../utils/kickoff';
+import { formatFactorEntries } from '../utils/recommendationFactors';
+import { SECTION_CONFIG } from '../utils/recommendationSections';
 import styles from './RecommendationRow.module.css';
 
 interface Props {
@@ -44,40 +47,72 @@ export function RecommendationRow({
 }: Props) {
   const { isShortlisted, toggleShortlist } = useShortlist();
   const isInShortlist = isShortlisted(recommendation.fixtureId, recommendation.type);
+  const [expanded, setExpanded] = useState(false);
 
   const handleToggleShortlist = (e: React.MouseEvent) => {
     e.stopPropagation();
     toggleShortlist(recommendation.fixtureId, recommendation.type);
   };
+
+  const toggleExpanded = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded((prev) => !prev);
+  };
+
   const fixtureLabel = `${recommendation.homeTeamName} vs ${recommendation.awayTeamName}`;
   const fixturePath = `/fixtures/${recommendation.fixtureId}`;
   const kickoff = formatKickoffDisplay(recommendation.matchDateUnix);
 
+  const config = SECTION_CONFIG[recommendation.type];
   const score = Number(recommendation.score || 0).toFixed(0);
-  const isBookingPoints = recommendation.type === 'BOOKING_POINTS';
-  const isCorners = recommendation.type === 'OVER_CORNERS' || recommendation.type === 'UNDER_CORNERS';
-  const isFormMismatch = recommendation.type === 'WINNING_FORM_MISMATCH' || recommendation.type === 'LOSING_FORM_MISMATCH';
-  const isHomeAwaySpecialist = recommendation.type === 'HOME_AWAY_SPECIALIST';
-  const scoreUnit = isBookingPoints || isFormMismatch || isHomeAwaySpecialist ? ' pts' : isCorners ? '' : '%';
+  const scoreUnit = config?.scoreUnit ?? '%';
+  const scoreLabel = config?.scoreLabel ?? 'Score';
+
+  const factorEntries = formatFactorEntries(recommendation.factors);
+  const hasWhy =
+    Boolean(recommendation.description?.trim()) || factorEntries.length > 0;
 
   const rowClass = showPrice ? styles.row : styles.rowNoPrice;
 
+  const details = expanded && hasWhy && (
+    <div className={styles.details} id={`why-${recommendation.fixtureId}-${recommendation.type}`}>
+      {recommendation.description?.trim() && (
+        <p className={styles.detailsSummary}>{recommendation.description.trim()}</p>
+      )}
+      {factorEntries.length > 0 && (
+        <dl className={styles.factorList}>
+          {factorEntries.map((entry) => (
+            <div key={entry.label} className={styles.factorItem}>
+              <dt className={styles.factorLabel}>{entry.label}</dt>
+              <dd className={styles.factorValue}>{entry.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+
   return (
-    <>
+    <div className={styles.item}>
       {/* Desktop row layout */}
       <div className={rowClass}>
         <span className={styles.sentiment} title={recommendation.confidence}>
           <ConfidenceIcon level={recommendation.confidence} />
         </span>
-        <span className={styles.league}>
+        <span
+          className={styles.league}
+          title={recommendation.leagueName || undefined}
+        >
           {recommendation.leagueImage ? (
-            <img 
-              src={recommendation.leagueImage} 
-              alt={recommendation.leagueName || 'League'} 
+            <img
+              src={recommendation.leagueImage}
+              alt=""
               className={styles.leagueIcon}
             />
           ) : (
-            <span className={styles.leaguePlaceholder}>⚽</span>
+            <span className={styles.leaguePlaceholder} aria-hidden>
+              ⚽
+            </span>
           )}
         </span>
         <span
@@ -87,27 +122,49 @@ export function RecommendationRow({
           <span className={styles.date}>{kickoff.primaryLabel}</span>
           <span className={styles.time}>{kickoff.timeLabel}</span>
         </span>
-        {linkToFixture ? (
-          <Link to={fixturePath} className={styles.fixtureLink}>
-            {fixtureLabel}
-          </Link>
-        ) : (
-          <span className={styles.fixture}>{fixtureLabel}</span>
-        )}
+        <div className={styles.fixtureBlock}>
+          {linkToFixture ? (
+            <Link to={fixturePath} className={styles.fixtureLink}>
+              {fixtureLabel}
+            </Link>
+          ) : (
+            <span className={styles.fixture}>{fixtureLabel}</span>
+          )}
+          {recommendation.leagueName && (
+            <span className={styles.leagueName}>{recommendation.leagueName}</span>
+          )}
+        </div>
         <span className={styles.market}>{recommendation.market}</span>
         {showPrice && (
           <span className={styles.price}>
             {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
           </span>
         )}
-        <span className={styles.score}>{score}{scoreUnit}</span>
-        <button 
-          className={`${styles.starButton} ${isInShortlist ? styles.starred : ''}`}
-          onClick={handleToggleShortlist}
-          title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
-        >
-          {isInShortlist ? '★' : '☆'}
-        </button>
+        <span className={styles.score} title={scoreLabel}>
+          {score}
+          {scoreUnit}
+        </span>
+        <div className={styles.actions}>
+          {hasWhy && (
+            <button
+              type="button"
+              className={`${styles.whyButton} ${expanded ? styles.whyButtonOpen : ''}`}
+              onClick={toggleExpanded}
+              aria-expanded={expanded}
+              aria-controls={`why-${recommendation.fixtureId}-${recommendation.type}`}
+              title={expanded ? 'Hide why' : 'Why this pick'}
+            >
+              Why
+            </button>
+          )}
+          <button
+            className={`${styles.starButton} ${isInShortlist ? styles.starred : ''}`}
+            onClick={handleToggleShortlist}
+            title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
+          >
+            {isInShortlist ? '★' : '☆'}
+          </button>
+        </div>
       </div>
 
       {/* Mobile card layout */}
@@ -117,22 +174,29 @@ export function RecommendationRow({
             <ConfidenceIcon level={recommendation.confidence} />
           </span>
           {recommendation.leagueImage ? (
-            <img 
-              src={recommendation.leagueImage} 
-              alt={recommendation.leagueName || 'League'} 
+            <img
+              src={recommendation.leagueImage}
+              alt=""
               className={styles.mobileLeagueIcon}
             />
           ) : (
-            <span className={styles.mobileLeaguePlaceholder}>⚽</span>
+            <span className={styles.mobileLeaguePlaceholder} aria-hidden>
+              ⚽
+            </span>
           )}
-          {linkToFixture ? (
-            <Link to={fixturePath} className={styles.mobileFixtureLink}>
-              {fixtureLabel}
-            </Link>
-          ) : (
-            <span className={styles.mobileFixture}>{fixtureLabel}</span>
-          )}
-          <button 
+          <div className={styles.mobileFixtureBlock}>
+            {linkToFixture ? (
+              <Link to={fixturePath} className={styles.mobileFixtureLink}>
+                {fixtureLabel}
+              </Link>
+            ) : (
+              <span className={styles.mobileFixture}>{fixtureLabel}</span>
+            )}
+            {recommendation.leagueName && (
+              <span className={styles.mobileLeagueName}>{recommendation.leagueName}</span>
+            )}
+          </div>
+          <button
             className={`${styles.mobileStarButton} ${isInShortlist ? styles.starred : ''}`}
             onClick={handleToggleShortlist}
             title={isInShortlist ? 'Remove from shortlist' : 'Add to shortlist'}
@@ -161,11 +225,26 @@ export function RecommendationRow({
             </div>
           )}
           <div className={styles.mobileInfo}>
-            <span className={styles.mobileLabel}>Score</span>
-            <span className={styles.mobileScore}>{score}{scoreUnit}</span>
+            <span className={styles.mobileLabel}>{scoreLabel}</span>
+            <span className={styles.mobileScore}>
+              {score}
+              {scoreUnit}
+            </span>
           </div>
         </div>
+        {hasWhy && (
+          <button
+            type="button"
+            className={`${styles.mobileWhyButton} ${expanded ? styles.whyButtonOpen : ''}`}
+            onClick={toggleExpanded}
+            aria-expanded={expanded}
+          >
+            {expanded ? 'Hide why' : 'Why this pick'}
+          </button>
+        )}
       </div>
-    </>
+
+      {details}
+    </div>
   );
 }

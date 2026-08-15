@@ -4,28 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fixtureService, recommendationService } from '../services/api';
 import { RecommendationRow } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
+import { SECTION_CONFIG } from '../utils/recommendationSections';
 import styles from './FixtureDetail.module.css';
-
-const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string; showPrice: boolean }> = {
-  BTTS: { title: 'Both Teams To Score', icon: '⚽', showPrice: true },
-  OVER_GOALS: { title: 'Over Goals', icon: '🎯', showPrice: true },
-  UNDER_GOALS: { title: 'Under Goals', icon: '🛡️', showPrice: true },
-  BOOKING_POINTS: { title: 'Booking Points', icon: '🟨', showPrice: false },
-  VALUE_BET: { title: 'Value Bets', icon: '💰', showPrice: true },
-  WINNING_FORM_MISMATCH: { title: 'Winning Form Mismatch', icon: '🔥', showPrice: false },
-  LOSING_FORM_MISMATCH: { title: 'Losing Form Mismatch', icon: '📉', showPrice: false },
-  OVER_CORNERS: { title: 'Over Corners', icon: '📐', showPrice: false },
-  UNDER_CORNERS: { title: 'Under Corners', icon: '📏', showPrice: false },
-  CLEAN_SHEET: { title: 'Clean Sheet', icon: '🧤', showPrice: false },
-  FIRST_HALF_GOALS: { title: 'First Half Goals', icon: '1️⃣', showPrice: false },
-  SECOND_HALF_GOALS: { title: 'Second Half Goals', icon: '2️⃣', showPrice: false },
-  MATCH_RESULT: { title: 'Match Result', icon: '🏆', showPrice: true },
-  HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', showPrice: false },
-  DRAW: { title: 'Draw', icon: '🤝', showPrice: true },
-  DOUBLE_CHANCE: { title: 'Double Chance', icon: '🎲', showPrice: false },
-  RESULT_BTTS: { title: 'Result + BTTS', icon: '🎯⚽', showPrice: false },
-  TOP_VS_BOTTOM: { title: 'Top vs Bottom', icon: '⬆️⬇️', showPrice: false },
-};
 
 const CONFIDENCE_ORDER: Record<string, number> = {
   STRONG: 0,
