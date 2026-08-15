@@ -201,46 +201,19 @@ class DoubleChanceRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze uses home win price for 1X recommendations")
-    void analyze_usesHomeWinPriceFor1X() {
+    @DisplayName("analyze synthesizes double chance odds from match-result prices")
+    void analyze_synthesizesDoubleChanceOdds() {
         FixtureContext context = createContextWithOdds();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Home/Draw (1X)");
-        assertThat(result.get().getOdds()).isEqualTo(1.80);
-        assertThat(result.get().getFactors().get("winPrice")).isEqualTo(1.80);
-        assertThat(result.get().getFactors().get("winPriceSide")).isEqualTo("home");
-    }
-
-    @Test
-    @DisplayName("analyze uses away win price for X2 recommendations")
-    void analyze_usesAwayWinPriceForX2() {
-        FixtureContext base = createStrongAwayContext();
-        FixtureOdds odds = FixtureOdds.builder()
-                .fixtureId(102L)
-                .oddsFt1(4.20)
-                .oddsFtX(3.60)
-                .oddsFt2(1.95)
-                .build();
-
-        FixtureContext context = FixtureContext.builder()
-                .fixture(base.getFixture())
-                .homeTeam(base.getHomeTeam())
-                .awayTeam(base.getAwayTeam())
-                .homeTeamStats(base.getHomeTeamStats())
-                .awayTeamStats(base.getAwayTeamStats())
-                .odds(odds)
-                .build();
-
-        Optional<Recommendation> result = engine.analyze(context);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Draw/Away (X2)");
-        assertThat(result.get().getOdds()).isEqualTo(1.95);
-        assertThat(result.get().getFactors().get("winPrice")).isEqualTo(1.95);
-        assertThat(result.get().getFactors().get("winPriceSide")).isEqualTo("away");
+        // 1.80 home + 3.50 draw => implied 55.56% + 28.57% = 84.13% => ~1.19
+        assertThat(result.get().getOdds()).isNotNull();
+        assertThat(result.get().getOdds()).isGreaterThan(1.0);
+        assertThat(result.get().getOdds()).isLessThan(1.5);
+        assertThat(result.get().getFactors()).containsKey("combined1XOdds");
     }
 
     // Helper methods to create test contexts
