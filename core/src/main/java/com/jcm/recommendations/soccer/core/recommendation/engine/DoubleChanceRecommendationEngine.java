@@ -162,19 +162,28 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        // Get odds for selected market
+        // Show the single win price for the backed side (home for 1X, away for X2).
+        // Value analysis still uses combined 1X/X2 implied probability above.
         Double odds = null;
+        Double winPrice = null;
+        String winPriceSide = null;
         if (context.hasOdds()) {
             if (market.contains("1X")) {
-                odds = calculate1XOdds(context);
+                winPrice = context.getOdds().getOddsFt1();
+                winPriceSide = "home";
             } else {
-                odds = calculateX2Odds(context);
+                winPrice = context.getOdds().getOddsFt2();
+                winPriceSide = "away";
+            }
+            if (winPrice != null && winPrice > 1.0) {
+                odds = winPrice;
             }
         }
 
         Map<String, Object> factors = buildFactors(context, homeWinProb, drawProb, awayWinProb,
                 homeDrawProb, drawAwayProb, value1X, valueX2, implied1X, impliedX2,
-                isFortress, isPoorTraveler, isRoadWarrior, isWeakHome, hasXgData);
+                isFortress, isPoorTraveler, isRoadWarrior, isWeakHome, hasXgData,
+                winPrice, winPriceSide);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.DOUBLE_CHANCE)
@@ -434,18 +443,6 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
         return impliedX + implied2;
     }
 
-    private Double calculate1XOdds(FixtureContext context) {
-        Double implied = calculateImplied1X(context);
-        if (implied == null || implied <= 0) return null;
-        return 100.0 / implied;
-    }
-
-    private Double calculateX2Odds(FixtureContext context) {
-        Double implied = calculateImpliedX2(context);
-        if (implied == null || implied <= 0) return null;
-        return 100.0 / implied;
-    }
-
     private int safeInt(Integer value) {
         return value != null ? value : 0;
     }
@@ -456,7 +453,9 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
             double value1X, double valueX2,
             Double implied1X, Double impliedX2,
             boolean isFortress, boolean isPoorTraveler, boolean isRoadWarrior, boolean isWeakHome,
-            boolean hasXgData) {
+            boolean hasXgData,
+            Double winPrice,
+            String winPriceSide) {
         
         Map<String, Object> factors = new HashMap<>();
         
@@ -471,10 +470,35 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
         if (implied1X != null) {
             factors.put("implied1X", implied1X);
             factors.put("value1X", value1X);
+            Double combined1XOdds = implied1X > 0 ? 100.0 / implied1X : null;
+            if (combined1XOdds != null) {
+                factors.put("combined1XOdds", combined1XOdds);
+            }
         }
         if (impliedX2 != null) {
             factors.put("impliedX2", impliedX2);
             factors.put("valueX2", valueX2);
+            Double combinedX2Odds = impliedX2 > 0 ? 100.0 / impliedX2 : null;
+            if (combinedX2Odds != null) {
+                factors.put("combinedX2Odds", combinedX2Odds);
+            }
+        }
+
+        // Displayed price is the win selection for the backed side
+        if (winPrice != null && winPrice > 1.0) {
+            factors.put("winPrice", winPrice);
+            factors.put("winPriceSide", winPriceSide);
+        }
+        if (context.hasOdds()) {
+            if (context.getOdds().getOddsFt1() != null) {
+                factors.put("homeWinOdds", context.getOdds().getOddsFt1());
+            }
+            if (context.getOdds().getOddsFt2() != null) {
+                factors.put("awayWinOdds", context.getOdds().getOddsFt2());
+            }
+            if (context.getOdds().getOddsFtX() != null) {
+                factors.put("drawOdds", context.getOdds().getOddsFtX());
+            }
         }
 
         // Team characteristics

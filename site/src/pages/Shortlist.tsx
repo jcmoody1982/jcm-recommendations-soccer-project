@@ -22,7 +22,7 @@ const SECTION_CONFIG: Record<RecommendationType, { title: string; icon: string; 
   MATCH_RESULT: { title: 'Match Result', icon: '🏆', showPrice: true },
   HOME_AWAY_SPECIALIST: { title: 'Home/Away Specialist', icon: '🏟️', showPrice: false },
   DRAW: { title: 'Draw', icon: '🤝', showPrice: true },
-  DOUBLE_CHANCE: { title: 'Double Chance', icon: '🎲', showPrice: false },
+  DOUBLE_CHANCE: { title: 'Double Chance', icon: '🎲', showPrice: true },
   RESULT_BTTS: { title: 'Result + BTTS', icon: '🎯⚽', showPrice: false },
   TOP_VS_BOTTOM: { title: 'Top vs Bottom', icon: '⬆️⬇️', showPrice: false },
 };
