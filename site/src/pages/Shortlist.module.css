@@ -32,12 +32,12 @@
 }
 
 .exportButton {
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.75rem;
   background: var(--accent-color);
   border: none;
   border-radius: 6px;
   color: var(--accent-contrast);
-  font-size: 0.875rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -48,12 +48,12 @@
 }
 
 .clearButton {
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.75rem;
   background: transparent;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: var(--font-size-md);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -84,18 +84,18 @@
 }
 
 .sectionIcon {
-  font-size: 1.25rem;
+  font-size: var(--font-size-section);
 }
 
 .sectionTitle {
-  font-size: 1.25rem;
+  font-size: var(--font-size-section);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .sectionCount {
   margin-left: auto;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
   font-weight: 400;
 }
@@ -137,7 +137,7 @@
 .empty p {
   color: var(--text-muted);
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--font-size-md);
 }
 
 .footer {
@@ -150,7 +150,7 @@
 
 .totalCount {
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
 }
 
 @media (max-width: 640px) {

@@ -39,6 +39,11 @@
   --early-kickoff-strong: #8e0000;
   --early-kickoff-bg: rgba(198, 40, 40, 0.1);
   --early-kickoff-border: rgba(198, 40, 40, 0.35);
+  /* Dense UI scale — matches recommendation cards */
+  --font-size-label: 0.65rem;
+  --font-size-sm: 0.72rem;
+  --font-size-md: 0.8rem;
+  --font-size-section: 0.95rem;
   --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-body: 'Manrope', system-ui, sans-serif;
 }

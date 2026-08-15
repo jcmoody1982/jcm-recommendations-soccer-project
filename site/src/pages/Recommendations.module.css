@@ -72,12 +72,12 @@
 .headerSearchInput {
   flex: 1;
   min-width: 0;
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.65rem;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--font-size-md);
 }
 
 .headerSearchInput:focus {
@@ -87,16 +87,16 @@
 
 .totalCount {
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
 }
 
 .select {
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.75rem;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--font-size-md);
   cursor: pointer;
   transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
@@ -132,7 +132,7 @@
 }
 
 .filterLabel {
-  font-size: 0.72rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -160,12 +160,12 @@
 }
 
 .chip {
-  padding: 0.4rem 0.75rem;
+  padding: 0.35rem 0.65rem;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--bg-card);
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
 }
@@ -199,7 +199,7 @@
 }
 
 .horizonLabel {
-  font-size: 0.72rem;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -208,12 +208,12 @@
 }
 
 .kickoffChip {
-  padding: 0.4rem 0.75rem;
+  padding: 0.35rem 0.65rem;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--bg-card);
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -231,12 +231,12 @@
 }
 
 .clearFilters {
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.65rem;
   background: transparent;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--font-size-md);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -250,12 +250,12 @@
 
 .clearFiltersAlt {
   margin-top: 1rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.55rem 1.15rem;
   background: var(--accent-color);
   border: none;
   border-radius: 8px;
   color: var(--accent-contrast);
-  font-size: 0.9rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -358,7 +358,7 @@
 
 .errorTitle {
   color: var(--text-primary);
-  font-size: 1.25rem;
+  font-size: var(--font-size-section);
   margin: 0 0 0.5rem 0;
 }
 
@@ -368,18 +368,19 @@
   max-width: 400px;
   margin-left: auto;
   margin-right: auto;
+  font-size: var(--font-size-md);
 }
 
 .retryButton {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.55rem 1.15rem;
   background: var(--accent-color);
   color: var(--accent-contrast);
   border: none;
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.1s ease;
@@ -399,6 +400,7 @@
   padding: 4rem 2rem;
   background: var(--bg-secondary);
   border-radius: 8px;
+  font-size: var(--font-size-md);
   transition: background 0.3s ease, color 0.3s ease;
 }
 
@@ -415,12 +417,12 @@
 }
 
 .soonHint {
-  padding: 0.35rem 0.75rem;
+  padding: 0.3rem 0.65rem;
   border: 1px solid var(--accent-color);
   border-radius: 6px;
   background: var(--accent-soft);
   color: var(--urgency-soon-strong);
-  font-size: 0.85rem;
+  font-size: var(--font-size-md);
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease;
