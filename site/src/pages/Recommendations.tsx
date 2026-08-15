@@ -19,7 +19,7 @@ import styles from './Recommendations.module.css';
 
 /** Fetch horizon when viewing all kickoffs (Soon/Today/Tomorrow set days automatically). */
 const HORIZON_OPTIONS = [3, 7] as const;
-const DEFAULT_HORIZON = 3;
+const DEFAULT_HORIZON = 7;
 const KICKOFF_WINDOWS: KickoffWindow[] = ['all', 'soon', 'today', 'tomorrow'];
 const SORT_OPTIONS: KickoffSort[] = ['score', 'kickoff'];
 
