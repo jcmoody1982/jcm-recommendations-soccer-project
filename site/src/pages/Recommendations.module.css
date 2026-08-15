@@ -118,6 +118,18 @@
   border: 1px solid var(--border-color);
 }
 
+.filtersShell {
+  margin-bottom: 0;
+}
+
+.filtersToggle {
+  display: none;
+}
+
+.filtersPanel {
+  display: block;
+}
+
 .filterBlock {
   display: flex;
   flex-direction: column;
@@ -282,11 +294,73 @@
     flex: 1 1 auto;
   }
 
+  .filtersShell {
+    margin-bottom: 0.85rem;
+  }
+
+  .filtersToggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .filtersToggleActive {
+    border-color: var(--accent-color);
+    background: var(--accent-soft);
+  }
+
+  .filtersToggleLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .filtersToggleBadge {
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: var(--accent-color);
+    color: var(--accent-contrast);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .filtersChevron {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    transition: transform 0.15s ease;
+  }
+
+  .filtersChevronOpen {
+    transform: rotate(180deg);
+  }
+
+  .filtersPanel {
+    display: none;
+    margin-top: 0.5rem;
+  }
+
+  .filtersPanelOpen {
+    display: block;
+  }
+
   .filters {
     flex-direction: column;
     align-items: stretch;
     padding: 0.75rem;
     gap: 0.5rem;
+    margin-bottom: 0.5rem;
   }
 
   .filters .select,
@@ -312,7 +386,7 @@
 
   .filterBlock {
     gap: 0.6rem;
-    margin-bottom: 0.85rem;
+    margin-bottom: 0;
   }
 
   .clearFilters {
