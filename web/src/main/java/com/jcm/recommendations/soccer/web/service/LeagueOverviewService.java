@@ -48,6 +48,7 @@ public class LeagueOverviewService {
                             .homeTeam(f.getHomeTeamName())
                             .awayTeam(f.getAwayTeamName())
                             .matchDate(Instant.ofEpochSecond(f.getDateUnix()))
+                            .matchDateUnix(f.getDateUnix())
                             .build())
                     .sorted(Comparator.comparing(FixtureSummaryDto::getMatchDate))
                     .toList();

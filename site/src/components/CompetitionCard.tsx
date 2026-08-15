@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Competition } from '../types';
-import { EARLY_KICKOFF_WARNING, isEarlyKickoffUk } from '../utils/kickoff';
+import type { Competition, FixtureSummary } from '../types';
+import {
+  EARLY_KICKOFF_WARNING,
+  isEarlyKickoffUk,
+  toKickoffDate,
+} from '../utils/kickoff';
 import { EarlyKickoffBadge } from './EarlyKickoffWarning';
 import styles from './CompetitionCard.module.css';
 
@@ -9,22 +13,43 @@ interface CompetitionCardProps {
   competition: Competition;
 }
 
+function fixtureKickoffInput(fixture: FixtureSummary): number | string | Date | null {
+  if (fixture.matchDateUnix != null && Number.isFinite(fixture.matchDateUnix)) {
+    return fixture.matchDateUnix;
+  }
+  if (fixture.matchDate != null && fixture.matchDate !== '') {
+    return fixture.matchDate;
+  }
+  return null;
+}
+
+function formatFixtureKickoff(fixture: FixtureSummary): string {
+  const input = fixtureKickoffInput(fixture);
+  const date = input == null ? null : toKickoffDate(input);
+  if (!date) return '—';
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function CompetitionCard({ competition }: CompetitionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const earlyCount = useMemo(
+    () =>
+      competition.fixtures.reduce((count, fixture) => {
+        const input = fixtureKickoffInput(fixture);
+        return input != null && isEarlyKickoffUk(input) ? count + 1 : count;
+      }, 0),
+    [competition.fixtures]
+  );
 
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${earlyCount > 0 ? styles.cardHasEarly : ''}`}>
       <button
         className={styles.header}
         onClick={() => setIsExpanded(!isExpanded)}
@@ -39,6 +64,17 @@ export function CompetitionCard({ competition }: CompetitionCardProps) {
             />
           )}
           <span className={styles.name}>{competition.name}</span>
+          {earlyCount > 0 && (
+            <span
+              className={styles.headerEarly}
+              title={`${earlyCount} early kick-off${earlyCount === 1 ? '' : 's'} · ${EARLY_KICKOFF_WARNING}`}
+            >
+              <EarlyKickoffBadge />
+              {earlyCount > 1 && (
+                <span className={styles.headerEarlyCount}>×{earlyCount}</span>
+              )}
+            </span>
+          )}
         </div>
         <div className={styles.fixtureCount}>
           <span className={styles.countIcon}>📅</span>
@@ -53,7 +89,9 @@ export function CompetitionCard({ competition }: CompetitionCardProps) {
         <div className={styles.fixtureList}>
           {competition.fixtures.length > 0 ? (
             competition.fixtures.map((fixture) => {
-              const isEarlyKickoff = isEarlyKickoffUk(fixture.matchDate);
+              const kickoffInput = fixtureKickoffInput(fixture);
+              const isEarlyKickoff =
+                kickoffInput != null && isEarlyKickoffUk(kickoffInput);
               return (
                 <Link
                   key={fixture.fixtureId}
@@ -67,7 +105,7 @@ export function CompetitionCard({ competition }: CompetitionCardProps) {
                     className={`${styles.date} ${isEarlyKickoff ? styles.dateEarly : ''}`}
                     title={isEarlyKickoff ? EARLY_KICKOFF_WARNING : undefined}
                   >
-                    <span>{formatDate(fixture.matchDate)}</span>
+                    <span>{formatFixtureKickoff(fixture)}</span>
                     {isEarlyKickoff && <EarlyKickoffBadge />}
                   </span>
                   <span className={styles.fixtureCue} aria-hidden="true">→</span>
