@@ -15,15 +15,20 @@ export function getKickoffMs(matchDateUnix: number): number {
   return matchDateUnix * 1000;
 }
 
-/** Kickoffs at or before 12:30 Europe/London are treated as early. */
-export const EARLY_KICKOFF_UK_MINUTES = 12 * 60 + 30;
+/** Inclusive UK window for the early-kickoff warning (Europe/London). */
+export const EARLY_KICKOFF_UK_START_MINUTES = 8 * 60;
+export const EARLY_KICKOFF_UK_END_MINUTES = 12 * 60 + 30;
 
+/** Full caution copy for tooltips / accessibility. */
 export const EARLY_KICKOFF_WARNING =
   'Early Kick-Off — Proceed with Extreme Caution';
 
+/** Desktop strip copy — badge already says Early KO. */
+export const EARLY_KICKOFF_STRIP = 'Proceed with Extreme Caution';
+
 /**
- * True when the fixture kicks off at or before 12:30 UK time
- * (Europe/London, including BST/GMT).
+ * True when the fixture kicks off between 08:00 and 12:30 UK time
+ * inclusive (Europe/London, including BST/GMT).
  */
 export function isEarlyKickoffUk(matchDateUnix: number): boolean {
   const date = new Date(getKickoffMs(matchDateUnix));
@@ -39,7 +44,11 @@ export function isEarlyKickoffUk(matchDateUnix: number): boolean {
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
     return false;
   }
-  return hour * 60 + minute <= EARLY_KICKOFF_UK_MINUTES;
+  const minutes = hour * 60 + minute;
+  return (
+    minutes >= EARLY_KICKOFF_UK_START_MINUTES
+    && minutes <= EARLY_KICKOFF_UK_END_MINUTES
+  );
 }
 
 export function matchesKickoffWindow(

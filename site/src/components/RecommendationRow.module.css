@@ -399,13 +399,6 @@
     padding-left: 7px;
   }
 
-  .mobileCard .earlyStrip {
-    margin: 0 0 5px;
-    border-radius: 4px;
-    font-size: 0.68rem;
-    padding: 0.3rem 0.5rem;
-  }
-
   .mobileCardHeader {
     display: flex;
     align-items: center;
