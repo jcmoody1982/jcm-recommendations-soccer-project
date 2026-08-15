@@ -22,6 +22,11 @@
   border-bottom: 1px solid var(--border-color);
 }
 
+.headerEarly {
+  border-left: 3px solid var(--early-kickoff);
+  padding-left: 0.85rem;
+}
+
 .matchup {
   margin-bottom: 0.75rem;
 }
@@ -63,6 +68,19 @@
 .kickoff {
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.kickoffEarly {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--early-kickoff-strong);
+  font-weight: 700;
+}
+
+.earlyStripWrap {
+  margin-top: 0.75rem;
 }
 
 .stadium,

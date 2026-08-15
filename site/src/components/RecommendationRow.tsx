@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import type { Recommendation } from '../types';
 import { useShortlist } from '../contexts/ShortlistContext';
 import {
-  EARLY_KICKOFF_STRIP,
   EARLY_KICKOFF_WARNING,
   formatKickoffDisplay,
   isEarlyKickoffUk,
@@ -11,6 +10,7 @@ import {
 import { formatFactorEntries } from '../utils/recommendationFactors';
 import { SECTION_CONFIG } from '../utils/recommendationSections';
 import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
+import { EarlyKickoffBadge, EarlyKickoffStrip } from './EarlyKickoffWarning';
 import styles from './RecommendationRow.module.css';
 
 interface Props {
@@ -46,45 +46,6 @@ const ConfidenceIcon = ({ level }: { level: string }) => {
     </svg>
   );
 };
-
-const EarlyWarningIcon = ({ size = 12 }: { size?: number }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 20 20"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden
-  >
-    <path
-      d="M10 2.5L18 17H2L10 2.5Z"
-      fill="currentColor"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinejoin="round"
-    />
-    <path d="M10 8V12" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-    <circle cx="10" cy="14.5" r="1" fill="white" />
-  </svg>
-);
-
-function EarlyKickoffBadge() {
-  return (
-    <span className={styles.earlyBadge} title={EARLY_KICKOFF_WARNING}>
-      <EarlyWarningIcon size={10} />
-      EARLY KO
-    </span>
-  );
-}
-
-function EarlyKickoffStrip() {
-  return (
-    <div className={styles.earlyStrip} role="status">
-      <EarlyWarningIcon size={13} />
-      <span>{EARLY_KICKOFF_STRIP}</span>
-    </div>
-  );
-}
 
 function rowClassName(showPrice: boolean, showPositionGap: boolean): string {
   if (showPrice && showPositionGap) return styles.rowPriceGap;
@@ -338,7 +299,7 @@ export function RecommendationRow({
 
       {isEarlyKickoff && (
         <div className={styles.earlyStripDesktop}>
-          <EarlyKickoffStrip />
+          <EarlyKickoffStrip flushTop />
         </div>
       )}
 

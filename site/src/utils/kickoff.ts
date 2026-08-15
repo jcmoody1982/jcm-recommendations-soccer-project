@@ -26,12 +26,30 @@ export const EARLY_KICKOFF_WARNING =
 /** Desktop strip copy — badge already says Early KO. */
 export const EARLY_KICKOFF_STRIP = 'Proceed with Extreme Caution';
 
+/** Accepts unix seconds, unix ms, ISO strings, or Date. */
+export function toKickoffDate(input: number | string | Date): Date | null {
+  if (input instanceof Date) {
+    return Number.isNaN(input.getTime()) ? null : input;
+  }
+  if (typeof input === 'number') {
+    if (!Number.isFinite(input)) return null;
+    // Values below ~1e12 are treated as unix seconds.
+    const ms = input < 1e12 ? input * 1000 : input;
+    const date = new Date(ms);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const date = new Date(input);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /**
  * True when the fixture kicks off between 08:00 and 12:30 UK time
  * inclusive (Europe/London, including BST/GMT).
  */
-export function isEarlyKickoffUk(matchDateUnix: number): boolean {
-  const date = new Date(getKickoffMs(matchDateUnix));
+export function isEarlyKickoffUk(input: number | string | Date): boolean {
+  const date = toKickoffDate(input);
+  if (!date) return false;
+
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/London',
     hour: '2-digit',

@@ -10,6 +10,10 @@
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
+.cardEarly {
+  border-left: 3px solid var(--early-kickoff);
+}
+
 .card:hover {
   background: var(--bg-option-hover);
   border-color: var(--accent-color);
@@ -18,8 +22,17 @@
 .time {
   color: var(--accent-color);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--font-size-md);
   min-width: 50px;
+}
+
+.timeEarly {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  color: var(--early-kickoff-strong);
+  min-width: 72px;
 }
 
 .teams {
