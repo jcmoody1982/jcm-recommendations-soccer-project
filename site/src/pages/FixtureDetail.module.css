@@ -174,12 +174,12 @@
 .retryButton {
   display: inline-flex;
   align-items: center;
-  padding: 0.75rem 1.5rem;
+  padding: 0.55rem 1.15rem;
   background: var(--accent-color);
   color: var(--accent-contrast);
   border: none;
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -199,7 +199,7 @@
 
 .empty h2 {
   margin: 0 0 0.5rem 0;
-  font-size: 1.15rem;
+  font-size: var(--font-size-section);
   color: var(--text-primary);
 }
 
@@ -209,6 +209,7 @@
   max-width: 440px;
   margin-left: auto;
   margin-right: auto;
+  font-size: var(--font-size-md);
 }
 
 @media (max-width: 640px) {
