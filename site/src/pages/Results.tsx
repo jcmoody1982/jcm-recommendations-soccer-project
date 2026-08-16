@@ -624,7 +624,7 @@ export default function Results() {
         <div>
           <h1 className={styles.title}>Results</h1>
           <p className={styles.subtitle}>
-            Daily Dashboard · Elite Picks · Performance
+            Daily Dashboard · Overall Performance Tracker · Elite Pick Performance
           </p>
         </div>
       </header>
@@ -637,16 +637,7 @@ export default function Results() {
           className={`${styles.viewToggleButton} ${view === 'day' ? styles.viewToggleActive : ''}`}
           onClick={() => updateParams({ view: 'day' })}
         >
-          Daily Dashboard
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'elite'}
-          className={`${styles.viewToggleButton} ${view === 'elite' ? styles.viewToggleActive : ''}`}
-          onClick={() => updateParams({ view: 'elite' })}
-        >
-          Elite Picks
+          1 - Daily Dashboard
         </button>
         <button
           type="button"
@@ -655,7 +646,16 @@ export default function Results() {
           className={`${styles.viewToggleButton} ${view === 'performance' ? styles.viewToggleActive : ''}`}
           onClick={() => updateParams({ view: 'performance' })}
         >
-          Performance
+          2 - Overall Performance Tracker
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'elite'}
+          className={`${styles.viewToggleButton} ${view === 'elite' ? styles.viewToggleActive : ''}`}
+          onClick={() => updateParams({ view: 'elite' })}
+        >
+          3 - Elite Pick Performance
         </button>
       </div>
 
@@ -811,7 +811,7 @@ export default function Results() {
       {view === 'elite' && (
         <>
           {eliteSummary && data?.snapshotDate && (
-            <SummaryStrip title="Elite Picks" summary={eliteSummary} tone="strong" />
+            <SummaryStrip title="Elite Pick Performance" summary={eliteSummary} tone="strong" />
           )}
 
           {isLoading && <div className={styles.message}>Loading elite picks…</div>}

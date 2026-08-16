@@ -3154,7 +3154,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 | Window basis | `snapshotDate` in `Europe/London` |
 | Periods | `7d` / `30d` / `90d` / `all` |
 | Minimum sample | Hit rate shown only when `wins + losses >= 10`; otherwise “Not enough data” / `enoughData=false` |
-| UI | Same Results page; toggle **Daily Dashboard \| Performance** (no new nav item) |
+| UI | Same Results page; toggle **1 - Daily Dashboard \| 2 - Overall Performance Tracker \| 3 - Elite Pick Performance** (no new nav item) |
 | v1 out of scope | ROI %, streaks, charts, per-league |
 
 **Statistics (v1):**
@@ -3164,8 +3164,8 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 - Sample size per bucket
 
 **UI:**
-- View toggle on Results: Daily Dashboard (UC-034) | Elite Picks (UC-037) | Performance (UC-035)
-- On Performance: period chips replace the day picker
+- View toggle on Results: **1 - Daily Dashboard** (UC-034) | **2 - Overall Performance Tracker** (UC-035) | **3 - Elite Pick Performance** (UC-037)
+- On Overall Performance Tracker: period chips replace the day picker
 - Overall summary strip + Strong/Moderate panels + by-type table
 
 **API:**
@@ -3236,7 +3236,7 @@ Live Recommendations Elite (UC-036) ranks across the **horizon** (3d/7d). Result
 **Historical days:** If a day has no `eliteRank` tags (pre-feature snapshots), Results may compute Elite on read with the same selector (display-only; optional backfill later).
 
 **Results UI:**
-- Third view toggle: **Daily Dashboard** | **Performance** | **Elite Picks**
+- Third view toggle: **1 - Daily Dashboard** | **2 - Overall Performance Tracker** | **3 - Elite Pick Performance**
 - Route: `/results?view=elite&date=YYYY-MM-DD`
 - Same date navigation as Daily Dashboard
 - Show Elite summary (wins / losses / voids / pending / unsupported / hit rate) + ranked pick list with outcomes / scorelines
@@ -3248,7 +3248,7 @@ Live Recommendations Elite (UC-036) ranks across the **horizon** (3d/7d). Result
 
 **Acceptance Criteria:**
 - [ ] Daily snapshot tags up to 10 Elite picks with `eliteRank`
-- [ ] Results has an **Elite Picks** tab with date nav
+- [ ] Results has an **Elite Pick Performance** tab with date nav
 - [ ] Elite tab shows that day’s Elite snapshot picks and settlement outcomes
 - [ ] Hit rate uses WIN/LOSS only (same as Daily Dashboard)
 - [ ] Days with no Elite candidates show a clear empty state
