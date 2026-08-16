@@ -56,6 +56,29 @@ class ElitePicksSelectorTest {
                 .containsExactly(300L, 200L, 100L);
     }
 
+    @Test
+    void capsBttsAtThreeAndFillsWithOtherMarkets() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        List<RecommendationSnapshot> day = List.of(
+                snap(1L, date, 100L, "BTTS", "STRONG", 95.0, 1.8, 1000L),
+                snap(2L, date, 200L, "BTTS", "STRONG", 94.0, 1.8, 2000L),
+                snap(3L, date, 300L, "BTTS", "STRONG", 93.0, 1.8, 3000L),
+                snap(4L, date, 400L, "BTTS", "STRONG", 92.0, 1.8, 4000L),
+                snap(5L, date, 500L, "BTTS", "STRONG", 91.0, 1.8, 5000L),
+                snap(6L, date, 600L, "OVER_GOALS", "STRONG", 70.0, 2.0, 6000L),
+                snap(7L, date, 700L, "DRAW", "STRONG", 69.0, 2.1, 7000L),
+                snap(8L, date, 400L, "MATCH_RESULT", "STRONG", 68.0, 2.2, 4000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite.stream().filter(r -> "BTTS".equals(r.getType())).count()).isEqualTo(3);
+        assertThat(elite).extracting(RecommendationSnapshot::getType)
+                .containsExactly("BTTS", "BTTS", "BTTS", "OVER_GOALS", "DRAW", "MATCH_RESULT");
+        assertThat(elite).extracting(RecommendationSnapshot::getFixtureId)
+                .containsExactly(100L, 200L, 300L, 600L, 700L, 400L);
+    }
+
     private static RecommendationSnapshot snap(
             Long id, LocalDate date, Long fixtureId, String type, String confidence,
             double score, double odds, long kickoff) {
