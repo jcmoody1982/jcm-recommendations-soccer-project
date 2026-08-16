@@ -2332,6 +2332,10 @@ GET /api/leagues/overview
 4. **Empty Section**
    - If a section has no recommendations, show subtle message or hide section
 
+5. **Elite Picks (UC-036)**
+   - Cross-market top 10 board at the **bottom** of the page (aggregation, not a new engine)
+   - See UC-036 for ranking / eligibility rules
+
 **API Endpoint:**
 ```
 GET /api/recommendations/grouped?daysAhead=7
