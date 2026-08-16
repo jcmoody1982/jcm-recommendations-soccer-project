@@ -26,8 +26,11 @@
 }
 
 .viewToggle {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
   margin-bottom: 1.25rem;
   padding: 0.25rem;
   background: var(--bg-secondary);
@@ -39,11 +42,13 @@
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.85rem;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
 }
 
 .viewToggleActive {
