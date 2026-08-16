@@ -45,7 +45,8 @@ public class ResultsQueryService {
             Double score,
             Double odds,
             String outcome,
-            String description
+            String description,
+            Integer eliteRank
     ) {}
 
     public record ScorelineView(Integer home, Integer away) {}
@@ -67,7 +68,9 @@ public class ResultsQueryService {
             DaySummary summary,
             DaySummary strongSummary,
             DaySummary moderateSummary,
-            List<FixtureResultsView> fixtures
+            DaySummary eliteSummary,
+            List<FixtureResultsView> fixtures,
+            List<FixtureResultsView> eliteFixtures
     ) {}
 
     public List<LocalDate> listSnapshotDates() {
@@ -77,7 +80,8 @@ public class ResultsQueryService {
     public DayResultsView getDayResults(LocalDate date, String outcomeFilter) {
         LocalDate snapshotDate = date != null ? date : resolveDefaultDate();
         if (snapshotDate == null) {
-            return new DayResultsView(null, emptySummary(), emptySummary(), emptySummary(), List.of());
+            return new DayResultsView(
+                    null, emptySummary(), emptySummary(), emptySummary(), emptySummary(), List.of(), List.of());
         }
 
         List<RecommendationSnapshot> allRows = snapshotRepository
@@ -87,19 +91,64 @@ public class ResultsQueryService {
         DaySummary strongSummary = summarize(filterByConfidence(allRows, "STRONG"));
         DaySummary moderateSummary = summarize(filterByConfidence(allRows, "MODERATE"));
 
+        List<RecommendationSnapshot> eliteRows = resolveEliteRows(allRows);
+        DaySummary eliteSummary = summarize(eliteRows);
+
         List<RecommendationSnapshot> rows = allRows;
         PickOutcome filter = parseOutcome(outcomeFilter);
         if (filter != null) {
             rows = rows.stream().filter(r -> r.getOutcome() == filter).toList();
         }
 
+        List<FixtureResultsView> fixtures = toFixtureViews(rows, completedMatchesFor(rows));
+
+        List<RecommendationSnapshot> eliteFiltered = eliteRows;
+        if (filter != null) {
+            eliteFiltered = eliteRows.stream().filter(r -> r.getOutcome() == filter).toList();
+        }
+        List<FixtureResultsView> eliteFixtures = toEliteFixtureViews(
+                eliteFiltered, completedMatchesFor(eliteFiltered));
+
+        return new DayResultsView(
+                snapshotDate, summary, strongSummary, moderateSummary, eliteSummary, fixtures, eliteFixtures);
+    }
+
+    LocalDate resolveDefaultDate() {
+        LocalDate today = LocalDate.now(resultsProperties.zoneId());
+        return listSnapshotDates().stream()
+                .filter(d -> !d.isAfter(today))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Prefer persisted eliteRank tags; otherwise compute Elite-of-day on read (historical days).
+     */
+    List<RecommendationSnapshot> resolveEliteRows(List<RecommendationSnapshot> allRows) {
+        boolean anyTagged = allRows.stream().anyMatch(r -> r.getEliteRank() != null);
+        if (anyTagged) {
+            return allRows.stream()
+                    .filter(r -> r.getEliteRank() != null)
+                    .sorted(Comparator.comparingInt(RecommendationSnapshot::getEliteRank))
+                    .toList();
+        }
+        return ElitePicksSelector.select(allRows);
+    }
+
+    private Map<Long, CompletedMatch> completedMatchesFor(List<RecommendationSnapshot> rows) {
         Set<Long> fixtureIds = rows.stream()
                 .map(RecommendationSnapshot::getFixtureId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Map<Long, CompletedMatch> matches = completedMatchRepository.findByFixtureIdIn(fixtureIds).stream()
+        if (fixtureIds.isEmpty()) {
+            return Map.of();
+        }
+        return completedMatchRepository.findByFixtureIdIn(fixtureIds).stream()
                 .collect(Collectors.toMap(CompletedMatch::getFixtureId, m -> m, (a, b) -> a));
+    }
 
+    private List<FixtureResultsView> toFixtureViews(
+            List<RecommendationSnapshot> rows, Map<Long, CompletedMatch> matches) {
         Map<Long, List<RecommendationSnapshot>> byFixture = new LinkedHashMap<>();
         for (RecommendationSnapshot row : rows) {
             byFixture.computeIfAbsent(row.getFixtureId(), id -> new ArrayList<>()).add(row);
@@ -127,16 +176,30 @@ public class ResultsQueryService {
         fixtures.sort(Comparator.comparing(
                 FixtureResultsView::matchDateUnix,
                 Comparator.nullsLast(Long::compareTo)));
-
-        return new DayResultsView(snapshotDate, summary, strongSummary, moderateSummary, fixtures);
+        return fixtures;
     }
 
-    LocalDate resolveDefaultDate() {
-        LocalDate today = LocalDate.now(resultsProperties.zoneId());
-        return listSnapshotDates().stream()
-                .filter(d -> !d.isAfter(today))
-                .findFirst()
-                .orElse(null);
+    /** One pick per fixture, ordered by elite rank. */
+    private List<FixtureResultsView> toEliteFixtureViews(
+            List<RecommendationSnapshot> eliteRows, Map<Long, CompletedMatch> matches) {
+        List<FixtureResultsView> fixtures = new ArrayList<>();
+        for (int i = 0; i < eliteRows.size(); i++) {
+            RecommendationSnapshot row = eliteRows.get(i);
+            Integer rank = row.getEliteRank() != null ? row.getEliteRank() : i + 1;
+            CompletedMatch match = matches.get(row.getFixtureId());
+            fixtures.add(new FixtureResultsView(
+                    row.getFixtureId(),
+                    row.getHomeTeamName(),
+                    row.getAwayTeamName(),
+                    row.getMatchDateUnix(),
+                    row.getLeagueName(),
+                    row.getLeagueImage(),
+                    scorelineOf(match),
+                    match != null ? match.getStatus() : null,
+                    List.of(toPickView(row, rank))
+            ));
+        }
+        return fixtures;
     }
 
     private DaySummary summarize(List<RecommendationSnapshot> rows) {
@@ -171,6 +234,10 @@ public class ResultsQueryService {
     }
 
     private PickView toPickView(RecommendationSnapshot row) {
+        return toPickView(row, row.getEliteRank());
+    }
+
+    private PickView toPickView(RecommendationSnapshot row, Integer eliteRank) {
         return new PickView(
                 row.getId(),
                 row.getType(),
@@ -179,7 +246,8 @@ public class ResultsQueryService {
                 row.getScore(),
                 row.getOdds(),
                 row.getOutcome() != null ? row.getOutcome().name() : PickOutcome.PENDING.name(),
-                row.getDescription()
+                row.getDescription(),
+                eliteRank
         );
     }
 

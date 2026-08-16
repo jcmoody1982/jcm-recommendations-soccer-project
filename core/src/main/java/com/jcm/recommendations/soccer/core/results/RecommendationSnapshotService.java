@@ -81,10 +81,41 @@ public class RecommendationSnapshotService {
             }
         }
 
+        int eliteTagged = assignEliteRanks(snapshotDate);
+
         SnapshotSummary summary = new SnapshotSummary(snapshotDate, eligible.size(), inserted, updated, skipped);
-        log.info("Snapshot completed: date={}, considered={}, inserted={}, updated={}, skipped={}",
-                snapshotDate, summary.considered(), summary.inserted(), summary.updated(), summary.skipped());
+        log.info("Snapshot completed: date={}, considered={}, inserted={}, updated={}, skipped={}, elite={}",
+                snapshotDate, summary.considered(), summary.inserted(), summary.updated(), summary.skipped(),
+                eliteTagged);
         return summary;
+    }
+
+    /**
+     * UC-037: clear previous elite tags for the day, then assign ranks 1..N to Elite-of-day picks.
+     */
+    int assignEliteRanks(LocalDate snapshotDate) {
+        List<RecommendationSnapshot> dayRows = snapshotRepository
+                .findBySnapshotDateOrderByMatchDateUnixAscIdAsc(snapshotDate);
+
+        boolean clearedAny = false;
+        for (RecommendationSnapshot row : dayRows) {
+            if (row.getEliteRank() != null) {
+                row.setEliteRank(null);
+                clearedAny = true;
+            }
+        }
+        if (clearedAny) {
+            snapshotRepository.saveAll(dayRows);
+        }
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(dayRows);
+        for (int i = 0; i < elite.size(); i++) {
+            elite.get(i).setEliteRank(i + 1);
+        }
+        if (!elite.isEmpty()) {
+            snapshotRepository.saveAll(elite);
+        }
+        return elite.size();
     }
 
     private boolean isActionableConfidence(Recommendation recommendation) {

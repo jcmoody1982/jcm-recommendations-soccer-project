@@ -3162,7 +3162,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 - Sample size per bucket
 
 **UI:**
-- View toggle on Results: Daily Dashboard (UC-034) | Performance (UC-035)
+- View toggle on Results: Daily Dashboard (UC-034) | Elite Picks (UC-037) | Performance (UC-035)
 - On Performance: period chips replace the day picker
 - Overall summary strip + Strong/Moderate panels + by-type table
 
@@ -3209,6 +3209,52 @@ GET /api/results/performance?period=7d|30d|90d|all
 
 ---
 
+#### UC-037: Elite Picks Daily Snapshot + Results Tab
+
+**Goal:** Freeze each day’s **Elite Picks** alongside the Strong/Moderate daily snapshot (UC-031), and surface those picks with settlement outcomes on Results under a dedicated **Elite Picks** view.
+
+**User Story:** As a user, I want to see how that day’s Elite shortlist performed so that I can track the curated top tips separately from the full Daily Dashboard and longer-run Performance.
+
+**Depends on:** UC-031 (daily snapshot), UC-033 (settlement), UC-034 (Results host), UC-036 (Elite ranking rules).
+
+**Scope nuance (locked):**
+Live Recommendations Elite (UC-036) ranks across the **horizon** (3d/7d). Results Elite is **elite-of-the-day**: apply the same UC-036 population rules to that day’s snapshotted Strong %-style picks (fixtures kicking off that London calendar day). Cap remains top **10**, ≤1 per fixture.
+
+**Population (same rules as UC-036, day-scoped):**
+1. Pool = snapshotted picks for `snapshotDate` with **STRONG** confidence
+2. Eligible %-style types only (UC-036 list)
+3. Rank by `score` desc → lower odds → sooner kickoff
+4. Dedupe ≤1 per fixture; take top 10
+
+**Persistence:**
+- Nullable `eliteRank` (`1`…`10`) on `RecommendationSnapshot`
+- Assigned (and cleared/reassigned) at the end of each daily snapshot upsert for that `snapshotDate`
+- Settlement unchanged — Elite rows are a tagged subset of existing snapshots
+
+**Historical days:** If a day has no `eliteRank` tags (pre-feature snapshots), Results may compute Elite on read with the same selector (display-only; optional backfill later).
+
+**Results UI:**
+- Third view toggle: **Daily Dashboard** | **Performance** | **Elite Picks**
+- Route: `/results?view=elite&date=YYYY-MM-DD`
+- Same date navigation as Daily Dashboard
+- Show Elite summary (wins / losses / voids / pending / unsupported / hit rate) + ranked pick list with outcomes / scorelines
+- Empty: no Elite candidates for that day
+
+**API:**
+- Extend `GET /api/results?date=` day payload with `eliteSummary` + `eliteFixtures` (ordered by `eliteRank`)
+- Per pick: include `eliteRank` when present
+
+**Acceptance Criteria:**
+- [ ] Daily snapshot tags up to 10 Elite picks with `eliteRank`
+- [ ] Results has an **Elite Picks** tab with date nav
+- [ ] Elite tab shows that day’s Elite snapshot picks and settlement outcomes
+- [ ] Hit rate uses WIN/LOSS only (same as Daily Dashboard)
+- [ ] Days with no Elite candidates show a clear empty state
+
+**Status:** Implementing
+
+---
+
 ### iOS Native App
 
 _Use cases for the iOS mobile application._
@@ -3246,7 +3292,7 @@ _As use cases are defined, summarize the domain entities needed here._
 | Referee | id, full_name, first_name, last_name, known_as, seasonId | API `/league-referees` | UC-003 |
 | RefereeStats | refereeId, seasonId, appearances, outcomes, goals, btts, penalties, cards (all fields) | API `/league-referees` | UC-003 |
 | TeamRecentForm | teamId, results, goals, btts, over/under, corners, cards, fouls, cleanSheets (last 5 matches) | API `/lastx` | UC-004 |
-| RecommendationSnapshot | snapshotDate, fixtureId, type, market, confidence, score, odds, outcome, matchResultJson, denormalized fixture/league labels | Internal engines + FootyStats results | UC-031–UC-035 |
+| RecommendationSnapshot | snapshotDate, fixtureId, type, market, confidence, score, odds, outcome, eliteRank, matchResultJson, denormalized fixture/league labels | Internal engines + FootyStats results | UC-031–UC-035, UC-037 |
 | CompletedMatch | fixtureId, status, FT/HT/2H goals, corners/cards, fetchedAt | FootyStats `/todays-matches`, `/match` | UC-032–UC-033 |
 
 ---

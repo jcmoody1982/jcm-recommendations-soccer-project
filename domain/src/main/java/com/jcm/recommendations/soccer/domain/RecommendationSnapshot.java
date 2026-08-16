@@ -65,6 +65,12 @@ public class RecommendationSnapshot {
     private Double score;
     private Double odds;
 
+    /**
+     * UC-037: 1-based Elite rank for this snapshot day (null when not Elite).
+     * At most one Elite pick per fixture; top 10 Strong %-style picks.
+     */
+    private Integer eliteRank;
+
     @Column(length = 2000)
     private String description;
 

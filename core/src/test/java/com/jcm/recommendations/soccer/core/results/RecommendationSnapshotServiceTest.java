@@ -62,6 +62,19 @@ class RecommendationSnapshotServiceTest {
         when(snapshotRepository.findBySnapshotDateAndFixtureIdAndType(any(), any(), any()))
                 .thenReturn(Optional.empty());
         when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(today))
+                .thenAnswer(inv -> List.of(RecommendationSnapshot.builder()
+                        .id(1L)
+                        .snapshotDate(today)
+                        .fixtureId(1L)
+                        .type("BTTS")
+                        .confidence("STRONG")
+                        .score(80.0)
+                        .odds(1.9)
+                        .matchDateUnix(todayKickoff)
+                        .outcome(PickOutcome.PENDING)
+                        .build()));
+        when(snapshotRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RecommendationSnapshotService.SnapshotSummary summary = service.snapshotForDate(today);
 
@@ -71,6 +84,11 @@ class RecommendationSnapshotServiceTest {
         verify(snapshotRepository).save(captor.capture());
         assertThat(captor.getValue().getFixtureId()).isEqualTo(1L);
         assertThat(captor.getValue().getOutcome()).isEqualTo(PickOutcome.PENDING);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecommendationSnapshot>> eliteCaptor = ArgumentCaptor.forClass(List.class);
+        verify(snapshotRepository).saveAll(eliteCaptor.capture());
+        assertThat(eliteCaptor.getValue()).hasSize(1);
+        assertThat(eliteCaptor.getValue().getFirst().getEliteRank()).isEqualTo(1);
     }
 
     @Test
@@ -83,21 +101,30 @@ class RecommendationSnapshotServiceTest {
 
         Recommendation existing = rec(1L, pastKickoff, ConfidenceLevel.STRONG, RecommendationType.BTTS);
         when(recommendationService.generateAllRecommendations(anyDouble())).thenReturn(List.of(existing));
+        RecommendationSnapshot pendingRow = RecommendationSnapshot.builder()
+                .id(99L)
+                .snapshotDate(today)
+                .fixtureId(1L)
+                .type("BTTS")
+                .confidence("STRONG")
+                .score(70.0)
+                .odds(1.9)
+                .matchDateUnix(pastKickoff)
+                .outcome(PickOutcome.PENDING)
+                .market("BTTS Yes")
+                .build();
         when(snapshotRepository.findBySnapshotDateAndFixtureIdAndType(today, 1L, "BTTS"))
-                .thenReturn(Optional.of(RecommendationSnapshot.builder()
-                        .id(99L)
-                        .snapshotDate(today)
-                        .fixtureId(1L)
-                        .type("BTTS")
-                        .matchDateUnix(pastKickoff)
-                        .outcome(PickOutcome.PENDING)
-                        .market("BTTS Yes")
-                        .build()));
+                .thenReturn(Optional.of(pendingRow));
+        when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(today))
+                .thenReturn(List.of(pendingRow));
+        when(snapshotRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RecommendationSnapshotService.SnapshotSummary summary = service.snapshotForDate(today);
 
         assertThat(summary.skipped()).isEqualTo(1);
         verify(snapshotRepository, never()).save(any());
+        verify(snapshotRepository).saveAll(any());
+        assertThat(pendingRow.getEliteRank()).isEqualTo(1);
     }
 
     @Test
@@ -117,22 +144,30 @@ class RecommendationSnapshotServiceTest {
 
         when(recommendationService.generateAllRecommendations(anyDouble()))
                 .thenReturn(List.of(rec(1L, todayKickoff, ConfidenceLevel.STRONG, RecommendationType.BTTS)));
+        RecommendationSnapshot settled = RecommendationSnapshot.builder()
+                .id(5L)
+                .snapshotDate(kickoffDate)
+                .fixtureId(1L)
+                .type("BTTS")
+                .confidence("STRONG")
+                .score(70.0)
+                .odds(1.9)
+                .matchDateUnix(todayKickoff)
+                .outcome(PickOutcome.WIN)
+                .market("BTTS Yes")
+                .build();
         when(snapshotRepository.findBySnapshotDateAndFixtureIdAndType(kickoffDate, 1L, "BTTS"))
-                .thenReturn(Optional.of(RecommendationSnapshot.builder()
-                        .id(5L)
-                        .snapshotDate(kickoffDate)
-                        .fixtureId(1L)
-                        .type("BTTS")
-                        .matchDateUnix(todayKickoff)
-                        .outcome(PickOutcome.WIN)
-                        .market("BTTS Yes")
-                        .build()));
+                .thenReturn(Optional.of(settled));
+        when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(kickoffDate))
+                .thenReturn(List.of(settled));
+        when(snapshotRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RecommendationSnapshotService.SnapshotSummary summary = service.snapshotForDate(kickoffDate);
 
         assertThat(summary.skipped()).isEqualTo(1);
         assertThat(summary.updated()).isEqualTo(0);
         verify(snapshotRepository, never()).save(any());
+        assertThat(settled.getEliteRank()).isEqualTo(1);
     }
 
     @Test
@@ -148,18 +183,22 @@ class RecommendationSnapshotServiceTest {
         updated.setFactors(java.util.Map.of("edge", 0.12));
 
         when(recommendationService.generateAllRecommendations(anyDouble())).thenReturn(List.of(updated));
+        RecommendationSnapshot existingRow = RecommendationSnapshot.builder()
+                .id(7L)
+                .snapshotDate(kickoffDate)
+                .fixtureId(1L)
+                .type("BTTS")
+                .confidence("STRONG")
+                .matchDateUnix(futureKickoff)
+                .outcome(PickOutcome.PENDING)
+                .market("BTTS Yes")
+                .score(60.0)
+                .build();
         when(snapshotRepository.findBySnapshotDateAndFixtureIdAndType(kickoffDate, 1L, "BTTS"))
-                .thenReturn(Optional.of(RecommendationSnapshot.builder()
-                        .id(7L)
-                        .snapshotDate(kickoffDate)
-                        .fixtureId(1L)
-                        .type("BTTS")
-                        .matchDateUnix(futureKickoff)
-                        .outcome(PickOutcome.PENDING)
-                        .market("BTTS Yes")
-                        .score(60.0)
-                        .build()));
+                .thenReturn(Optional.of(existingRow));
         when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(kickoffDate))
+                .thenAnswer(inv -> List.of(existingRow));
 
         RecommendationSnapshotService.SnapshotSummary summary = service.snapshotForDate(kickoffDate);
 
@@ -170,16 +209,20 @@ class RecommendationSnapshotServiceTest {
         assertThat(captor.getValue().getConfidence()).isEqualTo("MODERATE");
         assertThat(captor.getValue().getFactorsJson()).contains("edge");
         assertThat(captor.getValue().getOutcome()).isEqualTo(PickOutcome.PENDING);
+        // Moderate is not Elite-eligible for ranking pool
+        assertThat(existingRow.getEliteRank()).isNull();
+        verify(snapshotRepository, never()).saveAll(any());
     }
 
     @Test
     void persistsFactorsJsonOnInsert() {
-        LocalDate today = LocalDate.now(ZoneId.of("Europe/London"));
-        long todayKickoff = today.atTime(20, 0).atZone(ZoneId.of("Europe/London")).toEpochSecond();
-        if (todayKickoff <= Instant.now().getEpochSecond()) {
-            todayKickoff = Instant.now().getEpochSecond() + 1800;
-            today = Instant.ofEpochSecond(todayKickoff).atZone(ZoneId.of("Europe/London")).toLocalDate();
-        }
+        LocalDate initialToday = LocalDate.now(ZoneId.of("Europe/London"));
+        long initialKickoff = initialToday.atTime(20, 0).atZone(ZoneId.of("Europe/London")).toEpochSecond();
+        final long todayKickoff = initialKickoff <= Instant.now().getEpochSecond()
+                ? Instant.now().getEpochSecond() + 1800
+                : initialKickoff;
+        final LocalDate today = Instant.ofEpochSecond(todayKickoff)
+                .atZone(ZoneId.of("Europe/London")).toLocalDate();
 
         Recommendation recommendation = rec(9L, todayKickoff, ConfidenceLevel.STRONG, RecommendationType.OVER_GOALS);
         recommendation.setMarket("Over 2.5 Goals");
@@ -188,7 +231,26 @@ class RecommendationSnapshotServiceTest {
         when(recommendationService.generateAllRecommendations(anyDouble())).thenReturn(List.of(recommendation));
         when(snapshotRepository.findBySnapshotDateAndFixtureIdAndType(any(), any(), any()))
                 .thenReturn(Optional.empty());
-        when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(snapshotRepository.save(any())).thenAnswer(inv -> {
+            RecommendationSnapshot row = inv.getArgument(0);
+            if (row.getId() == null) {
+                row.setId(9L);
+            }
+            return row;
+        });
+        when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(today))
+                .thenAnswer(inv -> List.of(RecommendationSnapshot.builder()
+                        .id(9L)
+                        .snapshotDate(today)
+                        .fixtureId(9L)
+                        .type("OVER_GOALS")
+                        .confidence("STRONG")
+                        .score(70.0)
+                        .odds(1.8)
+                        .matchDateUnix(todayKickoff)
+                        .outcome(PickOutcome.PENDING)
+                        .build()));
+        when(snapshotRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.snapshotForDate(today);
 
