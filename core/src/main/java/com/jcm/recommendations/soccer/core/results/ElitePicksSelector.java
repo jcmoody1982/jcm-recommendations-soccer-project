@@ -10,12 +10,14 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * UC-036 / UC-037: rank Strong %-style snapshot picks into Elite (top 10, ≤1 per fixture).
+ * UC-036 / UC-037: rank Strong %-style snapshot picks into Elite
+ * (top 10, ≤1 per fixture, ≤3 BTTS).
  * Mirrors {@code site/src/utils/elitePicks.ts}.
  */
 public final class ElitePicksSelector {
 
     public static final int ELITE_PICKS_LIMIT = 10;
+    public static final int ELITE_BTTS_CAP = 3;
 
     private static final Set<String> ELIGIBLE_TYPES = Set.of(
             "MATCH_RESULT",
@@ -57,11 +59,20 @@ public final class ElitePicksSelector {
                 .toList();
 
         Set<Long> seenFixtures = new HashSet<>();
+        int bttsCount = 0;
         List<RecommendationSnapshot> elite = new ArrayList<>();
         for (RecommendationSnapshot row : pool) {
             Long fixtureId = row.getFixtureId();
-            if (fixtureId == null || !seenFixtures.add(fixtureId)) {
+            if (fixtureId == null || seenFixtures.contains(fixtureId)) {
                 continue;
+            }
+            boolean isBtts = "BTTS".equalsIgnoreCase(row.getType());
+            if (isBtts && bttsCount >= ELITE_BTTS_CAP) {
+                continue;
+            }
+            seenFixtures.add(fixtureId);
+            if (isBtts) {
+                bttsCount++;
             }
             elite.add(row);
             if (elite.size() >= limit) {

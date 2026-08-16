@@ -18,6 +18,11 @@ export const ELITE_ELIGIBLE_TYPES: readonly RecommendationType[] = [
 
 export const ELITE_PICKS_LIMIT = 10;
 
+/** Soft caps so one market cannot dominate the Elite board. */
+export const ELITE_TYPE_CAPS: Partial<Record<RecommendationType, number>> = {
+  BTTS: 3,
+};
+
 const ELITE_TYPE_SET = new Set<string>(ELITE_ELIGIBLE_TYPES);
 
 export function isEliteEligibleType(type: string): boolean {
@@ -37,7 +42,7 @@ function compareEliteRank(a: Recommendation, b: Recommendation): number {
 
 /**
  * Rank Strong %-style picks into Elite Picks (UC-036).
- * At most one selection per fixture; default cap 10.
+ * At most one selection per fixture; default cap 10; BTTS capped at 3.
  */
 export function selectElitePicks(
   recommendations: Recommendation[],
@@ -52,11 +57,18 @@ export function selectElitePicks(
   pool.sort(compareEliteRank);
 
   const seenFixtures = new Set<number>();
+  const typeCounts = new Map<string, number>();
   const elite: Recommendation[] = [];
 
   for (const rec of pool) {
     if (seenFixtures.has(rec.fixtureId)) continue;
+
+    const typeCap = ELITE_TYPE_CAPS[rec.type];
+    const typeCount = typeCounts.get(rec.type) ?? 0;
+    if (typeCap != null && typeCount >= typeCap) continue;
+
     seenFixtures.add(rec.fixtureId);
+    typeCounts.set(rec.type, typeCount + 1);
     elite.push(rec);
     if (elite.length >= limit) break;
   }
