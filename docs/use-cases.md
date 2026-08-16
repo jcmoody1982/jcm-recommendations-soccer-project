@@ -2740,7 +2740,7 @@ RecommendationHistory:
 
 #### UC-036: Elite Picks - Cross-Market Top Selections
 
-**Goal:** Add an **Elite Picks** section at the **bottom** of the Recommendations page that surfaces the best **10** selections from across all recommendation types — a curated “best of board” rather than another single-market engine.
+**Goal:** Add an **Elite Picks** section at the **bottom** of the Recommendations page that surfaces the best **10** selections from across eligible recommendation types — a curated “best of board” rather than another single-market engine.
 
 **User Story:** As a user, I want a shortlist of the strongest tips across every market so that I can quickly see the standout opportunities without scanning every section.
 
@@ -2749,97 +2749,92 @@ RecommendationHistory:
 **Placement:**
 - Recommendations page only
 - Rendered **after** all market sections (bottom of page)
-- Still respects the page’s active filters (horizon / kickoff / confidence / league / market) unless we lock Elite to its own rules (see open decisions)
 
 **What Elite Picks is (and is not):**
 | Is | Is not |
 |----|--------|
 | A **ranking / aggregation** over already-generated picks | A new prediction engine with its own model |
 | Fixed size: **top 10** (or fewer if the pool is smaller) | Unlimited “show all Strong” |
-| Cross-type: Match Result, BTTS, goals, DC, etc. | A duplicate of one market section |
+| Cross-type among %-style scores | A duplicate of one market section |
 
 **Data Required:**
-- All recommendations in the current Recommendations fetch window (`daysAhead` / kickoff filters)
+- Recommendations for the active **horizon** (`3d` / `7d`) only — not gated by kickoff / league / confidence / market filters
 - Per pick: `type`, `market`, `confidence`, `score`, `odds`, fixture identity, league
 
 **Core problem — scores are not comparable across types:**
-Engines publish different `score` meanings (probability %, predicted corners, booking points, form-gap pts). A raw global `ORDER BY score DESC` would overweight corners/bookings and underweight true probabilities. Elite ranking must normalize or constrain the pool.
+Engines publish different `score` meanings. Elite v1 constrains the pool to probability / quality %-style types only.
 
 ---
 
-##### Proposed population approach (draft — needs lock)
+##### Population rules (locked)
 
-**Pool (candidates):**
-1. Take all picks currently shown on the Recommendations page for the active horizon/kickoff window
-2. Keep only **STRONG** confidence (default proposal)
-3. Optionally exclude types whose `score` is not a probability-like 0–100 quality signal (see eligible types)
+**Pool:**
+1. Fetch / reuse grouped recommendations for the page **horizon** (`days` = 3 or 7)
+2. Keep **STRONG** confidence only
+3. Keep eligible %-style types only (below)
 
-**Eligible types for v1 (proposal):**
-Probability / quality %-style scores only:
+**Eligible types (v1):**
 - `MATCH_RESULT`, `BTTS`, `DOUBLE_CHANCE`, `DRAW`, `OVER_GOALS`, `UNDER_GOALS`
 - `CLEAN_SHEET`, `RESULT_BTTS`, `TOP_VS_BOTTOM`
-- `FIRST_HALF_GOALS`, `SECOND_HALF_GOALS`, `VALUE_BET` (if score is a comparable 0–100)
+- `FIRST_HALF_GOALS`, `SECOND_HALF_GOALS`, `VALUE_BET`
 
-**Exclude from v1 Elite pool (or gate later):**
-- `BOOKING_POINTS`, `OVER_CORNERS`, `UNDER_CORNERS` (score = predicted count, not win probability)
-- `HOME_AWAY_SPECIALIST`, `WINNING_FORM_MISMATCH`, `LOSING_FORM_MISMATCH` (score = gap/disparity pts)
+**Excluded (v1):**
+- `BOOKING_POINTS`, `OVER_CORNERS`, `UNDER_CORNERS`
+- `HOME_AWAY_SPECIALIST`, `WINNING_FORM_MISMATCH`, `LOSING_FORM_MISMATCH`
 
 **Rank:**
-1. `confidence` STRONG first (pool already Strong-only in proposal)
-2. Then `score` descending (within comparable %-style scores)
-3. Tie-break: lower decimal odds (more “likely” priced), then sooner kickoff
+1. `score` descending
+2. Tie-break: lower decimal odds (nulls last), then sooner kickoff
 
-**Dedupe (proposal):**
-- At most **one pick per fixture** in Elite (highest-ranked selection wins)
-- Prevents one match flooding the board with Match Result + BTTS + Over 2.5
+**Dedupe:**
+- At most **one pick per fixture** (highest-ranked selection wins)
 
-**Output:**
-- Top **10** after rank + dedupe (or all candidates if &lt; 10)
-- Each row still shows original `type` / market / price / score so users know which engine produced it
+**Filters (locked):**
+| Filter | Elite respects? |
+|--------|-----------------|
+| Horizon (3d / 7d) | **Yes** |
+| Kickoff window | No |
+| League | No |
+| Confidence chip | No (always Strong) |
+| Market filter | No |
+| Search | No |
+
+**Output:** Top **10** after rank + dedupe (or all candidates if &lt; 10). Hide section when empty.
 
 **UI contract:**
 - Section title: **Elite Picks**
-- Icon: distinct from market sections (e.g. crown / star — final art TBD)
-- Same row component as other sections (`RecommendationRow`), plus a small type label if not already obvious
-- Empty state: hide section or “No Elite Picks in this window”
-- Market Filter: Elite is **not** a `RecommendationType` in the dropdown; when a market filter is active, either hide Elite or re-rank within that market only (open decision)
+- Same row component as other sections (`RecommendationRow`)
+- Not a Market Filter dropdown option
 
-**API options:**
-| Option | Approach |
-|--------|----------|
-| **A — Client-side (v1 lean)** | Derive Elite from existing `GET /api/recommendations/grouped` on the site |
-| **B — Server-side** | `GET /api/recommendations/elite?daysAhead=7` returns pre-ranked top 10 |
-
-Proposal: start with **A** for speed; move to **B** if ranking rules grow (historical hit-rate weighting, etc.).
+**API:** Client-side from `GET /api/recommendations/grouped?daysAhead={horizon}` (v1). Dedicated elite endpoint deferred.
 
 ---
 
-##### Open decisions (to lock before build)
+##### Decisions (locked)
 
-| # | Topic | Options | Lean |
-|---|--------|---------|------|
-| 1 | Confidence gate | Strong only vs Strong+Moderate | **Strong only** |
-| 2 | Score comparability | %-style types only vs within-type percentile for all types | **%-style only (v1)** |
-| 3 | Fixture dedupe | 1 per fixture vs allow multi-market same fixture | **1 per fixture** |
-| 4 | Page filters | Elite respects Confidence/Market filters vs Elite ignores them (always global Strong) | **Respect kickoff/league/horizon; ignore Market filter; Confidence filter can shrink pool** |
-| 5 | Include Value / specialist / corners later | v1.1 with percentile rank | Defer |
-| 6 | Weight by historical hit rate (UC-035) | No vs boost types with better Strong hit rate | **No for v1** |
-| 7 | Section position | Bottom (requested) vs top hero | **Bottom** |
-| 8 | Implementation | Client-side from grouped feed vs dedicated API | **Client-side v1** |
+| # | Topic | Choice |
+|---|--------|--------|
+| 1 | Confidence gate | **Strong only** |
+| 2 | Score comparability | **%-style types only (v1)** |
+| 3 | Fixture dedupe | **1 per fixture** |
+| 4 | Page filters | **Horizon only** |
+| 5 | Corners / specialist / form later | Defer (percentile / separate board) |
+| 6 | Hit-rate weighting (UC-035) | **No for v1** |
+| 7 | Section position | **Bottom** |
+| 8 | Implementation | **Client-side v1** |
 
 **Acceptance Criteria:**
 - [ ] Elite Picks section appears at the bottom of Recommendations
-- [ ] Shows at most 10 picks
-- [ ] Ranking rules documented and unit-tested (once locked)
-- [ ] No raw cross-type score sort without a comparability rule
-- [ ] Empty / sparse windows handled cleanly
+- [ ] Shows at most 10 Strong %-style picks, ≤1 per fixture
+- [ ] Uses horizon window only; ignores other page filters
+- [ ] Empty window → section hidden
 - [ ] Early Kick-Off warnings still apply on Elite rows
 - [ ] Shortlist / Info behave the same as other sections
 
-**Status:** Draft — ranking decisions open
+**Status:** Reviewed — implementing
 
 **Next Steps:**
-- [ ] Lock open decisions 1–8 with product
+- [x] Lock decisions with product
 - [ ] Implement ranking helper + section on Recommendations page
 - [ ] Optional follow-up: server endpoint + hit-rate-aware ranking
 
