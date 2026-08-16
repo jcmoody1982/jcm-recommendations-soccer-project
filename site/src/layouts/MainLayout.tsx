@@ -7,9 +7,9 @@ import styles from './MainLayout.module.css';
 
 const navItems = [
   { path: '/recommendations', label: 'Recommendations' },
-  { path: '/shortlist', label: 'Shortlist', showBadge: true },
-  { path: '/results', label: 'Results' },
   { path: '/fixtures', label: 'Fixtures' },
+  { path: '/results', label: 'Results' },
+  { path: '/shortlist', label: 'Shortlist', showBadge: true },
 ];
 
 type Theme = 'light' | 'dark' | 'system';

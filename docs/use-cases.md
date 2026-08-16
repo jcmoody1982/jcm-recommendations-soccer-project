@@ -3104,7 +3104,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 | v1 filters | Date + outcome |
 | Day hit rate | `wins / (wins + losses)`; exclude VOID / PENDING / UNSUPPORTED |
 | UNSUPPORTED on UI | Show, muted; not counted in hit rate |
-| Nav position | After Shortlist, before Fixtures |
+| Nav position | After Fixtures, before Shortlist |
 | Type/confidence filters | Defer to v1.1 |
 | UC-035 entry | Not required on v1 page |
 
