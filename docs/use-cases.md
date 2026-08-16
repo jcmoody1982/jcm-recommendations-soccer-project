@@ -3205,7 +3205,7 @@ GET /api/results/performance?period=7d|30d|90d|all
 - [x] Overall + by confidence + by type returned
 - [x] Minimum sample size messaging when graded count &lt; 10
 - [x] Updates as new days settle (query live snapshots; no batch rebuild)
-- [x] Results page hosts Performance via Daily Dashboard / Performance toggle
+- [x] Results page hosts Performance via Daily Dashboard / Overall Performance Tracker / Elite Pick Performance toggle
 
 **Status:** Implemented
 
