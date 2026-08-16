@@ -2332,6 +2332,10 @@ GET /api/leagues/overview
 4. **Empty Section**
    - If a section has no recommendations, show subtle message or hide section
 
+5. **Elite Picks (UC-036)**
+   - Cross-market top 10 board at the **bottom** of the page (aggregation, not a new engine)
+   - See UC-036 for ranking / eligibility rules
+
 **API Endpoint:**
 ```
 GET /api/recommendations/grouped?daysAhead=7
@@ -2731,6 +2735,108 @@ RecommendationHistory:
 - [ ] Works on mobile browsers (where supported)
 
 **Status:** Draft
+
+---
+
+#### UC-036: Elite Picks - Cross-Market Top Selections
+
+**Goal:** Add an **Elite Picks** section at the **bottom** of the Recommendations page that surfaces the best **10** selections from across eligible recommendation types — a curated “best of board” rather than another single-market engine.
+
+**User Story:** As a user, I want a shortlist of the strongest tips across every market so that I can quickly see the standout opportunities without scanning every section.
+
+**Depends on:** Existing recommendation engines + UC-021 Recommendations page (grouped feed).
+
+**Placement:**
+- Recommendations page only
+- Rendered **after** all market sections (bottom of page)
+
+**What Elite Picks is (and is not):**
+| Is | Is not |
+|----|--------|
+| A **ranking / aggregation** over already-generated picks | A new prediction engine with its own model |
+| Fixed size: **top 10** (or fewer if the pool is smaller) | Unlimited “show all Strong” |
+| Cross-type among %-style scores | A duplicate of one market section |
+
+**Data Required:**
+- Recommendations for the active **horizon** (`3d` / `7d`) only — not gated by kickoff / league / confidence / market filters
+- Per pick: `type`, `market`, `confidence`, `score`, `odds`, fixture identity, league
+
+**Core problem — scores are not comparable across types:**
+Engines publish different `score` meanings. Elite v1 constrains the pool to probability / quality %-style types only.
+
+---
+
+##### Population rules (locked)
+
+**Pool:**
+1. Fetch / reuse grouped recommendations for the page **horizon** (`days` = 3 or 7)
+2. Keep **STRONG** confidence only
+3. Keep eligible %-style types only (below)
+
+**Eligible types (v1):**
+- `MATCH_RESULT`, `BTTS`, `DOUBLE_CHANCE`, `DRAW`, `OVER_GOALS`, `UNDER_GOALS`
+- `CLEAN_SHEET`, `RESULT_BTTS`, `TOP_VS_BOTTOM`
+- `FIRST_HALF_GOALS`, `SECOND_HALF_GOALS`, `VALUE_BET`
+
+**Excluded (v1):**
+- `BOOKING_POINTS`, `OVER_CORNERS`, `UNDER_CORNERS`
+- `HOME_AWAY_SPECIALIST`, `WINNING_FORM_MISMATCH`, `LOSING_FORM_MISMATCH`
+
+**Rank:**
+1. `score` descending
+2. Tie-break: lower decimal odds (nulls last), then sooner kickoff
+
+**Dedupe:**
+- At most **one pick per fixture** (highest-ranked selection wins)
+
+**Filters (locked):**
+| Filter | Elite respects? |
+|--------|-----------------|
+| Horizon (3d / 7d) | **Yes** |
+| Kickoff window | No |
+| League | No |
+| Confidence chip | No (always Strong) |
+| Market filter | No |
+| Search | No |
+
+**Output:** Top **10** after rank + dedupe (or all candidates if &lt; 10). Hide section when empty.
+
+**UI contract:**
+- Section title: **Elite Picks**
+- Same row component as other sections (`RecommendationRow`)
+- Not a Market Filter dropdown option
+
+**API:** Client-side from `GET /api/recommendations/grouped?daysAhead={horizon}` (v1). Dedicated elite endpoint deferred.
+
+---
+
+##### Decisions (locked)
+
+| # | Topic | Choice |
+|---|--------|--------|
+| 1 | Confidence gate | **Strong only** |
+| 2 | Score comparability | **%-style types only (v1)** |
+| 3 | Fixture dedupe | **1 per fixture** |
+| 4 | Page filters | **Horizon only** |
+| 5 | Corners / specialist / form later | Defer (percentile / separate board) |
+| 6 | Hit-rate weighting (UC-035) | **No for v1** |
+| 7 | Section position | **Bottom** |
+| 8 | Implementation | **Client-side v1** |
+
+**Acceptance Criteria:**
+- [ ] Elite Picks section appears at the bottom of Recommendations
+- [ ] Shows at most 10 Strong %-style picks, ≤1 per fixture
+- [ ] Uses horizon window only; ignores other page filters
+- [ ] Empty window → section hidden
+- [ ] Early Kick-Off warnings still apply on Elite rows
+- [ ] Shortlist / Info behave the same as other sections
+
+**Status:** Reviewed — implementing
+
+**Next Steps:**
+- [x] Lock decisions with product
+- [ ] Implement ranking helper + section on Recommendations page
+- [ ] Optional follow-up: server endpoint + hit-rate-aware ranking
 
 ---
 

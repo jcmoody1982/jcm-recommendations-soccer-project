@@ -30,6 +30,28 @@
   font-weight: 400;
 }
 
+.eliteBlurb {
+  margin: -0.35rem 0 0.65rem;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+}
+
+.eliteItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eliteType {
+  padding-left: 8px;
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .tableHeader {
   display: grid;
   grid-template-columns: 28px 44px 118px 1fr auto 52px 60px 76px;

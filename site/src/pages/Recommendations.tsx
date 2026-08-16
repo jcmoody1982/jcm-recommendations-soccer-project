@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { recommendationService } from '../services/api';
-import { RecommendationSection, RecommendationsPageSkeleton } from '../components';
+import {
+  ElitePicksSection,
+  RecommendationSection,
+  RecommendationsPageSkeleton,
+} from '../components';
 import type { Recommendation, RecommendationType } from '../types';
 import {
   compareByKickoff,
@@ -11,6 +15,10 @@ import {
   type KickoffSort,
   type KickoffWindow,
 } from '../utils/kickoff';
+import {
+  flattenGroupedRecommendations,
+  selectElitePicks,
+} from '../utils/elitePicks';
 import {
   SECTION_ORDER,
   sectionTitle,
@@ -146,6 +154,16 @@ export default function Recommendations() {
     queryFn: () => recommendationService.getGrouped(daysAhead),
   });
 
+  // Elite Picks (UC-036) always use the horizon window, not kickoff/league filters.
+  const { data: horizonGrouped } = useQuery({
+    queryKey: ['recommendations-grouped', horizon],
+    queryFn: () => recommendationService.getGrouped(horizon),
+  });
+
+  const elitePicks = useMemo(
+    () => selectElitePicks(flattenGroupedRecommendations(horizonGrouped)),
+    [horizonGrouped]
+  );
   const availableLeagues = useMemo(() => {
     if (!groupedRecommendations) return [];
     const leagueMap = new Map<string, string>();
@@ -557,41 +575,51 @@ export default function Recommendations() {
             Try Again
           </button>
         </div>
-      ) : filteredRecommendations && totalCount > 0 ? (
-        <div className={styles.sections}>
-          {SECTION_ORDER.map((type) => {
-            if (typeFilter !== 'ALL' && type !== typeFilter) {
-              return null;
-            }
-            const recommendations = filteredRecommendations[type] || [];
-            if (recommendations.length === 0) {
-              return null;
-            }
-            return (
-              <RecommendationSection
-                key={type}
-                type={type}
-                recommendations={recommendations}
-                initialItems={5}
-              />
-            );
-          })}
-        </div>
       ) : (
-        <div className={styles.empty}>
-          <p>
-            {kickoffWindow !== 'all'
-              ? 'No recommendations in that kickoff window.'
-              : confidenceFilter === 'strong'
-                ? 'No Strong recommendations match these filters.'
-                : 'No recommendations found.'}
-          </p>
-          {hasActiveFilters && (
-            <button className={styles.clearFiltersAlt} onClick={clearFilters}>
-              Clear filters
-            </button>
+        <>
+          {filteredRecommendations && totalCount > 0 ? (
+            <div className={styles.sections}>
+              {SECTION_ORDER.map((type) => {
+                if (typeFilter !== 'ALL' && type !== typeFilter) {
+                  return null;
+                }
+                const recommendations = filteredRecommendations[type] || [];
+                if (recommendations.length === 0) {
+                  return null;
+                }
+                return (
+                  <RecommendationSection
+                    key={type}
+                    type={type}
+                    recommendations={recommendations}
+                    initialItems={5}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className={styles.empty}>
+              <p>
+                {kickoffWindow !== 'all'
+                  ? 'No recommendations in that kickoff window.'
+                  : confidenceFilter === 'strong'
+                    ? 'No Strong recommendations match these filters.'
+                    : 'No recommendations found.'}
+              </p>
+              {hasActiveFilters && (
+                <button className={styles.clearFiltersAlt} onClick={clearFilters}>
+                  Clear filters
+                </button>
+              )}
+            </div>
           )}
-        </div>
+
+          {elitePicks.length > 0 && (
+            <div className={styles.eliteSection}>
+              <ElitePicksSection recommendations={elitePicks} />
+            </div>
+          )}
+        </>
       )}
 
       <footer className={styles.footer}>
