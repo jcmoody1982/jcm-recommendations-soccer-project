@@ -18,6 +18,7 @@ export interface ResultsPick {
   odds: number | null;
   outcome: PickOutcome;
   description: string | null;
+  eliteRank?: number | null;
 }
 
 export interface ResultsScoreline {
@@ -42,7 +43,9 @@ export interface DayResults {
   summary: ResultsDaySummary;
   strongSummary: ResultsDaySummary;
   moderateSummary: ResultsDaySummary;
+  eliteSummary: ResultsDaySummary;
   fixtures: ResultsFixture[];
+  eliteFixtures: ResultsFixture[];
 }
 
 export type PerformancePeriod = '7d' | '30d' | '90d' | 'all';

@@ -61,11 +61,35 @@ class ResultsQueryServiceTest {
         assertThat(view.moderateSummary().wins()).isEqualTo(0);
         assertThat(view.moderateSummary().losses()).isEqualTo(1);
         assertThat(view.moderateSummary().hitRate()).isEqualTo(0.0);
+        assertThat(view.eliteSummary().wins()).isEqualTo(1);
+        assertThat(view.eliteSummary().pending()).isEqualTo(1);
+        assertThat(view.eliteSummary().hitRate()).isEqualTo(100.0);
+        assertThat(view.eliteFixtures()).hasSize(2);
+        assertThat(view.eliteFixtures().getFirst().picks().getFirst().eliteRank()).isEqualTo(1);
+        assertThat(view.eliteFixtures().getFirst().picks().getFirst().type()).isEqualTo("BTTS");
+        assertThat(view.eliteFixtures().get(1).picks().getFirst().type()).isEqualTo("DRAW");
         assertThat(view.fixtures()).hasSize(2);
         assertThat(view.fixtures().getFirst().fixtureId()).isEqualTo(100L);
         assertThat(view.fixtures().getFirst().scoreline().home()).isEqualTo(2);
         assertThat(view.fixtures().getFirst().picks()).hasSize(2);
         assertThat(view.fixtures().getFirst().picks().getFirst().confidence()).isEqualTo("STRONG");
+    }
+
+    @Test
+    void prefersPersistedEliteRanksOverOnTheFlySelection() {
+        LocalDate date = LocalDate.of(2026, 8, 1);
+        when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(date)).thenReturn(List.of(
+                snap(1L, date, 100L, "BTTS", "STRONG", PickOutcome.WIN, 1000L, 90.0, 2),
+                snap(2L, date, 200L, "DRAW", "STRONG", PickOutcome.LOSS, 2000L, 70.0, 1)
+        ));
+        when(completedMatchRepository.findByFixtureIdIn(org.mockito.ArgumentMatchers.anySet()))
+                .thenReturn(List.of());
+
+        ResultsQueryService.DayResultsView view = service.getDayResults(date, null);
+
+        assertThat(view.eliteFixtures()).extracting(ResultsQueryService.FixtureResultsView::fixtureId)
+                .containsExactly(200L, 100L);
+        assertThat(view.eliteFixtures().getFirst().picks().getFirst().eliteRank()).isEqualTo(1);
     }
 
     @Test
@@ -91,6 +115,12 @@ class ResultsQueryServiceTest {
     private static RecommendationSnapshot snap(
             Long id, LocalDate date, Long fixtureId, String type, String confidence,
             PickOutcome outcome, long kickoff) {
+        return snap(id, date, fixtureId, type, confidence, outcome, kickoff, 70.0, null);
+    }
+
+    private static RecommendationSnapshot snap(
+            Long id, LocalDate date, Long fixtureId, String type, String confidence,
+            PickOutcome outcome, long kickoff, double score, Integer eliteRank) {
         return RecommendationSnapshot.builder()
                 .id(id)
                 .snapshotDate(date)
@@ -101,9 +131,11 @@ class ResultsQueryServiceTest {
                 .type(type)
                 .market(type)
                 .confidence(confidence)
-                .score(70.0)
+                .score(score)
+                .odds(1.9)
                 .matchDateUnix(kickoff)
                 .outcome(outcome)
+                .eliteRank(eliteRank)
                 .build();
     }
 }

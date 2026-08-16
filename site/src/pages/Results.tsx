@@ -27,7 +27,7 @@ const OUTCOME_SET = new Set<string>(OUTCOME_FILTERS);
 const PERIOD_SET = new Set<string>(PERIODS);
 
 type ConfidenceBand = 'STRONG' | 'MODERATE';
-type ResultsView = 'day' | 'performance';
+type ResultsView = 'day' | 'performance' | 'elite';
 
 function londonToday(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
@@ -77,7 +77,9 @@ function hitBadgeClass(bucket?: PerformanceBucket | null): string {
 }
 
 function parseView(value: string | null): ResultsView {
-  return value === 'performance' ? 'performance' : 'day';
+  if (value === 'performance') return 'performance';
+  if (value === 'elite') return 'elite';
+  return 'day';
 }
 
 function parsePeriod(value: string | null): PerformancePeriod {
@@ -250,10 +252,12 @@ function FixtureList({
   fixtures,
   emptyTitle,
   emptyBody,
+  showEliteRank = false,
 }: {
   fixtures: ResultsFixture[];
   emptyTitle: string;
   emptyBody: string;
+  showEliteRank?: boolean;
 }) {
   if (fixtures.length === 0) {
     return (
@@ -267,7 +271,7 @@ function FixtureList({
   return (
     <div className={styles.fixtureList}>
       {fixtures.map((fixture) => (
-        <section key={fixture.fixtureId} className={styles.fixtureBlock}>
+        <section key={`${fixture.fixtureId}-${fixture.picks[0]?.id ?? 'x'}`} className={styles.fixtureBlock}>
           <header className={styles.fixtureHeader}>
             <div>
               <Link to={`/fixtures/${fixture.fixtureId}`} className={styles.fixtureTitle}>
@@ -291,6 +295,11 @@ function FixtureList({
             {fixture.picks.map((pick) => (
               <li key={pick.id} className={styles.pickRow}>
                 <div className={styles.pickMain}>
+                  {showEliteRank && pick.eliteRank != null && (
+                    <span className={styles.eliteRank} aria-label={`Elite rank ${pick.eliteRank}`}>
+                      #{pick.eliteRank}
+                    </span>
+                  )}
                   <span className={styles.pickMarket}>{pick.market}</span>
                   <div className={styles.pickMeta}>
                     <span className={styles.pickType}>{formatType(pick.type)}</span>
@@ -349,6 +358,8 @@ function withConfidenceDefaults(data: DayResults | undefined): DayResults | unde
     ...data,
     strongSummary: data.strongSummary ?? emptySummary(),
     moderateSummary: data.moderateSummary ?? emptySummary(),
+    eliteSummary: data.eliteSummary ?? emptySummary(),
+    eliteFixtures: data.eliteFixtures ?? [],
   };
 }
 
@@ -516,7 +527,7 @@ export default function Results() {
   } = useQuery({
     queryKey: ['results-day', selectedDate, outcomeFilter],
     queryFn: () => resultsService.getDay(selectedDate, outcomeFilter),
-    enabled: view === 'day' && (Boolean(selectedDate) || dates.length === 0),
+    enabled: (view === 'day' || view === 'elite') && (Boolean(selectedDate) || dates.length === 0),
   });
 
   const {
@@ -538,11 +549,17 @@ export default function Results() {
     [data?.fixtures],
   );
 
+  const eliteTypes = useMemo(
+    () => collectTypes(data?.eliteFixtures ?? []),
+    [data?.eliteFixtures],
+  );
+
   useEffect(() => {
-    if (typeFilter !== 'ALL' && availableTypes.length > 0 && !availableTypes.includes(typeFilter)) {
+    const types = view === 'elite' ? eliteTypes : availableTypes;
+    if (typeFilter !== 'ALL' && types.length > 0 && !types.includes(typeFilter)) {
       updateParams({ type: null });
     }
-  }, [typeFilter, availableTypes, updateParams]);
+  }, [typeFilter, availableTypes, eliteTypes, view, updateParams]);
 
   const strongFixtures = useMemo(
     () => fixturesForConfidence(data?.fixtures ?? [], 'STRONG', typeFilter),
@@ -567,6 +584,23 @@ export default function Results() {
     return summaryFromFixtures([...strongFixtures, ...moderateFixtures]);
   }, [data, typeFilter, strongFixtures, moderateFixtures]);
 
+  const eliteFixtures = useMemo(() => {
+    const fixtures = data?.eliteFixtures ?? [];
+    if (typeFilter === 'ALL') return fixtures;
+    return fixtures
+      .map((fixture) => ({
+        ...fixture,
+        picks: fixture.picks.filter((pick) => pick.type === typeFilter),
+      }))
+      .filter((fixture) => fixture.picks.length > 0);
+  }, [data?.eliteFixtures, typeFilter]);
+
+  const eliteSummary = useMemo(() => {
+    if (!data) return undefined;
+    if (typeFilter === 'ALL') return data.eliteSummary;
+    return summaryFromFixtures(eliteFixtures);
+  }, [data, typeFilter, eliteFixtures]);
+
   const goPrev = () => {
     if (dateIndex < 0 || dateIndex >= dates.length - 1) return;
     updateParams({ date: dates[dateIndex + 1] });
@@ -579,15 +613,19 @@ export default function Results() {
 
   const goToday = () => {
     if (!todayTarget) return;
-    updateParams({ date: todayTarget, view: 'day' });
+    updateParams({ date: todayTarget, view: view === 'elite' ? 'elite' : 'day' });
   };
+
+  const showDayNav = view === 'day' || view === 'elite';
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Results</h1>
-          <p className={styles.subtitle}>Daily Dashboard for graded picks · Performance for longer-run accuracy</p>
+          <p className={styles.subtitle}>
+            Daily Dashboard · Elite Picks · Performance
+          </p>
         </div>
       </header>
 
@@ -604,6 +642,15 @@ export default function Results() {
         <button
           type="button"
           role="tab"
+          aria-selected={view === 'elite'}
+          className={`${styles.viewToggleButton} ${view === 'elite' ? styles.viewToggleActive : ''}`}
+          onClick={() => updateParams({ view: 'elite' })}
+        >
+          Elite Picks
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={view === 'performance'}
           className={`${styles.viewToggleButton} ${view === 'performance' ? styles.viewToggleActive : ''}`}
           onClick={() => updateParams({ view: 'performance' })}
@@ -612,7 +659,7 @@ export default function Results() {
         </button>
       </div>
 
-      {view === 'day' && (
+      {showDayNav && (
         <>
           <div className={styles.controls}>
             <div className={styles.dateNav}>
@@ -675,7 +722,7 @@ export default function Results() {
               </div>
             </div>
 
-            {availableTypes.length > 0 && (
+            {(view === 'day' ? availableTypes : eliteTypes).length > 0 && (
               <div className={styles.filterGroup}>
                 <span className={styles.filterLabel}>Type</span>
                 <div className={styles.filterRow}>
@@ -686,7 +733,7 @@ export default function Results() {
                   >
                     All
                   </button>
-                  {availableTypes.map((type) => (
+                  {(view === 'day' ? availableTypes : eliteTypes).map((type) => (
                     <button
                       key={type}
                       type="button"
@@ -700,7 +747,11 @@ export default function Results() {
               </div>
             )}
           </div>
+        </>
+      )}
 
+      {view === 'day' && (
+        <>
           {allSummary && data?.snapshotDate && (
             <SummaryStrip title="All picks" summary={allSummary} tone="all" />
           )}
@@ -753,6 +804,52 @@ export default function Results() {
                 />
               )}
             </div>
+          )}
+        </>
+      )}
+
+      {view === 'elite' && (
+        <>
+          {eliteSummary && data?.snapshotDate && (
+            <SummaryStrip title="Elite Picks" summary={eliteSummary} tone="strong" />
+          )}
+
+          {isLoading && <div className={styles.message}>Loading elite picks…</div>}
+
+          {isError && (
+            <div className={styles.error}>
+              <p>Could not load elite picks.</p>
+              <p className={styles.errorDetail}>{error instanceof Error ? error.message : 'Unknown error'}</p>
+              <button type="button" className={styles.navButton} onClick={() => refetch()}>Retry</button>
+            </div>
+          )}
+
+          {!isLoading && !isError && dates.length === 0 && (
+            <div className={styles.empty}>
+              <h2>No results yet</h2>
+              <p>Elite picks are tagged when the daily snapshot runs. Check back after the next sync.</p>
+            </div>
+          )}
+
+          {!isLoading && !isError && data?.snapshotDate && eliteFixtures.length === 0 && (
+            <div className={styles.empty}>
+              <h2>No Elite picks</h2>
+              <p>
+                No Elite candidates
+                {outcomeFilter !== 'ALL' ? ` matching ${outcomeLabel(outcomeFilter).toLowerCase()}` : ''}
+                {typeFilter !== 'ALL' ? ` for ${formatType(typeFilter)}` : ''}
+                {' '}on {data.snapshotDate}.
+              </p>
+            </div>
+          )}
+
+          {!isLoading && !isError && data?.snapshotDate && eliteFixtures.length > 0 && (
+            <FixtureList
+              fixtures={eliteFixtures}
+              emptyTitle="No Elite picks"
+              emptyBody="No Elite picks for this filter."
+              showEliteRank
+            />
           )}
         </>
       )}
