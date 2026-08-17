@@ -16,6 +16,9 @@ const SKIP_KEYS = new Set([
   'xgDominanceAppliedAsMultiplier',
   // BTTS: boost amount is internal; applied flag alone is enough if shown
   'leakyDefenseBoostAmount',
+  // Value Bets: noisy / bankroll-advice fields for the customer panel
+  'allOpportunities',
+  'kellyStake',
 ]);
 
 /** Friendly labels for specific factor keys (all markets). */
