@@ -14,6 +14,7 @@ const SKIP_KEYS = new Set([
   'xgDataAvailable', // all markets — not useful in the customer Info panel
   'drawsDeferredToDrawEngine',
   'xgDominanceAppliedAsMultiplier',
+<<<<<<< HEAD
   // BTTS: boost amount is internal; applied flag alone is enough if shown
   'leakyDefenseBoostAmount',
   // Value Bets: noisy / bankroll-advice fields for the customer panel
@@ -23,6 +24,11 @@ const SKIP_KEYS = new Set([
   'apiCornersPotential',
   'apiCornersO85Potential',
   'apiCornersO105Potential',
+=======
+  // Match Result: multipliers are informational only (not applied to score)
+  'homeXgDominanceMultiplier',
+  'awayXgDominanceMultiplier',
+>>>>>>> origin/main
 ]);
 
 /** Friendly labels for specific factor keys (all markets). */
