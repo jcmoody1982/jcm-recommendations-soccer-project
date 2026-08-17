@@ -19,6 +19,10 @@ const SKIP_KEYS = new Set([
   // Value Bets: noisy / bankroll-advice fields for the customer panel
   'allOpportunities',
   'kellyStake',
+  // Corners: dense API potential dump — keep O95 if useful, drop these
+  'apiCornersPotential',
+  'apiCornersO85Potential',
+  'apiCornersO105Potential',
 ]);
 
 /** Friendly labels for specific factor keys (all markets). */
