@@ -81,29 +81,31 @@
 }
 
 .whyButton {
-  padding: 0.15rem 0.35rem;
-  border: 1px solid var(--border-color);
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--accent-color);
   border-radius: 4px;
-  background: transparent;
-  color: var(--text-secondary);
+  background: var(--accent-color);
+  color: var(--accent-contrast);
   font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   cursor: pointer;
   line-height: 1.2;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .whyButton:hover {
-  border-color: var(--accent-color);
-  color: var(--accent-color);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-contrast);
 }
 
 .whyButtonOpen {
   background: var(--accent-soft);
   border-color: var(--accent-color);
   color: var(--accent-color);
+  box-shadow: inset 0 0 0 1px var(--accent-color);
 }
 
 .starButton {
@@ -498,21 +500,30 @@
   .mobileWhyButton {
     margin-top: 5px;
     width: 100%;
-    padding: 0.28rem 0.5rem;
-    border: 1px solid var(--border-color);
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--accent-color);
     border-radius: 4px;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 0.65rem;
-    font-weight: 600;
+    background: var(--accent-color);
+    color: var(--accent-contrast);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
     cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   }
 
-  .mobileWhyButton:hover,
+  .mobileWhyButton:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: var(--accent-contrast);
+  }
+
   .mobileWhyButton.whyButtonOpen {
+    background: var(--accent-soft);
     border-color: var(--accent-color);
     color: var(--accent-color);
-    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-color);
   }
 
   .details {
