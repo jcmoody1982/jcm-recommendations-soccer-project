@@ -1,4 +1,5 @@
 import type { Recommendation } from '../types';
+import { MarketIcon } from './MarketIcon';
 import { RecommendationRow } from './RecommendationRow';
 import { sectionTitle } from '../utils/recommendationSections';
 import styles from './RecommendationSection.module.css';
@@ -19,7 +20,7 @@ export function ElitePicksSection({ recommendations }: Props) {
   return (
     <section className={styles.section} id="rec-section-elite-picks">
       <h2 className={styles.header}>
-        <span className={styles.icon}>👑</span>
+        <MarketIcon type="ELITE" title="Elite Picks" />
         <span className={styles.title}>Elite Picks</span>
         <span className={styles.count}>
           {recommendations.length} pick{recommendations.length !== 1 ? 's' : ''}

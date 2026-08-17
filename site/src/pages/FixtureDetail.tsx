@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fixtureService, recommendationService } from '../services/api';
-import { EarlyKickoffBadge, EarlyKickoffStrip, RecommendationRow } from '../components';
+import { EarlyKickoffBadge, EarlyKickoffStrip, MarketIcon, RecommendationRow } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
 import {
   EARLY_KICKOFF_WARNING,
@@ -193,14 +193,15 @@ export default function FixtureDetail() {
               const typeRecs = groupedByType[type];
               const config = SECTION_CONFIG[type] || {
                 title: type,
-                icon: '📊',
                 showPrice: true,
+                scoreLabel: 'Score',
+                scoreUnit: '',
               };
 
               return (
                 <section key={type} className={styles.section}>
                   <h3 className={styles.typeHeader}>
-                    <span className={styles.typeIcon}>{config.icon}</span>
+                    <MarketIcon type={type} title={config.title} className={styles.typeIcon} />
                     <span className={styles.typeTitle}>{config.title}</span>
                     <span className={styles.typeCount}>
                       {typeRecs.length} pick{typeRecs.length !== 1 ? 's' : ''}

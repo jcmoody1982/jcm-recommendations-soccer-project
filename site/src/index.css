@@ -46,6 +46,10 @@
   --font-size-section: 0.95rem;
   --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-body: 'Manrope', system-ui, sans-serif;
+  --market-icon-bg: #dce8f4;
+  --market-icon-primary: #1a4a7a;
+  --market-icon-secondary: #5a9fd4;
+  --market-icon-on-primary: #ffffff;
 }
 
 [data-theme="dark"] {
@@ -84,6 +88,10 @@
   --early-kickoff-strong: #ff8a80;
   --early-kickoff-bg: rgba(198, 40, 40, 0.18);
   --early-kickoff-border: rgba(255, 107, 107, 0.4);
+  --market-icon-bg: #16324f;
+  --market-icon-primary: #c5e5ff;
+  --market-icon-secondary: #6eb6e8;
+  --market-icon-on-primary: #07111f;
 }
 
 html {
