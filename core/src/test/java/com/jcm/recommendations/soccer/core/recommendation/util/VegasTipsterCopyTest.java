@@ -68,18 +68,20 @@ class VegasTipsterCopyTest {
     @DisplayName("narrate varies layouts and phrasing across fixtures")
     void narrateVariesAcrossFixtures() {
         Set<String> outputs = new HashSet<>();
-        for (long fixtureId = 1; fixtureId <= 24; fixtureId++) {
+        String[] selections = {"Home Win", "BTTS Yes", "Over 2.5 Goals", "Draw", "Over 9.5 Corners"};
+        for (long fixtureId = 1; fixtureId <= 40; fixtureId++) {
             String text = VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
-                    .confidence(fixtureId % 2 == 0 ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE)
-                    .selection(fixtureId % 3 == 0 ? "BTTS Yes" : "Home Win")
+                    .confidence(fixtureId % 3 == 0 ? ConfidenceLevel.STRONG
+                            : fixtureId % 3 == 1 ? ConfidenceLevel.MODERATE : ConfidenceLevel.WEAK)
+                    .selection(selections[(int) (fixtureId % selections.length)])
                     .context(context(fixtureId, "Home FC", "Away United"))
-                    .probabilityPct(60.0 + fixtureId)
-                    .valuePct(8.0 + fixtureId / 10.0)
+                    .probabilityPct(55.0 + fixtureId)
+                    .valuePct(5.0 + fixtureId / 5.0)
                     .colourNote(fixtureId % 2 == 0 ? "Team in good form" : null)
                     .build());
             outputs.add(text);
         }
-        assertThat(outputs.size()).isGreaterThan(8);
+        assertThat(outputs.size()).isGreaterThan(20);
     }
 
     @Test

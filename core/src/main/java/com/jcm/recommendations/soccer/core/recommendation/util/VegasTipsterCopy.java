@@ -12,16 +12,15 @@ import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
 public final class VegasTipsterCopy {
 
     private enum Layout {
-        /** Opener → lean → numbers → colour → closer */
         CLASSIC,
-        /** Opener → colour → lean → numbers → closer */
         COLOUR_FIRST,
-        /** Lean + numbers up front, then theatrical closer with selection */
         BOARD_READ,
-        /** Colour as the hook, selection woven into the lean */
         STREET_WISE,
-        /** Short punch: opener packs selection + lean, numbers trail */
-        SHORT_PUNCH
+        SHORT_PUNCH,
+        CLOSER_LEAD,
+        NUMBERS_HOOK,
+        ASIDE,
+        WHISPER
     }
 
     private static final String[] OPENERS = {
@@ -36,7 +35,19 @@ public final class VegasTipsterCopy {
             "Crowd's buzzing about %s.",
             "Tape this one: %s.",
             "Mark the card — %s.",
-            "The window likes %s tonight."
+            "The window likes %s tonight.",
+            "Hot off the printer: %s.",
+            "Somebody cash this vibe — %s.",
+            "Ink's still wet on %s.",
+            "Raise a glass to %s.",
+            "The pit boss whispered %s.",
+            "Fresh chalk on %s.",
+            "All eyes on %s.",
+            "They're talking %s in the lounge.",
+            "Slide over — %s just hit the board.",
+            "Hold the dice for %s.",
+            "Cue the brass section for %s.",
+            "Flashbulb moment: %s."
     };
 
     private static final String[] STRONG_LEANS = {
@@ -44,7 +55,14 @@ public final class VegasTipsterCopy {
             "Strong lean — the board's nodding along",
             "We're shouting Strong on this one",
             "Strong lean stamped on the slip",
-            "The house calls this a Strong lean"
+            "The house calls this a Strong lean",
+            "Strong lean with the chest out",
+            "Bold Strong lean — no soft pedaling",
+            "We're planting a Strong flag here",
+            "Strong lean walking in like it owns the room",
+            "Call it Strong and mean it",
+            "Strong lean, lights and all",
+            "This earns the Strong stamp tonight"
     };
 
     private static final String[] MODERATE_LEANS = {
@@ -52,7 +70,14 @@ public final class VegasTipsterCopy {
             "Moderate lean — worth a look without the fireworks",
             "Board says Moderate; keep the powder dry",
             "A measured Moderate lean tonight",
-            "Moderate lean, no parade needed"
+            "Moderate lean, no parade needed",
+            "Moderate lean with the volume at half",
+            "Steady Moderate lean from the sheet",
+            "We're in Moderate territory — sensible money",
+            "Moderate lean, cool hand on the rail",
+            "Pencil in a Moderate lean",
+            "Moderate lean without the trumpet solo",
+            "Call it Moderate and keep walking"
     };
 
     private static final String[] WEAK_LEANS = {
@@ -60,7 +85,14 @@ public final class VegasTipsterCopy {
             "Weak lean — entertainment money only",
             "Speculative Weak lean if you're feeling spicy",
             "Weak lean on the long-shot ticket",
-            "Call it Weak and treat it like popcorn"
+            "Call it Weak and treat it like popcorn",
+            "Weak lean, tiny stake energy",
+            "We're whispering Weak on this one",
+            "Weak lean for the curious only",
+            "A dart-throw Weak lean",
+            "Weak lean — don't rearrange the bankroll",
+            "Parking a Weak lean on the fringe",
+            "Weak lean with a wink, not a wave"
     };
 
     private static final String[] PROB_PHRASES = {
@@ -68,7 +100,14 @@ public final class VegasTipsterCopy {
             "our number sits at %.1f%%",
             "tape has it around %.1f%%",
             "board math says %.1f%%",
-            "we're marking %.1f%% on the sheet"
+            "we're marking %.1f%% on the sheet",
+            "probability clocked at %.1f%%",
+            "the abacus lands on %.1f%%",
+            "we're penciling %.1f%%",
+            "hit rate vibes at %.1f%%",
+            "sheet says roughly %.1f%%",
+            "model temperature: %.1f%%",
+            "we're hanging %.1f%% on the hook"
     };
 
     private static final String[] EXPECTED_PHRASES = {
@@ -76,7 +115,14 @@ public final class VegasTipsterCopy {
             "projection lands near %.1f %s",
             "expect something like %.1f %s",
             "the total's hanging around %.1f %s",
-            "card projects ~%.1f %s"
+            "card projects ~%.1f %s",
+            "we're sniffing roughly %.1f %s",
+            "forecast parks near %.1f %s",
+            "number crunch points to %.1f %s",
+            "ballpark: %.1f %s",
+            "the line of best fit says %.1f %s",
+            "we're floating ~%.1f %s",
+            "expectancy humming around %.1f %s"
     };
 
     private static final String[] VALUE_PHRASES = {
@@ -84,27 +130,45 @@ public final class VegasTipsterCopy {
             "+%.1f%% value left on the bone",
             "price still leaking +%.1f%%",
             "juice check: +%.1f%%",
-            "mispriced to the tune of +%.1f%%"
+            "mispriced to the tune of +%.1f%%",
+            "+%.1f%% hanging off the ticket",
+            "value drip at +%.1f%%",
+            "the price owes you +%.1f%%",
+            "+%.1f%% of daylight vs the market",
+            "still +%.1f%% fat on this number",
+            "overlay roughly +%.1f%%",
+            "market lagging by +%.1f%%"
     };
 
     private static final String[] EDGE_PHRASES = {
             "+%.1f edge in the tank",
             "+%.1f of edge riding shotgun",
             "edge meter at +%.1f",
-            "+%.1f edge still breathing"
+            "+%.1f edge still breathing",
+            "we're packing +%.1f edge",
+            "+%.1f edge tucked in the cuff",
+            "edge ledger shows +%.1f",
+            "+%.1f of cushion on the model"
     };
 
     private static final String[] ODDS_PHRASES = {
             "priced at %.2f",
             "window showing %.2f",
             "ticket sits at %.2f",
-            "listed %.2f on the board"
+            "listed %.2f on the board",
+            "market hanging %.2f",
+            "you're getting %.2f",
+            "the number's %.2f",
+            "chalked at %.2f"
     };
 
     private static final String[] EV_PHRASES = {
             "EV %.3f",
             "expected value %.3f",
-            "EV sitting at %.3f"
+            "EV sitting at %.3f",
+            "EV humming %.3f",
+            "long-run EV %.3f",
+            "value engine reads EV %.3f"
     };
 
     private static final String[] CLOSERS = {
@@ -113,7 +177,13 @@ public final class VegasTipsterCopy {
             "Under the lights: %s vs %s.",
             "The marquee: %s vs %s.",
             "Kickoff billing: %s vs %s.",
-            "Main event: %s vs %s."
+            "Main event: %s vs %s.",
+            "On the strip: %s vs %s.",
+            "Centre stage: %s vs %s.",
+            "The matchup: %s vs %s.",
+            "Feature bout: %s vs %s.",
+            "Tonight's duel: %s vs %s.",
+            "Bill it as %s vs %s."
     };
 
     private static final String[] COLOUR_BRIDGES = {
@@ -121,7 +191,45 @@ public final class VegasTipsterCopy {
             "Colour on the tape: %s",
             "Here's the juice: %s",
             "Read the room — %s",
-            "Side note from the floor: %s"
+            "Side note from the floor: %s",
+            "Floor gossip: %s",
+            "And the subplot — %s",
+            "Between the lines: %s",
+            "Bonus reel: %s",
+            "Why it sings: %s",
+            "The texture: %s",
+            "Whisper from the rail: %s"
+    };
+
+    private static final String[] SELECTION_HOOKS = {
+            "We're sliding the chips toward %s.",
+            "Circle %s in red ink.",
+            "The play is %s.",
+            "We're riding %s.",
+            "Ticket stub says %s.",
+            "Park it on %s.",
+            "Our horse is %s.",
+            "Bank the angle on %s.",
+            "We're cashing the vibe on %s.",
+            "Lean the stack into %s."
+    };
+
+    private static final String[] ASIDE_OPENERS = {
+            "Quick aside from the tipster desk.",
+            "One for the late ticket writers.",
+            "A little theatre before kickoff.",
+            "From the smoke-filled lounge:",
+            "Pass it down the rail —",
+            "For those keeping a lively card:"
+    };
+
+    private static final String[] WHISPER_OPENERS = {
+            "Lean in.",
+            "Between you and me — hold this close.",
+            "Soft voice, loud number.",
+            "Don't make a scene.",
+            "Quiet tip from the corner.",
+            "Cupped hand from the rail."
     };
 
     private VegasTipsterCopy() {}
@@ -232,9 +340,9 @@ public final class VegasTipsterCopy {
 
         int hash = stableHash(brief);
         Layout layout = pick(Layout.values(), hash, 0);
-        // Prefer colour-forward layouts when we actually have colour to sell.
         if (!hasColour(brief) && (layout == Layout.COLOUR_FIRST || layout == Layout.STREET_WISE)) {
-            layout = Layout.CLASSIC;
+            layout = pick(new Layout[]{Layout.CLASSIC, Layout.BOARD_READ, Layout.SHORT_PUNCH,
+                    Layout.CLOSER_LEAD, Layout.NUMBERS_HOOK, Layout.ASIDE, Layout.WHISPER}, hash, 11);
         }
 
         String selection = brief.selection().trim();
@@ -243,13 +351,17 @@ public final class VegasTipsterCopy {
         String numbers = numbersLine(brief, hash);
         String colour = colourLine(brief, hash);
         String closer = closerLine(brief, hash);
+        String selectionHook = String.format(pick(SELECTION_HOOKS, hash, 12), selection);
+        String numbersSentence = numbers.isBlank()
+                ? null
+                : endSentence(capitalize(numbers.replaceFirst("^—\\s*", "")));
 
         String text = switch (layout) {
             case CLASSIC -> joinSentences(opener, leanWithNumbers(lean, numbers), colour, closer);
             case COLOUR_FIRST -> joinSentences(opener, colour, leanWithNumbers(lean, numbers), closer);
             case BOARD_READ -> joinSentences(
                     leanWithNumbers(lean, numbers),
-                    "We're sliding the chips toward " + selection + ".",
+                    selectionHook,
                     colour,
                     closer
             );
@@ -260,7 +372,35 @@ public final class VegasTipsterCopy {
             );
             case SHORT_PUNCH -> joinSentences(
                     opener + " " + lean + ".",
-                    numbers.isBlank() ? null : capitalize(numbers.replaceFirst("^—\\s*", "")),
+                    numbersSentence,
+                    colour,
+                    closer
+            );
+            case CLOSER_LEAD -> joinSentences(
+                    closer,
+                    opener,
+                    leanWithNumbers(lean, numbers),
+                    colour
+            );
+            case NUMBERS_HOOK -> joinSentences(
+                    numbersSentence != null
+                            ? numbersSentence
+                            : endSentence(lean + " on " + selection),
+                    selectionHook,
+                    numbersSentence != null ? endSentence(lean) : null,
+                    colour,
+                    closer
+            );
+            case ASIDE -> joinSentences(
+                    pick(ASIDE_OPENERS, hash, 13),
+                    opener,
+                    leanWithNumbers(lean, numbers),
+                    colour,
+                    closer
+            );
+            case WHISPER -> joinSentences(
+                    pick(WHISPER_OPENERS, hash, 14),
+                    leanWithNumbers(lean + " — " + selection, numbers),
                     colour,
                     closer
             );
@@ -316,8 +456,6 @@ public final class VegasTipsterCopy {
             return null;
         }
         String note = trimSentence(brief.colourNote());
-        // Keep the raw note when tests/engines rely on exact keywords;
-        // only sometimes wrap it with a bridge so variety stays optional.
         String bridge = pick(COLOUR_BRIDGES, hash, 8);
         if ("%s".equals(bridge)) {
             return endSentence(note);
@@ -361,9 +499,6 @@ public final class VegasTipsterCopy {
                 sb.append(' ');
             }
             sb.append(cleaned);
-            if (!cleaned.endsWith(".") && !cleaned.endsWith("!") && !cleaned.endsWith("?")) {
-                // leave as-is; callers usually punctuate
-            }
         }
         return sb.toString().trim();
     }
@@ -409,7 +544,6 @@ public final class VegasTipsterCopy {
         if (brief.confidence() != null) {
             h = 31 * h + brief.confidence().hashCode();
         }
-        // Nudge variety when the same selection shows with different numbers.
         if (brief.probabilityPct() != null) {
             h = 31 * h + Double.hashCode(Math.rint(brief.probabilityPct() * 10));
         } else if (brief.expectedNumber() != null) {
