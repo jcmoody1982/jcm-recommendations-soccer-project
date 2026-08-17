@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.RefereeStats;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
@@ -410,14 +411,14 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence,
             double expectedPoints, MarketPick pick) {
-        return String.format(
-                "%s confidence %s recommendation (%.1f expected points, +%.1f edge) - %s vs %s",
-                confidence.getDisplayName(),
-                pick.market(),
-                expectedPoints,
-                pick.edge(),
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(pick.market())
+                .context(context)
+                .expected(expectedPoints, "expected booking points")
+                .edge(pick.edge())
+                .colourNote("Cards are cooking — the whistle's got work tonight")
+                .build());
     }
 
     private record WeightedSignal(String name, double value, double weight) {}

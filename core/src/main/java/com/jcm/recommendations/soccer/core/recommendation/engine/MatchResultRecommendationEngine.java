@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import lombok.extern.slf4j.Slf4j;
@@ -668,23 +669,13 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     private String buildDescription(FixtureContext context, String outcome, double probability,
             ConfidenceLevel confidence, double valueVsOdds, String outcomeType,
             double homeFormMomentum, double awayFormMomentum, boolean hasOutcomeOdds) {
-        StringBuilder sb = new StringBuilder();
-
-        sb.append(confidence.getDisplayName()).append(" confidence ");
-        sb.append(outcome).append(" recommendation ");
-        sb.append(String.format("(%.1f%% probability)", probability));
-
-        if (hasOutcomeOdds && valueVsOdds > 0) {
-            sb.append(String.format(" (+%.1f%% value)", valueVsOdds));
-        }
-
-        sb.append(". ");
+        StringBuilder colour = new StringBuilder();
 
         double relevantMomentum = outcomeType.equals("HOME") ? homeFormMomentum : awayFormMomentum;
         if (relevantMomentum >= FORM_HOT_STREAK_MULTIPLIER) {
-            sb.append("Team on hot streak. ");
+            colour.append("Team on hot streak");
         } else if (relevantMomentum >= FORM_GOOD_MULTIPLIER) {
-            sb.append("Team in good form. ");
+            colour.append("Team in good form");
         }
 
         TeamSeasonStats homeStats = context.getHomeTeamStats();
@@ -694,12 +685,20 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
                     ? calculateXgDominance(homeStats, awayStats, true)
                     : calculateXgDominance(awayStats, homeStats, false);
             if (xgDom > XG_STRONG_DOMINANCE_THRESHOLD) {
-                sb.append("Strong xG advantage. ");
+                if (!colour.isEmpty()) {
+                    colour.append(". ");
+                }
+                colour.append("Strong xG advantage");
             }
         }
 
-        sb.append(context.getHomeTeam().getName()).append(" vs ").append(context.getAwayTeam().getName());
-
-        return sb.toString();
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(outcome)
+                .context(context)
+                .probabilityPct(probability)
+                .valuePct(hasOutcomeOdds && valueVsOdds > 0 ? valueVsOdds : null)
+                .colourNote(colour.isEmpty() ? null : colour.toString())
+                .build());
     }
 }

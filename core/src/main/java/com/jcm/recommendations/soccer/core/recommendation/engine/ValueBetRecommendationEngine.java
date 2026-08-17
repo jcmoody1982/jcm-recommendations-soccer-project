@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -423,15 +424,15 @@ private double calculateHomeWinProbability(FixtureContext context) {
     }
 
     private String buildDescription(FixtureContext context, ValueOpportunity opportunity) {
-        return String.format("%s confidence Value Bet on %s @ %.2f (%.1f%% value, EV: %.3f, Kelly: %.1f%%) - %s vs %s",
-                opportunity.confidence.getDisplayName(),
-                opportunity.market,
-                opportunity.odds,
-                opportunity.valuePercentage,
-                opportunity.expectedValue,
-                opportunity.kellyStake * 100,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(opportunity.confidence)
+                .selection("Value Bet on " + opportunity.market)
+                .context(context)
+                .odds(opportunity.odds)
+                .valuePct(opportunity.valuePercentage)
+                .expectedValue(opportunity.expectedValue)
+                .colourNote("The board's mispriced this one — grab the juice while it lasts")
+                .build());
     }
 
     private record ValueOpportunity(

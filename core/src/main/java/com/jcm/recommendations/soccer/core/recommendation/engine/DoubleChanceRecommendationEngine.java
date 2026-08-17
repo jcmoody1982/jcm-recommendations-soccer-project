@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
@@ -572,30 +573,24 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
 
     private String buildDescription(FixtureContext context, String market, double probability,
             double value, ConfidenceLevel confidence, Map<String, Object> factors) {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(confidence.getDisplayName()).append(" confidence ");
-        sb.append(market).append(" recommendation");
-        sb.append(String.format(" (%.1f%% probability", probability));
-        
-        if (Math.abs(value) > 0.1) {
-            sb.append(String.format(", %.1f%% value", value));
-        }
-        sb.append("). ");
-
-        // Add key factor
+        String colourNote = null;
         if (Boolean.TRUE.equals(factors.get("homeFortress"))) {
-            sb.append("Home fortress. ");
+            colourNote = "Home fortress writing the script tonight";
         } else if (Boolean.TRUE.equals(factors.get("awayPoorTraveler"))) {
-            sb.append("Away team poor travelers. ");
+            colourNote = "Away team poor travelers — suitcase full of regret";
         } else if (Boolean.TRUE.equals(factors.get("awayRoadWarrior"))) {
-            sb.append("Away road warriors. ");
+            colourNote = "Away road warriors rolling into town";
         } else if (Boolean.TRUE.equals(factors.get("homeWeakAtHome"))) {
-            sb.append("Home team weak at home. ");
+            colourNote = "Home team weak at home — the house is leaking";
         }
 
-        sb.append(context.getHomeTeam().getName()).append(" vs ").append(context.getAwayTeam().getName());
-
-        return sb.toString();
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(market)
+                .context(context)
+                .probabilityPct(probability)
+                .valuePct(Math.abs(value) > 0.1 ? value : null)
+                .colourNote(colourNote)
+                .build());
     }
 }

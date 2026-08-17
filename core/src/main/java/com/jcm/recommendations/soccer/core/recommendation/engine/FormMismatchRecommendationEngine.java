@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
@@ -368,10 +369,10 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, TeamMismatch mismatch, 
             RecommendationType type, ConfidenceLevel confidence) {
-        String trend = type == RecommendationType.WINNING_FORM_MISMATCH 
-                ? "Hot streak - potentially undervalued" 
+        String trend = type == RecommendationType.WINNING_FORM_MISMATCH
+                ? "Hot streak - potentially undervalued"
                 : "Cold streak - potentially overvalued";
-        
+
         StringBuilder extras = new StringBuilder();
         if (mismatch.scoringTrendUp) {
             extras.append(", scoring trending up");
@@ -382,16 +383,14 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
         if (mismatch.xgRegressionRisk) {
             extras.append(", xG regression risk");
         }
-        
-        return String.format("%s confidence %s for %s (%.1f%% mismatch%s) - %s - %s vs %s",
-                confidence.getDisplayName(),
-                type.getDisplayName(),
-                mismatch.teamName,
-                Math.abs(mismatch.mismatchScore),
-                extras,
-                trend,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
+
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(type.getDisplayName() + " for " + mismatch.teamName)
+                .context(context)
+                .probabilityPct(Math.abs(mismatch.mismatchScore))
+                .colourNote(trend + extras)
+                .build());
     }
 
     private record TeamMismatch(

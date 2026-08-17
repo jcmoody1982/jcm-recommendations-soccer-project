@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
@@ -475,25 +476,22 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, ResultBttsCandidate best,
             ConfidenceLevel confidence, ConfidenceAdjustment adjustment) {
-        StringBuilder sb = new StringBuilder();
-
-        sb.append(confidence.getDisplayName()).append(" confidence ");
-        sb.append(best.market);
-        sb.append(String.format(" (%.1f%% combined", best.combinedProb));
+        StringBuilder colour = new StringBuilder();
+        colour.append(String.format("Result %.1f%% x BTTS %.1f%%", best.resultProb, best.bttsProb));
         if (Math.abs(adjustment.multiplier() - 1.0) > 0.001) {
-            sb.append(String.format(", %.1f%% adjusted", best.adjustedProb));
+            colour.append(String.format(" — adjusted to %.1f%%", best.adjustedProb));
         }
-        sb.append("). ");
-
-        sb.append(String.format("Result %.1f%% x BTTS %.1f%%. ", best.resultProb, best.bttsProb));
-
         if (!adjustment.applied().isEmpty()) {
-            sb.append(String.join("; ", adjustment.applied())).append(". ");
+            colour.append(". ").append(String.join("; ", adjustment.applied()));
         }
 
-        sb.append(context.getHomeTeam().getName()).append(" vs ").append(context.getAwayTeam().getName());
-
-        return sb.toString();
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(best.market)
+                .context(context)
+                .probabilityPct(best.combinedProb)
+                .colourNote(colour.toString())
+                .build());
     }
 
     private record ResultBttsCandidate(String market, String resultType, double resultProb,

@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.RefereeStats;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
@@ -568,28 +569,29 @@ public class DrawRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence, 
             double score, Map<String, Object> factors) {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(confidence.getDisplayName()).append(" confidence Draw recommendation");
-        sb.append(String.format(" (%.1f%% score)", score));
+        StringBuilder colour = new StringBuilder();
 
-        // Draw specialists
         double homeDrawPct = calculateDrawPercentage(context.getHomeTeamStats(), true);
         double awayDrawPct = calculateDrawPercentage(context.getAwayTeamStats(), false);
         if (homeDrawPct >= 30 && awayDrawPct >= 30) {
-            sb.append(" - Draw specialists meeting");
+            colour.append("Draw specialists meeting under the neon");
         }
 
-        // xG similarity
         @SuppressWarnings("unchecked")
         List<String> positiveIndicators = (List<String>) factors.get("positiveIndicators");
         if (positiveIndicators != null && positiveIndicators.stream().anyMatch(s -> s.contains("xG"))) {
-            sb.append(" - Similar xG profiles");
+            if (!colour.isEmpty()) {
+                colour.append(". ");
+            }
+            colour.append("Similar xG profiles — stalemate perfume in the air");
         }
 
-        sb.append(". ");
-        sb.append(context.getHomeTeam().getName()).append(" vs ").append(context.getAwayTeam().getName());
-
-        return sb.toString();
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection("Draw")
+                .context(context)
+                .probabilityPct(score)
+                .colourNote(colour.isEmpty() ? null : colour.toString())
+                .build());
     }
 }

@@ -69,14 +69,12 @@ public final class RecommendationFactory {
             double scoreOrProbability,
             String scoreLabel,
             FixtureContext context) {
-        
-        return String.format("%s confidence %s recommendation (%.1f%% %s) - %s vs %s",
-                confidence.getDisplayName(),
-                marketOrType,
-                scoreOrProbability,
-                scoreLabel,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(marketOrType)
+                .context(context)
+                .probabilityPct(scoreOrProbability)
+                .build());
     }
 
     /**
@@ -88,14 +86,12 @@ public final class RecommendationFactory {
             double expectedValue,
             String valueLabel,
             FixtureContext context) {
-        
-        return String.format("%s confidence %s recommendation (%.2f %s) - %s vs %s",
-                confidence.getDisplayName(),
-                market,
-                expectedValue,
-                valueLabel,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(market)
+                .context(context)
+                .expected(expectedValue, valueLabel)
+                .build());
     }
 
     /**
@@ -107,13 +103,11 @@ public final class RecommendationFactory {
             String teamName,
             double score,
             FixtureContext context) {
-        
-        return String.format("%s confidence %s for %s (%.1f%%) - %s vs %s",
-                confidence.getDisplayName(),
-                recommendationType,
-                teamName,
-                score,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(recommendationType + " for " + teamName)
+                .context(context)
+                .probabilityPct(score)
+                .build());
     }
 }

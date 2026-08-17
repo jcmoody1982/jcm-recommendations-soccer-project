@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -156,12 +157,12 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, String favoriteTeam, int positionGap,
             ConfidenceLevel confidence, String flag) {
-        return String.format("%s confidence %s recommendation (%d position gap, %s) - %s vs %s",
-                confidence.getDisplayName(),
-                favoriteTeam,
-                positionGap,
-                flag,
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName());
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(favoriteTeam)
+                .context(context)
+                .colourNote(String.format("%d position gap on the table, %s — big fish, small pond energy",
+                        positionGap, flag))
+                .build());
     }
 }

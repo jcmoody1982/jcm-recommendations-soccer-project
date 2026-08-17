@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import lombok.extern.slf4j.Slf4j;
@@ -537,31 +538,33 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence, 
             double expected2HGoals, String market) {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(confidence == ConfidenceLevel.STRONG ? "Strong" : "Moderate");
-        sb.append(" second half goals potential. ");
-        sb.append(String.format("Expected 2H goals: %.2f. ", expected2HGoals));
-        
-        // Add key factors
+        StringBuilder colour = new StringBuilder();
+
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
-        
+
         if (hasXgData(homeStats, awayStats)) {
             double combinedXg = safeDouble(homeStats.getXgForAvgHome()) + safeDouble(awayStats.getXgForAvgAway());
             if (combinedXg > XG_HIGH_THRESHOLD) {
-                sb.append("High combined xG (").append(String.format("%.2f", combinedXg)).append("). ");
+                colour.append(String.format("High combined xG (%.2f)", combinedXg));
             }
         }
-        
+
         double homeCards = safeDouble(homeStats.getCardsAvgHome(), 2.0);
         double awayCards = safeDouble(awayStats.getCardsAvgAway(), 2.0);
         if (homeCards + awayCards >= HIGH_INTENSITY_CARDS_THRESHOLD) {
-            sb.append("High-intensity matchup expected. ");
+            if (!colour.isEmpty()) {
+                colour.append(". ");
+            }
+            colour.append("High-intensity matchup expected after the break");
         }
-        
-        sb.append("Recommended: ").append(market).append(".");
-        
-        return sb.toString();
+
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(market)
+                .context(context)
+                .expected(expected2HGoals, "expected 2H goals")
+                .colourNote(colour.isEmpty() ? "Second half goals potential after the interval" : colour.toString())
+                .build());
     }
 }

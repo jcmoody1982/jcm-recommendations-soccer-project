@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -429,27 +430,30 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
     }
 
     private String buildDescription(FixtureContext context, CleanSheetCandidate candidate, ConfidenceLevel confidence) {
-        StringBuilder desc = new StringBuilder();
-        desc.append(String.format("%s confidence Clean Sheet for %s (%.1f%% score)",
-                confidence.getDisplayName(),
-                candidate.teamName,
-                candidate.score));
-        
+        StringBuilder colour = new StringBuilder();
         if (candidate.hotStreak) {
-            desc.append(" [hot streak]");
+            colour.append("hot streak between the sticks");
         }
         if (candidate.xgRegressionRisk) {
-            desc.append(" [xG regression risk]");
+            if (!colour.isEmpty()) {
+                colour.append(". ");
+            }
+            colour.append("xG regression risk on the opponent's finishing");
         }
         if (candidate.opponentXgOverperformance) {
-            desc.append(" [opponent overperforming]");
+            if (!colour.isEmpty()) {
+                colour.append(". ");
+            }
+            colour.append("opponent overperforming their chances");
         }
-        
-        desc.append(String.format(" - %s vs %s",
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName()));
-        
-        return desc.toString();
+
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection("Clean Sheet for " + candidate.teamName)
+                .context(context)
+                .probabilityPct(candidate.score)
+                .colourNote(colour.isEmpty() ? null : colour.toString())
+                .build());
     }
 
     private record CleanSheetCandidate(
