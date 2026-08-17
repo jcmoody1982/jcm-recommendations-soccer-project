@@ -14,13 +14,106 @@ const SKIP_KEYS = new Set([
   'xgDataAvailable', // all markets — not useful in the customer Info panel
   'drawsDeferredToDrawEngine',
   'xgDominanceAppliedAsMultiplier',
+<<<<<<< HEAD
+  // BTTS: boost amount is internal; applied flag alone is enough if shown
+  'leakyDefenseBoostAmount',
+  // Value Bets: noisy / bankroll-advice fields for the customer panel
+  'allOpportunities',
+  'kellyStake',
+  // Corners: dense API potential dump — keep O95 if useful, drop these
+  'apiCornersPotential',
+  'apiCornersO85Potential',
+  'apiCornersO105Potential',
+=======
   // Match Result: multipliers are informational only (not applied to score)
   'homeXgDominanceMultiplier',
   'awayXgDominanceMultiplier',
+>>>>>>> origin/main
 ]);
 
 /** Friendly labels for specific factor keys (all markets). */
 const GLOBAL_LABELS: Record<string, string> = {};
+
+/**
+ * Preferred Info order for BTTS: all Home attributes, then Away, then shared.
+ * Keys not listed keep relative order after the known list.
+ */
+const BTTS_FACTOR_ORDER: readonly string[] = [
+  'homeBttsSeasonPct',
+  'homeBttsFormPct',
+  'homeGoalsAvgHome',
+  'homeConcededAvgHome',
+  'homeFailedToScorePct',
+  'homeVenueScoredPct',
+  'homeVenueMatches',
+  'homeXgForAvgHome',
+  'homeXgAgainstAvgHome',
+  'homeFormSampleSize',
+  'awayBttsSeasonPct',
+  'awayBttsFormPct',
+  'awayGoalsAvgAway',
+  'awayConcededAvgAway',
+  'awayFailedToScorePct',
+  'awayVenueScoredPct',
+  'awayVenueMatches',
+  'awayXgForAvgAway',
+  'awayXgAgainstAvgAway',
+  'awayFormSampleSize',
+  'apiPotential',
+  'goalsBoostApplied',
+  'goalsBoostAmount',
+  'leakyDefenseBoostApplied',
+  'xgBoostApplied',
+  'xgBoostAmount',
+  'combinedXgMatchup',
+  'combinedXg',
+  'baseScore',
+  'appliedBoost',
+  'calculatedScore',
+  'filtersVenueAware',
+  'maxCombinedBoost',
+];
+
+/** Preferred Info order for Double Chance: Home attributes before Away. */
+const DOUBLE_CHANCE_FACTOR_ORDER: readonly string[] = [
+  'homeWinProbability',
+  'homeDrawCombined',
+  'homeFortress',
+  'homeWeakAtHome',
+  'homePosition',
+  'homeWinRateHome',
+  'homeLossRateHome',
+  'homeLast5Wins',
+  'homeLast5Losses',
+  'homeXgFor',
+  'homeXgAgainst',
+  'awayWinProbability',
+  'drawAwayCombined',
+  'awayPoorTraveler',
+  'awayRoadWarrior',
+  'awayPosition',
+  'awayWinRateAway',
+  'awayLossRateAway',
+  'awayLast5Wins',
+  'awayLast5Losses',
+  'awayXgFor',
+  'awayXgAgainst',
+  'drawProbability',
+  'positionGap',
+  'implied1X',
+  'value1X',
+  'combined1XOdds',
+  'impliedX2',
+  'valueX2',
+  'combinedX2Odds',
+  'positiveIndicators',
+  'riskFlags',
+];
+
+const FACTOR_ORDER_BY_TYPE: Partial<Record<RecommendationType, readonly string[]>> = {
+  BTTS: BTTS_FACTOR_ORDER,
+  DOUBLE_CHANCE: DOUBLE_CHANCE_FACTOR_ORDER,
+};
 
 const MAX_FACTORS = 8;
 
@@ -126,6 +219,24 @@ function formatFactorValue(value: unknown): string | null {
   return String(value);
 }
 
+function orderedFactorKeys(
+  keys: string[],
+  type?: RecommendationType
+): string[] {
+  const preferred = type ? FACTOR_ORDER_BY_TYPE[type] : undefined;
+  if (!preferred) {
+    return keys;
+  }
+
+  const rank = new Map(preferred.map((key, index) => [key, index]));
+  return [...keys].sort((a, b) => {
+    const aRank = rank.get(a) ?? preferred.length;
+    const bRank = rank.get(b) ?? preferred.length;
+    if (aRank !== bRank) return aRank - bRank;
+    return a.localeCompare(b);
+  });
+}
+
 /**
  * Turns a recommendation factors map into a short, readable list for the UI.
  */
@@ -136,9 +247,11 @@ export function formatFactorEntries(
 ): FactorEntry[] {
   if (!factors) return [];
 
+  const keys = orderedFactorKeys(Object.keys(factors), options?.type);
   const entries: FactorEntry[] = [];
-  for (const [key, raw] of Object.entries(factors)) {
+  for (const key of keys) {
     if (SKIP_KEYS.has(key)) continue;
+    const raw = factors[key];
     if (typeof raw === 'boolean' && raw === false) continue;
 
     const value = formatFactorValue(raw);
