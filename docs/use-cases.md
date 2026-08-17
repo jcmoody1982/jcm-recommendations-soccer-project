@@ -882,27 +882,29 @@ Expected Corners Calculation:
 
 **Confidence Determination:**
 ```
+Market selection is driven by expected corners only (line must be consistent
+with the prediction). API potentials may boost confidence, never the line.
+
 Strong Over:
-  - Expected corners ≥ 12 OR
-  - corners_o105_potential ≥ 70% (API confidence boost)
+  - Expected corners ≥ 12 → market Over 10.5
+  - Expected 10–11.9 with strong API O95/O105 → still Over 9.5, confidence STRONG
 
 Moderate Over:
-  - Expected corners 10-11.9 OR
-  - corners_o95_potential ≥ 65%
+  - Expected corners 10–11.9 without strong API → Over 9.5, MODERATE
 
-Strong Under (handled by same engine):
-  - Expected corners ≤ 8 OR
-  - (O95 potential < 40% AND O105 potential < 25%)
+Strong Under:
+  - Expected corners ≤ 8 → market Under 8.5
+  - Expected 8.1–9.5 with weak API O85/O95 → still Under 9.5, confidence STRONG
 
 Moderate Under:
-  - Expected corners 8.1-9.5
+  - Expected corners 8.1–9.5 without weak API → Under 9.5, MODERATE
 ```
 
 **Market Selection:**
-- **Over 10.5 Corners:** Strong confidence over
-- **Over 9.5 Corners:** Moderate confidence over
-- **Under 9.5 Corners:** Moderate confidence under
-- **Under 8.5 Corners:** Strong confidence under
+- **Over 10.5 Corners:** Expected ≥ 12
+- **Over 9.5 Corners:** Expected 10–11.9
+- **Under 9.5 Corners:** Expected 8.1–9.5
+- **Under 8.5 Corners:** Expected ≤ 8.0
 
 **Output:**
 - Single recommendation per fixture (Over or Under)
@@ -914,7 +916,7 @@ Moderate Under:
   - `homeConcededAvg` / `awayConcededAvg` - corners conceded
   - `homeFormCornersAvg` / `awayFormCornersAvg` - form data
   - `apiCornersO85Potential` / `apiCornersO95Potential` / `apiCornersO105Potential` - API potentials
-  - `apiConfidenceBoostApplied` - whether API boosted confidence
+  - `apiConfidenceBoostApplied` - whether API boosted confidence (not the line)
   - `playingStyleMultiplier` - attacking style adjustment
   - `matchContextMultiplier` - position-based adjustment
   - `trendMultiplier` / `trendDirection` - form trend adjustment
@@ -941,17 +943,20 @@ The engine returns UNDER_CORNERS type when expected corners fall below threshold
 
 Under Detection:
 - Expected corners ≤ 9.5: triggers Under recommendation
-- Expected corners ≤ 8.0: Strong confidence Under 8.5
-- Low API potentials (O95 < 40% AND O105 < 25%): confidence boost
+- Expected corners ≤ 8.0: Under 8.5 (STRONG)
+- Expected corners 8.1–9.5: Under 9.5 (MODERATE, or STRONG if API corner potentials are weak)
+- Weak API potentials boost confidence only — they must not move the line to Under 8.5
+  when expected corners are still above 8.0
 ```
 
 **Thresholds:**
-- **Strong Under:** Expected corners ≤ 8.0 OR (O95 < 40% AND O105 < 25%)
-- **Moderate Under:** Expected corners 8.1-9.5
+- **Strong Under (Under 8.5):** Expected corners ≤ 8.0
+- **Moderate Under (Under 9.5):** Expected corners 8.1–9.5
+- **API confidence boost:** O85 / O95 weak → STRONG on Under 9.5 only
 
 **Market Selection:**
-- **Under 8.5 Corners:** Strong confidence under
-- **Under 9.5 Corners:** Moderate confidence under
+- **Under 8.5 Corners:** Expected ≤ 8.0 only
+- **Under 9.5 Corners:** Expected 8.1–9.5
 
 **Output:**
 - Returns UNDER_CORNERS recommendation type

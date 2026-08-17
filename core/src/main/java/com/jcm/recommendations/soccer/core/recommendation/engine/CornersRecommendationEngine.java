@@ -92,30 +92,30 @@ double expectedCorners = calculateExpectedCorners(context);
 
         if (expectedCorners >= THRESHOLD_MODERATE_OVER) {
             type = RecommendationType.OVER_CORNERS;
-            
-            // Determine confidence: STRONG if stats exceed threshold OR API strongly supports
-            if (expectedCorners >= THRESHOLD_STRONG_OVER || isApiLineStrong(apiO105)) {
+
+            // Market line must sit below expected corners; API only boosts confidence.
+            if (expectedCorners >= THRESHOLD_STRONG_OVER) {
                 market = "Over 10.5 Corners";
-                // STRONG if stats alone are strong, or stats are moderate AND API supports
-                confidence = (expectedCorners >= THRESHOLD_STRONG_OVER || isApiLineStrong(apiO105)) 
-                        ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
-                apiBoostApplied = isApiLineStrong(apiO105) && expectedCorners < THRESHOLD_STRONG_OVER;
+                confidence = ConfidenceLevel.STRONG;
             } else {
                 market = "Over 9.5 Corners";
-                confidence = isApiLineStrong(apiO95) ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+                boolean apiBoost = isApiLineStrong(apiO95) || isApiLineStrong(apiO105);
+                confidence = apiBoost ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+                apiBoostApplied = apiBoost;
             }
         } else if (expectedCorners <= THRESHOLD_MODERATE_UNDER) {
             type = RecommendationType.UNDER_CORNERS;
-            
-            // For under, STRONG if stats exceed threshold OR API shows weak corner potential
-            if (expectedCorners <= THRESHOLD_STRONG_UNDER || isApiLineWeak(apiO85)) {
+
+            // Market line must sit above expected corners; API only boosts confidence.
+            // Do not pick Under 8.5 when expected is still ~9 (e.g. weak O85 alone).
+            if (expectedCorners <= THRESHOLD_STRONG_UNDER) {
                 market = "Under 8.5 Corners";
-                confidence = (expectedCorners <= THRESHOLD_STRONG_UNDER || isApiLineWeak(apiO85)) 
-                        ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
-                apiBoostApplied = isApiLineWeak(apiO85) && expectedCorners > THRESHOLD_STRONG_UNDER;
+                confidence = ConfidenceLevel.STRONG;
             } else {
                 market = "Under 9.5 Corners";
-                confidence = isApiLineWeak(apiO95) ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+                boolean apiBoost = isApiLineWeak(apiO85) || isApiLineWeak(apiO95);
+                confidence = apiBoost ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+                apiBoostApplied = apiBoost;
             }
         } else {
             return Optional.empty();
