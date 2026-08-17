@@ -167,6 +167,96 @@ class CornersRecommendationEngineTest {
         assertThat(result.get().getFactors().get("formDataAvailable")).isEqualTo(false);
     }
 
+    @Test
+    @DisplayName("analyze does not pick Under 8.5 when expected corners are above 8.0")
+    void analyze_withExpectedNearNine_doesNotSelectUnder85() {
+        // Season/form around ~4.5 each side → expected near 9, but weak O85 used to
+        // incorrectly force Under 8.5. Line must stay Under 9.5.
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .cornersAvgHome(4.5)
+                .cornersAvgAway(4.0)
+                .cornersAvgOverall(4.2)
+                .seasonGoalsHome(14)
+                .position(12)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .cornersAvgHome(4.0)
+                .cornersAvgAway(4.5)
+                .cornersAvgOverall(4.2)
+                .seasonGoalsAway(10)
+                .position(14)
+                .build();
+
+        TeamRecentForm homeForm = TeamRecentForm.builder()
+                .teamId(1L)
+                .cornersAvgHome(4.4)
+                .cornersAvgAway(4.0)
+                .cornersAvgOverall(4.2)
+                .build();
+
+        TeamRecentForm awayForm = TeamRecentForm.builder()
+                .teamId(2L)
+                .cornersAvgHome(4.0)
+                .cornersAvgAway(4.4)
+                .cornersAvgOverall(4.2)
+                .build();
+
+        FixturePotentials potentials = FixturePotentials.builder()
+                .fixtureId(1000L)
+                .cornersPotential(40.0)
+                .cornersO85Potential(30.0) // weak — previously upgraded line to Under 8.5
+                .cornersO95Potential(25.0)
+                .cornersO105Potential(15.0)
+                .build();
+
+        FixtureContext context = FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Near Nine Home"))
+                .awayTeam(createTeam(2L, "Near Nine Away"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .homeTeamForm(homeForm)
+                .awayTeamForm(awayForm)
+                .potentials(potentials)
+                .build();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        Recommendation rec = result.get();
+        assertThat(rec.getType()).isEqualTo(RecommendationType.UNDER_CORNERS);
+        double expected = (Double) rec.getFactors().get("expectedCorners");
+        assertThat(expected).isGreaterThan(8.0);
+        assertThat(expected).isLessThanOrEqualTo(9.5);
+        assertThat(rec.getMarket()).isEqualTo("Under 9.5 Corners");
+        assertThat(rec.getMarket()).doesNotContain("8.5");
+        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(rec.getFactors().get("apiConfidenceBoostApplied")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("analyze picks Under 8.5 only when expected corners are at or below 8.0")
+    void analyze_withVeryLowExpected_selectsUnder85() {
+        FixtureContext context = createLowCornersContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        Recommendation rec = result.get();
+        assertThat(rec.getType()).isEqualTo(RecommendationType.UNDER_CORNERS);
+        double expected = (Double) rec.getFactors().get("expectedCorners");
+        assertThat(expected).isLessThanOrEqualTo(8.0);
+        assertThat(rec.getMarket()).isEqualTo("Under 8.5 Corners");
+        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+    }
+
     // Helper methods
 
     private FixtureContext createHighCornersContext() {
