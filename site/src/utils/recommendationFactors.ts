@@ -61,6 +61,47 @@ const BTTS_FACTOR_ORDER: readonly string[] = [
   'maxCombinedBoost',
 ];
 
+/** Preferred Info order for Double Chance: Home attributes before Away. */
+const DOUBLE_CHANCE_FACTOR_ORDER: readonly string[] = [
+  'homeWinProbability',
+  'homeDrawCombined',
+  'homeFortress',
+  'homeWeakAtHome',
+  'homePosition',
+  'homeWinRateHome',
+  'homeLossRateHome',
+  'homeLast5Wins',
+  'homeLast5Losses',
+  'homeXgFor',
+  'homeXgAgainst',
+  'awayWinProbability',
+  'drawAwayCombined',
+  'awayPoorTraveler',
+  'awayRoadWarrior',
+  'awayPosition',
+  'awayWinRateAway',
+  'awayLossRateAway',
+  'awayLast5Wins',
+  'awayLast5Losses',
+  'awayXgFor',
+  'awayXgAgainst',
+  'drawProbability',
+  'positionGap',
+  'implied1X',
+  'value1X',
+  'combined1XOdds',
+  'impliedX2',
+  'valueX2',
+  'combinedX2Odds',
+  'positiveIndicators',
+  'riskFlags',
+];
+
+const FACTOR_ORDER_BY_TYPE: Partial<Record<RecommendationType, readonly string[]>> = {
+  BTTS: BTTS_FACTOR_ORDER,
+  DOUBLE_CHANCE: DOUBLE_CHANCE_FACTOR_ORDER,
+};
+
 const MAX_FACTORS = 8;
 
 export interface FactorEntry {
@@ -169,14 +210,15 @@ function orderedFactorKeys(
   keys: string[],
   type?: RecommendationType
 ): string[] {
-  if (type !== 'BTTS') {
+  const preferred = type ? FACTOR_ORDER_BY_TYPE[type] : undefined;
+  if (!preferred) {
     return keys;
   }
 
-  const rank = new Map(BTTS_FACTOR_ORDER.map((key, index) => [key, index]));
+  const rank = new Map(preferred.map((key, index) => [key, index]));
   return [...keys].sort((a, b) => {
-    const aRank = rank.get(a) ?? BTTS_FACTOR_ORDER.length;
-    const bRank = rank.get(b) ?? BTTS_FACTOR_ORDER.length;
+    const aRank = rank.get(a) ?? preferred.length;
+    const bRank = rank.get(b) ?? preferred.length;
     if (aRank !== bRank) return aRank - bRank;
     return a.localeCompare(b);
   });
