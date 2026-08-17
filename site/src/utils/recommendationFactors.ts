@@ -14,6 +14,9 @@ const SKIP_KEYS = new Set([
   'xgDataAvailable', // all markets — not useful in the customer Info panel
   'drawsDeferredToDrawEngine',
   'xgDominanceAppliedAsMultiplier',
+  // Match Result: multipliers are informational only (not applied to score)
+  'homeXgDominanceMultiplier',
+  'awayXgDominanceMultiplier',
 ]);
 
 /** Friendly labels for specific factor keys (all markets). */
