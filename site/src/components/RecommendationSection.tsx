@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Recommendation, RecommendationType } from '../types';
+import { MarketIcon } from './MarketIcon';
 import { RecommendationRow } from './RecommendationRow';
 import { SECTION_CONFIG, sectionDomId } from '../utils/recommendationSections';
 import styles from './RecommendationSection.module.css';
@@ -35,7 +36,6 @@ export function RecommendationSection({
 
   const config = SECTION_CONFIG[type] || {
     title: type,
-    icon: '📊',
     scoreLabel: 'Score',
     scoreUnit: '',
     showPrice: true,
@@ -65,7 +65,7 @@ export function RecommendationSection({
   return (
     <section className={styles.section} id={sectionDomId(type)}>
       <h2 className={styles.header}>
-        <span className={styles.icon}>{config.icon}</span>
+        <MarketIcon type={type} title={config.title} />
         <span className={styles.title}>{config.title}</span>
         <span className={styles.count}>
           {visibleRecommendations.length} of {recommendations.length} picks

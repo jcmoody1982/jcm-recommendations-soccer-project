@@ -2,6 +2,7 @@ export { RecommendationCard } from './RecommendationCard';
 export { RecommendationRow } from './RecommendationRow';
 export { RecommendationSection } from './RecommendationSection';
 export { ElitePicksSection } from './ElitePicksSection';
+export { MarketIcon } from './MarketIcon';
 export { SummaryCard } from './SummaryCard';
 export { FixtureCard } from './FixtureCard';
 export { CompetitionCard } from './CompetitionCard';

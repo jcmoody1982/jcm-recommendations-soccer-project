@@ -1,0 +1,68 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.55rem;
+  height: 1.55rem;
+  line-height: 0;
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.disc {
+  fill: var(--market-icon-bg);
+}
+
+.fillPrimary {
+  fill: var(--market-icon-primary);
+}
+
+.fillSecondary {
+  fill: var(--market-icon-secondary);
+}
+
+.strokePrimary {
+  fill: none;
+  stroke: var(--market-icon-primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.strokeSecondary {
+  fill: none;
+  stroke: var(--market-icon-secondary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mark {
+  fill: var(--market-icon-on-primary);
+  font-family: var(--font-display);
+  font-size: 7.5px;
+  font-weight: 700;
+}
+
+.halfMark {
+  fill: var(--market-icon-primary);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.booking {
+  fill: #e0a84a;
+}
+
+.bookingMark {
+  fill: rgba(7, 17, 31, 0.35);
+}
+
+[data-theme='dark'] .bookingMark {
+  fill: rgba(5, 13, 24, 0.45);
+}

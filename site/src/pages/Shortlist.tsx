@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useShortlist } from '../contexts/ShortlistContext';
 import { recommendationService } from '../services/api';
-import { RecommendationRow, ExportModal } from '../components';
+import { RecommendationRow, ExportModal, MarketIcon } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
 import { SECTION_CONFIG } from '../utils/recommendationSections';
 import styles from './Shortlist.module.css';
@@ -71,7 +71,6 @@ export default function Shortlist() {
             const recommendations = groupedByType[type];
             const config = SECTION_CONFIG[type] || {
               title: type,
-              icon: '📊',
               showPrice: true,
               scoreLabel: 'Score',
               scoreUnit: '',
@@ -80,7 +79,7 @@ export default function Shortlist() {
             return (
               <section key={type} className={styles.section}>
                 <h2 className={styles.sectionHeader}>
-                  <span className={styles.sectionIcon}>{config.icon}</span>
+                  <MarketIcon type={type} title={config.title} className={styles.sectionIcon} />
                   <span className={styles.sectionTitle}>{config.title}</span>
                   <span className={styles.sectionCount}>
                     {recommendations.length} pick{recommendations.length !== 1 ? 's' : ''}

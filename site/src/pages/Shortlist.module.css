@@ -84,7 +84,8 @@
 }
 
 .sectionIcon {
-  font-size: var(--font-size-section);
+  width: 1.55rem;
+  height: 1.55rem;
 }
 
 .sectionTitle {
