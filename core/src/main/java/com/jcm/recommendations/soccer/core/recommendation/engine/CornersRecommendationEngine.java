@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.FixturePotentials;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
@@ -347,32 +348,35 @@ double expectedCorners = calculateExpectedCorners(context);
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence, 
             double expectedCorners, String market, boolean apiBoostApplied) {
-        StringBuilder desc = new StringBuilder();
-        desc.append(String.format("%s confidence %s recommendation (%.1f expected corners)",
-                confidence.getDisplayName(),
-                market,
-                expectedCorners));
-        
+        StringBuilder colour = new StringBuilder();
         if (apiBoostApplied) {
-            desc.append(" [API potential boost]");
+            colour.append("API potential boost lighting up the board");
         }
-        
+
         if (context.hasRecentForm()) {
             double homeSeasonCorners = safeDouble(context.getHomeTeamStats().getCornersAvgHome(), DEFAULT_CORNERS_AVG);
             double awaySeasonCorners = safeDouble(context.getAwayTeamStats().getCornersAvgAway(), DEFAULT_CORNERS_AVG);
             double trendMultiplier = calculateTrendMultiplier(context, homeSeasonCorners, awaySeasonCorners);
             if (trendMultiplier > 1.0) {
-                desc.append(" [trending up]");
+                if (!colour.isEmpty()) {
+                    colour.append(". ");
+                }
+                colour.append("Corner mills trending up");
             } else if (trendMultiplier < 1.0) {
-                desc.append(" [trending down]");
+                if (!colour.isEmpty()) {
+                    colour.append(". ");
+                }
+                colour.append("Corner mills trending down");
             }
         }
-        
-        desc.append(String.format(" - %s vs %s",
-                context.getHomeTeam().getName(),
-                context.getAwayTeam().getName()));
-        
-        return desc.toString();
+
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(market)
+                .context(context)
+                .expected(expectedCorners, "expected corners")
+                .colourNote(colour.isEmpty() ? null : colour.toString())
+                .build());
     }
 
     private boolean isApiLineStrong(Double potential) {

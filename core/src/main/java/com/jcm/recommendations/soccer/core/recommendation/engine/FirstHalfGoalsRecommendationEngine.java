@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import lombok.extern.slf4j.Slf4j;
@@ -577,32 +578,34 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence, 
             double expected1HGoals, String market) {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(confidence == ConfidenceLevel.STRONG ? "Strong" : "Moderate");
-        sb.append(" first half goals potential. ");
-        sb.append(String.format("Expected 1H goals: %.2f. ", expected1HGoals));
-        
-        // Add key factors
+        StringBuilder colour = new StringBuilder();
+
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
-        
+
         if (hasXgData(homeStats, awayStats)) {
             double combinedXg = safeDouble(homeStats.getXgForAvgHome()) + safeDouble(awayStats.getXgForAvgAway());
             if (combinedXg > XG_HIGH_THRESHOLD) {
-                sb.append("High combined xG (").append(String.format("%.2f", combinedXg)).append("). ");
+                colour.append(String.format("High combined xG (%.2f)", combinedXg));
             }
         }
-        
+
         if (context.hasPotentials() && context.getPotentials().getO05HtPotential() != null) {
             double o05Ht = context.getPotentials().getO05HtPotential();
             if (o05Ht >= 70.0) {
-                sb.append("API rates O0.5HT at ").append(String.format("%.0f%%", o05Ht)).append(". ");
+                if (!colour.isEmpty()) {
+                    colour.append(". ");
+                }
+                colour.append(String.format("API rates O0.5HT at %.0f%%", o05Ht));
             }
         }
-        
-        sb.append("Recommended: ").append(market).append(".");
-        
-        return sb.toString();
+
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(confidence)
+                .selection(market)
+                .context(context)
+                .expected(expected1HGoals, "expected 1H goals")
+                .colourNote(colour.isEmpty() ? "First half goals potential lighting up early" : colour.toString())
+                .build());
     }
 }

@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import lombok.extern.slf4j.Slf4j;
@@ -623,30 +624,27 @@ private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
     }
 
     private String buildDescription(FixtureContext context, SpecialistCandidate candidate) {
-        StringBuilder sb = new StringBuilder();
-        
-        sb.append(candidate.confidence.getDisplayName()).append(" confidence ");
-        sb.append(candidate.classification).append(": ");
-        sb.append(candidate.teamName);
-        sb.append(String.format(" (%.1f%% disparity)", candidate.overallDisparityScore));
-        sb.append(". ");
+        StringBuilder colour = new StringBuilder();
 
-        // Add key stats
         if (candidate.isHomeTeam || candidate.classification.contains("Poor Traveler")) {
-            sb.append(String.format("Home PPG: %.2f, Away PPG: %.2f. ", candidate.homePpg, candidate.awayPpg));
+            colour.append(String.format("Home PPG: %.2f, Away PPG: %.2f", candidate.homePpg, candidate.awayPpg));
         } else {
-            sb.append(String.format("Away PPG: %.2f (consistent away performer). ", candidate.awayPpg));
+            colour.append(String.format("Away PPG: %.2f (consistent away performer)", candidate.awayPpg));
         }
 
-        // Add form context
         if (candidate.formContext.hasFormData && candidate.formContext.formDiverges) {
-            sb.append("Form: ").append(candidate.formContext.formStatus).append(". ");
+            colour.append(". Form: ").append(candidate.formContext.formStatus);
         }
 
-        sb.append("Recommendation: ").append(candidate.recommendation).append(". ");
-        sb.append(context.getHomeTeam().getName()).append(" vs ").append(context.getAwayTeam().getName());
+        colour.append(". Recommendation: ").append(candidate.recommendation);
 
-        return sb.toString();
+        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+                .confidence(candidate.confidence)
+                .selection(candidate.classification + ": " + candidate.teamName)
+                .context(context)
+                .probabilityPct(candidate.overallDisparityScore)
+                .colourNote(colour.toString())
+                .build());
     }
 
     private record SpecialistCandidate(
