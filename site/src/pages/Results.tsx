@@ -81,12 +81,37 @@ const FOLD_NAMES = [
   'ten-fold',
 ] as const;
 
+type PricedPick = ResultsPick & { odds: number };
+type ReturnAmount =
+  | { status: 'ready'; amount: number }
+  | { status: 'pending' }
+  | { status: 'na' };
+
+interface CombinationCoverLine {
+  betCount: number;
+  mixLabel: string;
+  amount: ReturnAmount;
+  detail?: string;
+}
+
+interface ReturnColumnStats {
+  singlesCount: number;
+  singlesAmount: ReturnAmount;
+  singlesDetail?: string;
+  accumulatorAmount: ReturnAmount;
+  combinationCover: CombinationCoverLine | null;
+}
+
 function flattenPicks(fixtures: ResultsFixture[]): ResultsPick[] {
   return fixtures.flatMap((fixture) => fixture.picks);
 }
 
 function isPricedOdds(odds: number | null | undefined): odds is number {
   return odds != null && !Number.isNaN(odds) && odds > 0;
+}
+
+function pricedPicksOf(picks: ResultsPick[]): PricedPick[] {
+  return picks.filter((pick): pick is PricedPick => isPricedOdds(pick.odds));
 }
 
 function formatUsd(amount: number): string {
@@ -96,6 +121,12 @@ function formatUsd(amount: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function formatReturnAmount(amount: ReturnAmount): string {
+  if (amount.status === 'pending') return 'Pending';
+  if (amount.status === 'na') return '—';
+  return formatUsd(amount.amount);
 }
 
 function combinations(n: number, k: number): number {
@@ -113,35 +144,131 @@ function foldName(size: number, count: number): string {
   return `${count} ${count === 1 ? singular : `${singular}s`}`;
 }
 
-function combinationCoverReturn(odds: number[], stake = COMBINATION_STAKE_USD) {
-  const n = odds.length;
+function combinationMix(n: number): { betCount: number; mixLabel: string } | null {
   if (n < 2) return null;
-
-  const productPlusOne = odds.reduce((product, price) => product * (1 + price), 1);
-  const singlesSum = odds.reduce((sum, price) => sum + price, 0);
   const mix = [];
   for (let size = 2; size <= n; size += 1) {
     mix.push(foldName(size, combinations(n, size)));
   }
+  return { betCount: 2 ** n - 1 - n, mixLabel: mix.join(', ') };
+}
 
+function potentialCombinationCover(odds: number[], stake = COMBINATION_STAKE_USD): CombinationCoverLine | null {
+  const mix = combinationMix(odds.length);
+  if (!mix) return null;
+  const productPlusOne = odds.reduce((product, price) => product * (1 + price), 1);
+  const singlesSum = odds.reduce((sum, price) => sum + price, 0);
   return {
-    betCount: 2 ** n - 1 - n,
-    returnIfAllWon: stake * (productPlusOne - 1 - singlesSum),
-    mixLabel: mix.join(', '),
+    ...mix,
+    amount: { status: 'ready', amount: stake * (productPlusOne - 1 - singlesSum) },
   };
 }
 
-function allWinReturns(picks: ResultsPick[], stake = LEVEL_STAKE_USD) {
-  const pricedOdds = picks.map((pick) => pick.odds).filter(isPricedOdds);
-  const singlesReturn = pricedOdds.reduce((total, odds) => total + stake * odds, 0);
-  const combinedOdds = pricedOdds.reduce((product, odds) => product * odds, 1);
+function isOpenOutcome(outcome: PickOutcome | null | undefined): boolean {
+  return outcome == null || outcome === 'PENDING' || outcome === 'UNSUPPORTED';
+}
+
+/** Win/loss/void settlement for a single fold. A lost leg settles the bet at $0 even if others are pending. */
+function settleFold(legs: PricedPick[], stake: number): ReturnAmount {
+  if (legs.length === 0) return { status: 'na' };
+  if (legs.some((leg) => leg.outcome === 'LOSS')) {
+    return { status: 'ready', amount: 0 };
+  }
+  if (legs.some((leg) => isOpenOutcome(leg.outcome))) {
+    return { status: 'pending' };
+  }
+  const winners = legs.filter((leg) => leg.outcome === 'WIN');
+  if (winners.length === 0) {
+    return { status: 'ready', amount: stake };
+  }
+  const product = winners.reduce((total, leg) => total * leg.odds, 1);
+  return { status: 'ready', amount: stake * product };
+}
+
+function actualSingles(picks: PricedPick[], stake: number): { amount: ReturnAmount; pending: number } {
+  let total = 0;
+  let pending = 0;
+  let settled = 0;
+  for (const pick of picks) {
+    const result = settleFold([pick], stake);
+    if (result.status === 'pending') {
+      pending += 1;
+    } else if (result.status === 'ready') {
+      settled += 1;
+      total += result.amount;
+    }
+  }
+  if (picks.length === 0) return { amount: { status: 'na' }, pending };
+  if (settled === 0 && pending > 0) return { amount: { status: 'pending' }, pending };
+  return { amount: { status: 'ready', amount: total }, pending };
+}
+
+function actualCombinationCover(picks: PricedPick[], stake = COMBINATION_STAKE_USD): CombinationCoverLine | null {
+  const mix = combinationMix(picks.length);
+  if (!mix) return null;
+
+  let settledReturn = 0;
+  let pendingBets = 0;
+  let settledBets = 0;
+  const n = picks.length;
+  const limit = 1 << n;
+  for (let mask = 0; mask < limit; mask += 1) {
+    const subset: PricedPick[] = [];
+    for (let i = 0; i < n; i += 1) {
+      if (mask & (1 << i)) subset.push(picks[i]);
+    }
+    if (subset.length < 2) continue;
+    const result = settleFold(subset, stake);
+    if (result.status === 'pending') {
+      pendingBets += 1;
+    } else if (result.status === 'ready') {
+      settledBets += 1;
+      settledReturn += result.amount;
+    }
+  }
+
+  const amount: ReturnAmount =
+    settledBets === 0 && pendingBets > 0
+      ? { status: 'pending' }
+      : { status: 'ready', amount: settledReturn };
+
   return {
-    priced: pricedOdds.length,
-    unpriced: picks.length - pricedOdds.length,
-    singlesCount: pricedOdds.length,
-    singlesReturn,
-    accumulatorReturn: pricedOdds.length > 0 ? stake * combinedOdds : 0,
-    combinationCover: combinationCoverReturn(pricedOdds),
+    ...mix,
+    amount,
+    detail: pendingBets > 0 ? `${pendingBets} still pending` : undefined,
+  };
+}
+
+function computeReturns(picks: ResultsPick[]) {
+  const priced = pricedPicksOf(picks);
+  const odds = priced.map((pick) => pick.odds);
+  const singles = actualSingles(priced, LEVEL_STAKE_USD);
+  const combinedOdds = odds.reduce((product, price) => product * price, 1);
+
+  const potential: ReturnColumnStats = {
+    singlesCount: priced.length,
+    singlesAmount: priced.length > 0
+      ? { status: 'ready', amount: odds.reduce((total, price) => total + LEVEL_STAKE_USD * price, 0) }
+      : { status: 'na' },
+    accumulatorAmount: priced.length > 0
+      ? { status: 'ready', amount: LEVEL_STAKE_USD * combinedOdds }
+      : { status: 'na' },
+    combinationCover: potentialCombinationCover(odds),
+  };
+
+  const actual: ReturnColumnStats = {
+    singlesCount: priced.length,
+    singlesAmount: singles.amount,
+    singlesDetail: singles.pending > 0 ? `${singles.pending} still pending` : undefined,
+    accumulatorAmount: settleFold(priced, LEVEL_STAKE_USD),
+    combinationCover: actualCombinationCover(priced),
+  };
+
+  return {
+    priced: priced.length,
+    unpriced: picks.length - priced.length,
+    potential,
+    actual,
   };
 }
 
@@ -335,8 +462,79 @@ function PerformanceSummary({
   );
 }
 
+function returnValueClass(amount: ReturnAmount): string {
+  if (amount.status === 'pending' || amount.status === 'na') return styles.returnsValueMuted;
+  if (amount.status === 'ready' && amount.amount === 0) return styles.returnsValueZero;
+  return styles.returnsValue;
+}
+
+function CombinationReturnRow({ cover }: { cover: CombinationCoverLine | null }) {
+  if (!cover) {
+    return (
+      <div className={styles.returnsRow}>
+        <span className={styles.returnsLabelBlock}>
+          <span className={styles.returnsLabel}>$1 doubles, trebles and above</span>
+          <span className={styles.returnsDetail}>Needs at least two priced picks</span>
+        </span>
+        <span className={styles.returnsValueMuted}>—</span>
+      </div>
+    );
+  }
+
+  const detail = [cover.mixLabel, `${cover.betCount} × $1`, cover.detail].filter(Boolean).join(' · ');
+
+  return (
+    <div className={styles.returnsRow}>
+      <span className={styles.returnsLabelBlock}>
+        <span className={styles.returnsLabel}>$1 doubles, trebles and above</span>
+        <span className={styles.returnsDetail}>{detail}</span>
+      </span>
+      <span className={returnValueClass(cover.amount)}>{formatReturnAmount(cover.amount)}</span>
+    </div>
+  );
+}
+
+function ReturnsColumn({
+  title,
+  intro,
+  stats,
+}: {
+  title: string;
+  intro: string;
+  stats: ReturnColumnStats;
+}) {
+  return (
+    <div className={styles.returnsColumn}>
+      <h3 className={styles.returnsColumnTitle}>{title}</h3>
+      <p className={styles.returnsStatement}>{intro}</p>
+      <div className={styles.returnsRows}>
+        <div className={styles.returnsRow}>
+          <span className={styles.returnsLabelBlock}>
+            <span className={styles.returnsLabel}>
+              {stats.singlesCount} × $10 singles
+            </span>
+            {stats.singlesDetail && (
+              <span className={styles.returnsDetail}>{stats.singlesDetail}</span>
+            )}
+          </span>
+          <span className={returnValueClass(stats.singlesAmount)}>
+            {formatReturnAmount(stats.singlesAmount)}
+          </span>
+        </div>
+        <div className={styles.returnsRow}>
+          <span className={styles.returnsLabel}>$10 accumulator</span>
+          <span className={returnValueClass(stats.accumulatorAmount)}>
+            {formatReturnAmount(stats.accumulatorAmount)}
+          </span>
+        </div>
+        <CombinationReturnRow cover={stats.combinationCover} />
+      </div>
+    </div>
+  );
+}
+
 function ReturnsPanel({ fixtures }: { fixtures: ResultsFixture[] }) {
-  const stats = allWinReturns(flattenPicks(fixtures));
+  const stats = computeReturns(flattenPicks(fixtures));
 
   return (
     <section className={styles.returnsPanel}>
@@ -347,48 +545,18 @@ function ReturnsPanel({ fixtures }: { fixtures: ResultsFixture[] }) {
           cannot be calculated.
         </p>
       ) : (
-        <>
-          <p className={styles.returnsStatement}>
-            If every priced Elite pick in this view had won:
-          </p>
-          <div className={styles.returnsRows}>
-            <div className={styles.returnsRow}>
-              <span className={styles.returnsLabel}>
-                {stats.singlesCount} × $10 singles
-              </span>
-              <span className={styles.returnsValue}>{formatUsd(stats.singlesReturn)}</span>
-            </div>
-            <div className={styles.returnsRow}>
-              <span className={styles.returnsLabel}>$10 accumulator</span>
-              <span className={styles.returnsValue}>{formatUsd(stats.accumulatorReturn)}</span>
-            </div>
-            <div className={styles.returnsRow}>
-              {stats.combinationCover ? (
-                <>
-                  <span className={styles.returnsLabelBlock}>
-                    <span className={styles.returnsLabel}>$1 doubles, trebles and above</span>
-                    <span className={styles.returnsDetail}>
-                      {stats.combinationCover.mixLabel}
-                      {' · '}
-                      {stats.combinationCover.betCount} × $1
-                    </span>
-                  </span>
-                  <span className={styles.returnsValue}>
-                    {formatUsd(stats.combinationCover.returnIfAllWon)}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className={styles.returnsLabelBlock}>
-                    <span className={styles.returnsLabel}>$1 doubles, trebles and above</span>
-                    <span className={styles.returnsDetail}>Needs at least two priced picks</span>
-                  </span>
-                  <span className={styles.returnsValue}>—</span>
-                </>
-              )}
-            </div>
-          </div>
-        </>
+        <div className={styles.returnsSplit}>
+          <ReturnsColumn
+            title="Actual Returns"
+            intro="From wins, losses and voids in this view:"
+            stats={stats.actual}
+          />
+          <ReturnsColumn
+            title="Potential Returns"
+            intro="If every priced Elite pick in this view had won:"
+            stats={stats.potential}
+          />
+        </div>
       )}
       {stats.unpriced > 0 && stats.priced > 0 && (
         <p className={styles.returnsHint}>
