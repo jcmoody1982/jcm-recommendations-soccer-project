@@ -17,6 +17,8 @@ export const SECTION_ORDER: RecommendationType[] = [
   'DOUBLE_CHANCE',
   'RESULT_BTTS',
   'TOP_VS_BOTTOM',
+  'OVER_15_GOALS',
+  'OVER_25_GOALS',
   'DRAW',
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
@@ -63,6 +65,18 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
     scoreUnit: '%',
     showPrice: false,
     showPositionGap: true,
+  },
+  OVER_15_GOALS: {
+    title: 'Over 1.5 Goals',
+    scoreLabel: 'Probability',
+    scoreUnit: '%',
+    showPrice: true,
+  },
+  OVER_25_GOALS: {
+    title: 'Over 2.5 Goals',
+    scoreLabel: 'Probability',
+    scoreUnit: '%',
+    showPrice: true,
   },
   DRAW: {
     title: 'Draw',

@@ -4,7 +4,7 @@ import { useShortlist } from '../contexts/ShortlistContext';
 import { recommendationService } from '../services/api';
 import { RecommendationRow, ExportModal, MarketIcon } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
-import { SECTION_CONFIG } from '../utils/recommendationSections';
+import { SECTION_CONFIG, SECTION_ORDER } from '../utils/recommendationSections';
 import {
   elitePickKey,
   flattenGroupedRecommendations,
@@ -50,7 +50,7 @@ export default function Shortlist() {
     return acc;
   }, {} as Record<RecommendationType, Recommendation[]>);
 
-  const sortedTypes = Object.keys(groupedByType).sort() as RecommendationType[];
+  const sortedTypes = SECTION_ORDER.filter((type) => groupedByType[type]?.length);
 
   return (
     <div className={styles.page}>

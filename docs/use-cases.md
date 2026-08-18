@@ -409,6 +409,8 @@ If xG data available:
   - `xgBoostApplied` / `xgBoostAmount` / `combinedXg` - xG boost details
   - Form data (when available): `homeScoredFormAvg`, `awayScoredFormAvg`, `homeConcededFormAvg`, `awayConcededFormAvg`
 
+**Related:** Dedicated **Over 1.5 Goals** (UC-038) and **Over 2.5 Goals** (UC-039) boards sit after Top vs Bottom on the Recommendations page. This engine remains the high-scoring selector that may step up to Over 3.5.
+
 **Status:** `Implemented`
 
 ---
@@ -2145,6 +2147,122 @@ Combined Mismatch Score = Gap Score × Quality Score Multiplier
 
 ---
 
+#### UC-038: Over 1.5 Goals Recommendations
+
+**Goal:** Identify fixtures likely to finish with **2 or more total goals** and recommend the **Over 1.5 Goals** line as its own board (not mixed with Over 2.5 / 3.5).
+
+**User Story:** As a user, I want a dedicated Over 1.5 section so I can back the safer total-goals line when both teams consistently clear 1.5, without scanning the generic Over Goals board.
+
+**Data Required:**
+- Goals scored/conceded averages (season + form)
+- Season Over 1.5 percentages (`seasonOver15Percentage_overall`)
+- Recent-form Over 1.5 percentages when last-x data exists
+- `o15_potential` from API
+- `odds_ft_over15`
+- xG for/against averages (when available)
+
+**API Source(s):** football-data-api.com `/league-matches`, `/league-teams?include=stats`, `/lastx`
+
+**Distinct from UC-006:** UC-006 is a high-scoring engine that may select Over 2.5 or Over 3.5. UC-038 always markets **Over 1.5 Goals** and weights Over 1.5 hit-rates plus `o15_potential`.
+
+**Logic:**
+
+*Expected goals (same blend as UC-006):*
+```
+Actual Expected = (Home scored + Away scored + Home conceded + Away conceded) / 2
+If xG available:
+  xG Expected = (Home xG for + Away xG for + Home xG against + Away xG against) / 2
+  Final Expected = (Actual × 0.6) + (xG × 0.4)
+```
+
+*Over 1.5 rate used in the score:*
+```
+If form Over 1.5 % exists: 0.5 × season O1.5 % + 0.5 × form O1.5 %
+Else: season O1.5 %
+```
+
+*Base Weights (form available, total = 1.0):*
+```
+  Home/Away scored avg (season)     × 0.07 each
+  Home/Away conceded avg (season)   × 0.07 each
+  Home/Away scored avg (form)       × 0.10 each
+  Home/Away conceded avg (form)     × 0.07 each
+  Home/Away Over 1.5 % (blended)    × 0.12 each
+  API o15_potential                 × 0.14
+```
+
+*Redistributed Weights (no form, total = 1.0):*
+```
+  Home/Away scored avg (season)     × 0.13 each
+  Home/Away conceded avg (season)   × 0.10 each
+  Home/Away Over 1.5 % (season)     × 0.16 each
+  API o15_potential                 × 0.22
+```
+
+**Boosts:**
+- Combined goals average ≥ 2.4 → +5%
+- Combined xG for ≥ 2.2 → +4%
+
+**Filters (all must pass):**
+- Expected goals ≥ 1.8
+- Average Over 1.5 % (both teams) ≥ 62%
+- Score ≥ Moderate threshold
+
+**Thresholds:**
+- **Strong:** Score ≥ 78%
+- **Moderate:** Score 65–77%
+- **Weak:** Score < 65% (filtered out)
+
+**Market:** Always `Over 1.5 Goals`. Odds from `odds_ft_over15`.
+
+**UI:** Recommendations section **Over 1.5 Goals**, immediately after **Top vs Bottom** and before **Over 2.5 Goals**. Elite-eligible (UC-036). Settlement: FT total vs 1.5 (UC-033).
+
+**Status:** Implemented
+
+---
+
+#### UC-039: Over 2.5 Goals Recommendations
+
+**Goal:** Identify fixtures likely to finish with **3 or more total goals** and recommend the **Over 2.5 Goals** line as its own board (never stepping up to Over 3.5).
+
+**User Story:** As a user, I want a dedicated Over 2.5 section so I can back that line when both teams’ Over 2.5 rates support it, without the generic Over Goals engine swapping in Over 3.5.
+
+**Data Required:**
+- Goals scored/conceded averages (season + form)
+- Season Over 2.5 percentages (`seasonOver25Percentage_overall`)
+- Recent-form Over 2.5 percentages when last-x data exists
+- `o25_potential` from API
+- `odds_ft_over25`
+- xG for/against averages (when available)
+
+**API Source(s):** football-data-api.com `/league-matches`, `/league-teams?include=stats`, `/lastx`
+
+**Distinct from UC-006:** UC-006 may select Over 3.5 when expected goals and Over 3.5 rates are high. UC-039 always markets **Over 2.5 Goals** and weights Over 2.5 hit-rates plus `o25_potential` more heavily than UC-006.
+
+**Logic:** Same expected-goals blend and weight layout as UC-038, substituting Over 2.5 percentages and `o25_potential`.
+
+**Boosts:**
+- Combined goals average ≥ 3.0 → +5%
+- Combined xG for ≥ 2.8 → +4%
+
+**Filters (all must pass):**
+- Expected goals ≥ 2.5
+- Average Over 2.5 % (both teams) ≥ 48%
+- Score ≥ Moderate threshold
+
+**Thresholds:**
+- **Strong:** Score ≥ 80%
+- **Moderate:** Score 65–79%
+- **Weak:** Score < 65% (filtered out)
+
+**Market:** Always `Over 2.5 Goals`. Odds from `odds_ft_over25`.
+
+**UI:** Recommendations section **Over 2.5 Goals**, after **Over 1.5 Goals** and before **Draw**. Elite-eligible (UC-036). Settlement: FT total vs 2.5 (UC-033).
+
+**Status:** Implemented
+
+---
+
 ### Website
 
 _Use cases for the web application interface._
@@ -2317,9 +2435,11 @@ GET /api/leagues/overview
      - Score/probability
      - Key factors
 
-3. **Section Types (15 total):**
+3. **Section Types:**
    - Both Teams To Score (BTTS)
-   - Over Goals
+   - Over Goals (UC-006 — Over 2.5 or Over 3.5)
+   - Over 1.5 Goals (UC-038) — display order after Top vs Bottom
+   - Over 2.5 Goals (UC-039) — display order after Over 1.5, before Draw
    - Under Goals
    - Booking Points
    - Value Bet
@@ -2333,6 +2453,7 @@ GET /api/leagues/overview
    - Match Result
    - Home/Away Specialist
    - Draw
+   - Double Chance, Result + BTTS, Top vs Bottom
 
 4. **Empty Section**
    - If a section has no recommendations, show subtle message or hide section
@@ -2780,6 +2901,7 @@ Engines publish different `score` meanings. Elite v1 constrains the pool to prob
 
 **Eligible types (v1):**
 - `MATCH_RESULT`, `BTTS`, `DOUBLE_CHANCE`, `DRAW`, `OVER_GOALS`, `UNDER_GOALS`
+- `OVER_15_GOALS`, `OVER_25_GOALS`
 - `CLEAN_SHEET`, `RESULT_BTTS`, `TOP_VS_BOTTOM`
 - `FIRST_HALF_GOALS`, `SECOND_HALF_GOALS`, `VALUE_BET`
 
@@ -3049,7 +3171,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 | RecommendationType | WIN when | Data |
 |--------------------|----------|------|
 | `BTTS` | `BTTS Yes` → both teams scored | FT |
-| `OVER_GOALS` / `UNDER_GOALS` | FT total vs line in market (`Over/Under 1.5/2.5/3.5 Goals`) | FT |
+| `OVER_GOALS` / `UNDER_GOALS` / `OVER_15_GOALS` / `OVER_25_GOALS` | FT total vs line in market (`Over/Under 1.5/2.5/3.5 Goals`) | FT |
 | `MATCH_RESULT` | market is home name → home win; away name → away win; `Draw` → draw | FT |
 | `DRAW` | FT draw (`market` = `Draw`) | FT |
 | `DOUBLE_CHANCE` | `Home/Draw (1X)` → home or draw; `Draw/Away (X2)` → draw or away | FT |

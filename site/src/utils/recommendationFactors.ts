@@ -107,9 +107,31 @@ const DOUBLE_CHANCE_FACTOR_ORDER: readonly string[] = [
   'riskFlags',
 ];
 
+const TOTAL_GOALS_OVER_FACTOR_ORDER: readonly string[] = [
+  'expectedGoals',
+  'homeGoalsScoredAvg',
+  'awayGoalsScoredAvg',
+  'homeGoalsConcededAvg',
+  'awayGoalsConcededAvg',
+  'over15PctHome',
+  'over15PctAway',
+  'over25PctHome',
+  'over25PctAway',
+  'homeOverFormPct',
+  'awayOverFormPct',
+  'apiO15Potential',
+  'apiO25Potential',
+  'combinedGoalsAvg',
+  'highScoringBoostApplied',
+  'xgBoostApplied',
+  'calculatedScore',
+];
+
 const FACTOR_ORDER_BY_TYPE: Partial<Record<RecommendationType, readonly string[]>> = {
   BTTS: BTTS_FACTOR_ORDER,
   DOUBLE_CHANCE: DOUBLE_CHANCE_FACTOR_ORDER,
+  OVER_15_GOALS: TOTAL_GOALS_OVER_FACTOR_ORDER,
+  OVER_25_GOALS: TOTAL_GOALS_OVER_FACTOR_ORDER,
 };
 
 const MAX_FACTORS = 8;

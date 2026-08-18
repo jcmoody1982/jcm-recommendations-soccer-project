@@ -83,6 +83,24 @@ public class RecommendationController {
         return ResponseEntity.ok(recommendations);
     }
 
+    @GetMapping("/over-15-goals")
+    public ResponseEntity<List<Recommendation>> getOver15GoalsRecommendations(
+            @RequestParam(defaultValue = "7") double daysAhead) {
+        log.info("GET /api/recommendations/over-15-goals requested: daysAhead={}", daysAhead);
+        List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
+                RecommendationType.OVER_15_GOALS, daysAhead);
+        return ResponseEntity.ok(recommendations);
+    }
+
+    @GetMapping("/over-25-goals")
+    public ResponseEntity<List<Recommendation>> getOver25GoalsRecommendations(
+            @RequestParam(defaultValue = "7") double daysAhead) {
+        log.info("GET /api/recommendations/over-25-goals requested: daysAhead={}", daysAhead);
+        List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
+                RecommendationType.OVER_25_GOALS, daysAhead);
+        return ResponseEntity.ok(recommendations);
+    }
+
     @GetMapping("/under-goals")
     public ResponseEntity<List<Recommendation>> getUnderGoalsRecommendations(
             @RequestParam(defaultValue = "7") double daysAhead) {

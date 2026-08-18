@@ -8,7 +8,7 @@ import {
   EARLY_KICKOFF_WARNING,
   isEarlyKickoffUk,
 } from '../utils/kickoff';
-import { SECTION_CONFIG } from '../utils/recommendationSections';
+import { SECTION_CONFIG, SECTION_ORDER } from '../utils/recommendationSections';
 import {
   elitePickKey,
   flattenGroupedRecommendations,
@@ -79,7 +79,7 @@ export default function FixtureDetail() {
     }, {} as Record<RecommendationType, Recommendation[]>);
   }, [recommendations]);
 
-  const sortedTypes = Object.keys(groupedByType) as RecommendationType[];
+  const sortedTypes = SECTION_ORDER.filter((type) => groupedByType[type]?.length);
 
   if (!Number.isFinite(id) || id <= 0) {
     return (

@@ -36,6 +36,22 @@ class PickSettlementGraderTest {
     }
 
     @Test
+    void over15DedicatedTypeWinsOnTwoGoals() {
+        assertThat(grader.grade(snapshot("OVER_15_GOALS", "Over 1.5 Goals"), complete(1, 1)).outcome())
+                .isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(snapshot("OVER_15_GOALS", "Over 1.5 Goals"), complete(1, 0)).outcome())
+                .isEqualTo(PickOutcome.LOSS);
+    }
+
+    @Test
+    void over25DedicatedTypeWinsOnThreeGoals() {
+        assertThat(grader.grade(snapshot("OVER_25_GOALS", "Over 2.5 Goals"), complete(2, 1)).outcome())
+                .isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(snapshot("OVER_25_GOALS", "Over 2.5 Goals"), complete(1, 1)).outcome())
+                .isEqualTo(PickOutcome.LOSS);
+    }
+
+    @Test
     void under25LosesWhenThreeGoals() {
         GradeResult result = grader.grade(snapshot("UNDER_GOALS", "Under 2.5 Goals"), complete(2, 1));
         assertThat(result.outcome()).isEqualTo(PickOutcome.LOSS);

@@ -18,7 +18,9 @@ public enum RecommendationType {
     DRAW("Draw", "UC-019"),
     DOUBLE_CHANCE("Double Chance", "UC-024"),
     RESULT_BTTS("Result + BTTS", "UC-025"),
-    TOP_VS_BOTTOM("Top vs Bottom", "UC-026");
+    TOP_VS_BOTTOM("Top vs Bottom", "UC-026"),
+    OVER_15_GOALS("Over 1.5 Goals", "UC-038"),
+    OVER_25_GOALS("Over 2.5 Goals", "UC-039");
 
     private final String displayName;
     private final String useCaseId;

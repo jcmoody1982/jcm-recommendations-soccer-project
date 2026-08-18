@@ -25,6 +25,8 @@ public final class ElitePicksSelector {
             "DOUBLE_CHANCE",
             "DRAW",
             "OVER_GOALS",
+            "OVER_15_GOALS",
+            "OVER_25_GOALS",
             "UNDER_GOALS",
             "CLEAN_SHEET",
             "RESULT_BTTS",

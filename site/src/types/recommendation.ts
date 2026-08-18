@@ -3,6 +3,8 @@ export type ConfidenceLevel = 'STRONG' | 'MODERATE' | 'WEAK';
 export type RecommendationType =
   | 'BTTS'
   | 'OVER_GOALS'
+  | 'OVER_15_GOALS'
+  | 'OVER_25_GOALS'
   | 'UNDER_GOALS'
   | 'BOOKING_POINTS'
   | 'VALUE_BET'

@@ -8,6 +8,8 @@ interface Props {
 const typeLabels: Record<string, string> = {
   BTTS: 'BTTS',
   OVER_GOALS: 'Over Goals',
+  OVER_15_GOALS: 'Over 1.5',
+  OVER_25_GOALS: 'Over 2.5',
   UNDER_GOALS: 'Under Goals',
   BOOKING_POINTS: 'Booking Points',
   VALUE_BET: 'Value Bet',
