@@ -481,12 +481,15 @@ function CombinationReturnRow({ cover }: { cover: CombinationCoverLine | null })
     );
   }
 
-  const detail = [cover.mixLabel, `${cover.betCount} × $1`, cover.detail].filter(Boolean).join(' · ');
+  const totalStake = formatUsd(cover.betCount * COMBINATION_STAKE_USD);
+  const detail = [cover.mixLabel, cover.detail].filter(Boolean).join(' · ');
 
   return (
     <div className={styles.returnsRow}>
       <span className={styles.returnsLabelBlock}>
-        <span className={styles.returnsLabel}>$1 doubles, trebles and above</span>
+        <span className={styles.returnsLabel}>
+          $1 doubles, trebles and above. Total Stake: {totalStake}
+        </span>
         <span className={styles.returnsDetail}>{detail}</span>
       </span>
       <span className={returnValueClass(cover.amount)}>{formatReturnAmount(cover.amount)}</span>
