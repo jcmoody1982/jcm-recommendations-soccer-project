@@ -65,6 +65,21 @@ function formatPrice(odds: number | null | undefined): string | null {
 }
 
 const LEVEL_STAKE_USD = 10;
+const COMBINATION_STAKE_USD = 1;
+
+const FOLD_NAMES = [
+  '',
+  '',
+  'double',
+  'treble',
+  'four-fold',
+  'five-fold',
+  'six-fold',
+  'seven-fold',
+  'eight-fold',
+  'nine-fold',
+  'ten-fold',
+] as const;
 
 function flattenPicks(fixtures: ResultsFixture[]): ResultsPick[] {
   return fixtures.flatMap((fixture) => fixture.picks);
@@ -83,6 +98,39 @@ function formatUsd(amount: number): string {
   });
 }
 
+function combinations(n: number, k: number): number {
+  if (k < 0 || k > n) return 0;
+  const size = Math.min(k, n - k);
+  let result = 1;
+  for (let i = 1; i <= size; i += 1) {
+    result = (result * (n - size + i)) / i;
+  }
+  return Math.round(result);
+}
+
+function foldName(size: number, count: number): string {
+  const singular = FOLD_NAMES[size] ?? `${size}-fold`;
+  return `${count} ${count === 1 ? singular : `${singular}s`}`;
+}
+
+function combinationCoverReturn(odds: number[], stake = COMBINATION_STAKE_USD) {
+  const n = odds.length;
+  if (n < 2) return null;
+
+  const productPlusOne = odds.reduce((product, price) => product * (1 + price), 1);
+  const singlesSum = odds.reduce((sum, price) => sum + price, 0);
+  const mix = [];
+  for (let size = 2; size <= n; size += 1) {
+    mix.push(foldName(size, combinations(n, size)));
+  }
+
+  return {
+    betCount: 2 ** n - 1 - n,
+    returnIfAllWon: stake * (productPlusOne - 1 - singlesSum),
+    mixLabel: mix.join(', '),
+  };
+}
+
 function allWinReturns(picks: ResultsPick[], stake = LEVEL_STAKE_USD) {
   const pricedOdds = picks.map((pick) => pick.odds).filter(isPricedOdds);
   const singlesReturn = pricedOdds.reduce((total, odds) => total + stake * odds, 0);
@@ -93,6 +141,7 @@ function allWinReturns(picks: ResultsPick[], stake = LEVEL_STAKE_USD) {
     singlesCount: pricedOdds.length,
     singlesReturn,
     accumulatorReturn: pricedOdds.length > 0 ? stake * combinedOdds : 0,
+    combinationCover: combinationCoverReturn(pricedOdds),
   };
 }
 
@@ -294,7 +343,7 @@ function ReturnsPanel({ fixtures }: { fixtures: ResultsFixture[] }) {
       <h2 className={styles.returnsTitle}>Returns</h2>
       {stats.priced === 0 ? (
         <p className={styles.returnsStatement}>
-          None of the Elite picks in this view have a known price, so $10 returns
+          None of the Elite picks in this view have a known price, so returns
           cannot be calculated.
         </p>
       ) : (
@@ -312,6 +361,31 @@ function ReturnsPanel({ fixtures }: { fixtures: ResultsFixture[] }) {
             <div className={styles.returnsRow}>
               <span className={styles.returnsLabel}>$10 accumulator</span>
               <span className={styles.returnsValue}>{formatUsd(stats.accumulatorReturn)}</span>
+            </div>
+            <div className={styles.returnsRow}>
+              {stats.combinationCover ? (
+                <>
+                  <span className={styles.returnsLabelBlock}>
+                    <span className={styles.returnsLabel}>$1 doubles, trebles and above</span>
+                    <span className={styles.returnsDetail}>
+                      {stats.combinationCover.mixLabel}
+                      {' · '}
+                      {stats.combinationCover.betCount} × $1
+                    </span>
+                  </span>
+                  <span className={styles.returnsValue}>
+                    {formatUsd(stats.combinationCover.returnIfAllWon)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className={styles.returnsLabelBlock}>
+                    <span className={styles.returnsLabel}>$1 doubles, trebles and above</span>
+                    <span className={styles.returnsDetail}>Needs at least two priced picks</span>
+                  </span>
+                  <span className={styles.returnsValue}>—</span>
+                </>
+              )}
             </div>
           </div>
         </>
