@@ -38,9 +38,8 @@ const ConfidenceIcon = ({ level, isElite }: { level: string; isElite?: boolean }
   if (level === 'MODERATE') {
     return (
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="9" fill="var(--confidence-moderate)" stroke="var(--confidence-moderate)" strokeWidth="1"/>
-        <path d="M10 6V10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-        <circle cx="10" cy="13" r="1" fill="white"/>
+        <circle cx="10" cy="10" r="8" stroke="var(--confidence-moderate)" strokeWidth="2" />
+        <path d="M7 10h6" stroke="var(--confidence-moderate)" strokeWidth="2.4" strokeLinecap="round" />
       </svg>
     );
   }

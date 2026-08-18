@@ -3,11 +3,11 @@ import styles from './EliteBolt.module.css';
 interface Props {
   size?: number;
   className?: string;
-  /** Circle badge matching Strong/Moderate pick icons. */
+  /** Medal rings + bolt in the pick-row icon slot. */
   variant?: 'plain' | 'badge';
 }
 
-/** Lightning mark for Elite picks. Badge variant replaces the Strong check icon. */
+/** Lightning mark for Elite picks. Badge variant is a double gold ring (medal). */
 export function EliteBolt({ size = 14, className, variant = 'plain' }: Props) {
   if (variant === 'badge') {
     return (
@@ -25,12 +25,13 @@ export function EliteBolt({ size = 14, className, variant = 'plain' }: Props) {
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden
         >
-          <circle cx="10" cy="10" r="9" fill="var(--elite-bolt)" />
+          <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.7" />
+          <circle cx="10" cy="10" r="6.1" stroke="currentColor" strokeWidth="1.25" />
           <path
-            d="M11.1 4.2 6.2 10.8h3.4L8.3 15.8l6.2-8H11.4L11.1 4.2Z"
-            fill="white"
-            stroke="white"
-            strokeWidth="0.6"
+            d="M10.85 5.2 7.55 10.15h2.25L8.9 14.7l4.35-5.7H11.05L10.85 5.2Z"
+            fill="currentColor"
+            stroke="currentColor"
+            strokeWidth="0.4"
             strokeLinejoin="round"
           />
         </svg>
