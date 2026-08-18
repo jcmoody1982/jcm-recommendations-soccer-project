@@ -363,9 +363,25 @@
   letter-spacing: 0.02em;
 }
 
+.pickSelection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
 .pickMarket {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.pickPrice {
+  color: var(--accent-color);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .pickMeta {

@@ -58,6 +58,11 @@ function formatScore(score: number | null | undefined): string {
   return Number.isInteger(score) ? String(score) : score.toFixed(1);
 }
 
+function formatPrice(odds: number | null | undefined): string | null {
+  if (odds == null || Number.isNaN(odds) || odds <= 0) return null;
+  return odds.toFixed(2);
+}
+
 function formatHitRate(summary?: { hitRate: number | null } | null): string {
   if (summary?.hitRate == null) return '—';
   return `${summary.hitRate.toFixed(0)}%`;
@@ -292,32 +297,42 @@ function FixtureList({
           </header>
 
           <ul className={styles.pickList}>
-            {fixture.picks.map((pick) => (
-              <li key={pick.id} className={styles.pickRow}>
-                <div className={styles.pickMain}>
-                  {showEliteRank && pick.eliteRank != null && (
-                    <span className={styles.eliteRank} aria-label={`Elite rank ${pick.eliteRank}`}>
-                      #{pick.eliteRank}
-                    </span>
-                  )}
-                  <span className={styles.pickMarket}>{pick.market}</span>
-                  <div className={styles.pickMeta}>
-                    <span className={styles.pickType}>{formatType(pick.type)}</span>
-                    <span className={`${styles.confidenceBadge} ${confidenceClass(pick.confidence)}`}>
-                      {pick.confidence ? outcomeLabel(pick.confidence) : '—'}
-                    </span>
-                    <span className={styles.pickScore} title="Model score">
-                      {formatScore(pick.score)}
+            {fixture.picks.map((pick) => {
+              const price = formatPrice(pick.odds);
+              return (
+                <li key={pick.id} className={styles.pickRow}>
+                  <div className={styles.pickMain}>
+                    {showEliteRank && pick.eliteRank != null && (
+                      <span className={styles.eliteRank} aria-label={`Elite rank ${pick.eliteRank}`}>
+                        #{pick.eliteRank}
+                      </span>
+                    )}
+                    <div className={styles.pickSelection}>
+                      <span className={styles.pickMarket}>{pick.market}</span>
+                      {price && (
+                        <span className={styles.pickPrice} title="Selection price">
+                          @ {price}
+                        </span>
+                      )}
+                    </div>
+                    <div className={styles.pickMeta}>
+                      <span className={styles.pickType}>{formatType(pick.type)}</span>
+                      <span className={`${styles.confidenceBadge} ${confidenceClass(pick.confidence)}`}>
+                        {pick.confidence ? outcomeLabel(pick.confidence) : '—'}
+                      </span>
+                      <span className={styles.pickScore} title="Model score">
+                        {formatScore(pick.score)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.pickSide}>
+                    <span className={`${styles.outcome} ${styles[`outcome${pick.outcome}`]}`}>
+                      {outcomeLabel(pick.outcome)}
                     </span>
                   </div>
-                </div>
-                <div className={styles.pickSide}>
-                  <span className={`${styles.outcome} ${styles[`outcome${pick.outcome}`]}`}>
-                    {outcomeLabel(pick.outcome)}
-                  </span>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </section>
       ))}
