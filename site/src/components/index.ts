@@ -11,3 +11,4 @@ export { SettingsDropdown } from './SettingsDropdown';
 export { Skeleton, RecommendationsPageSkeleton, DashboardSkeleton } from './Skeleton';
 export { ExportModal } from './ExportModal';
 export { EarlyKickoffBadge, EarlyKickoffStrip } from './EarlyKickoffWarning';
+export { EliteBolt } from './EliteBolt';

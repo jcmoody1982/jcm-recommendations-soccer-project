@@ -47,6 +47,7 @@ export function ElitePicksSection({ recommendations }: Props) {
               recommendation={rec}
               showPrice
               showPositionGap={false}
+              isElite
             />
           </div>
         ))}

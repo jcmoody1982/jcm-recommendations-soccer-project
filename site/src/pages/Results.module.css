@@ -482,7 +482,7 @@
 .pickSelection {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 0.45rem;
 }
 

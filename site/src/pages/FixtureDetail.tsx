@@ -9,6 +9,12 @@ import {
   isEarlyKickoffUk,
 } from '../utils/kickoff';
 import { SECTION_CONFIG } from '../utils/recommendationSections';
+import {
+  elitePickKey,
+  flattenGroupedRecommendations,
+  selectElitePicks,
+  toEliteKeySet,
+} from '../utils/elitePicks';
 import styles from './FixtureDetail.module.css';
 
 const CONFIDENCE_ORDER: Record<string, number> = {
@@ -44,6 +50,16 @@ export default function FixtureDetail() {
     queryFn: () => recommendationService.getByFixture(id),
     enabled: Number.isFinite(id) && id > 0,
   });
+
+  const { data: groupedRecommendations } = useQuery({
+    queryKey: ['recommendations-grouped', 7],
+    queryFn: () => recommendationService.getGrouped(7),
+  });
+
+  const eliteKeys = useMemo(
+    () => toEliteKeySet(selectElitePicks(flattenGroupedRecommendations(groupedRecommendations))),
+    [groupedRecommendations],
+  );
 
   const groupedByType = useMemo(() => {
     const sorted = [...recommendations].sort((a, b) => {
@@ -215,6 +231,7 @@ export default function FixtureDetail() {
                         showPrice={config.showPrice}
                         showPositionGap={Boolean(config.showPositionGap)}
                         linkToFixture={false}
+                        isElite={eliteKeys.has(elitePickKey(rec.fixtureId, rec.type))}
                       />
                     ))}
                   </div>

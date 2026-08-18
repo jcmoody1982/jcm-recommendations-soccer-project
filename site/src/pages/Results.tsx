@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { resultsService } from '../services/api';
+import { EliteBolt } from '../components';
 import type {
   DayResults,
   PerformanceBucket,
@@ -576,11 +577,13 @@ function FixtureList({
   emptyTitle,
   emptyBody,
   showEliteRank = false,
+  eliteKeys,
 }: {
   fixtures: ResultsFixture[];
   emptyTitle: string;
   emptyBody: string;
   showEliteRank?: boolean;
+  eliteKeys?: Set<string>;
 }) {
   if (fixtures.length === 0) {
     return (
@@ -617,6 +620,10 @@ function FixtureList({
           <ul className={styles.pickList}>
             {fixture.picks.map((pick) => {
               const price = formatPrice(pick.odds);
+              const isElite =
+                showEliteRank
+                || pick.eliteRank != null
+                || Boolean(eliteKeys?.has(`${fixture.fixtureId}:${pick.type}`));
               return (
                 <li key={pick.id} className={styles.pickRow}>
                   <div className={styles.pickMain}>
@@ -626,6 +633,7 @@ function FixtureList({
                       </span>
                     )}
                     <div className={styles.pickSelection}>
+                      {isElite && <EliteBolt variant="badge" size={16} />}
                       <span className={styles.pickMarket}>{pick.market}</span>
                       {price && (
                         <span className={styles.pickPrice} title="Selection price">
@@ -663,11 +671,13 @@ function ConfidenceSection({
   tone,
   summary,
   fixtures,
+  eliteKeys,
 }: {
   title: string;
   tone: 'strong' | 'moderate';
   summary: ResultsDaySummary;
   fixtures: ResultsFixture[];
+  eliteKeys?: Set<string>;
 }) {
   return (
     <section className={styles.confidenceSection}>
@@ -676,6 +686,7 @@ function ConfidenceSection({
         fixtures={fixtures}
         emptyTitle={`No ${title.toLowerCase()} picks`}
         emptyBody={`No ${title.toLowerCase()} picks for this filter.`}
+        eliteKeys={eliteKeys}
       />
     </section>
   );
@@ -934,6 +945,16 @@ export default function Results() {
     return summaryFromFixtures(eliteFixtures);
   }, [data, typeFilter, eliteFixtures]);
 
+  const eliteKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const fixture of data?.eliteFixtures ?? []) {
+      for (const pick of fixture.picks) {
+        keys.add(`${fixture.fixtureId}:${pick.type}`);
+      }
+    }
+    return keys;
+  }, [data?.eliteFixtures]);
+
   const goPrev = () => {
     if (dateIndex < 0 || dateIndex >= dates.length - 1) return;
     updateParams({ date: dates[dateIndex + 1] });
@@ -1126,6 +1147,7 @@ export default function Results() {
                   tone="strong"
                   summary={strongSummary}
                   fixtures={strongFixtures}
+                  eliteKeys={eliteKeys}
                 />
               )}
               {moderateFixtures.length > 0 && moderateSummary && (
@@ -1134,6 +1156,7 @@ export default function Results() {
                   tone="moderate"
                   summary={moderateSummary}
                   fixtures={moderateFixtures}
+                  eliteKeys={eliteKeys}
                 />
               )}
             </div>

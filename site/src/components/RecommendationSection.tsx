@@ -3,6 +3,7 @@ import type { Recommendation, RecommendationType } from '../types';
 import { MarketIcon } from './MarketIcon';
 import { RecommendationRow } from './RecommendationRow';
 import { SECTION_CONFIG, sectionDomId } from '../utils/recommendationSections';
+import { elitePickKey } from '../utils/elitePicks';
 import styles from './RecommendationSection.module.css';
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   recommendations: Recommendation[];
   initialItems?: number;
   incrementBy?: number;
+  eliteKeys?: Set<string>;
 }
 
 function headerClassName(showPrice: boolean, showPositionGap: boolean): string {
@@ -31,6 +33,7 @@ export function RecommendationSection({
   recommendations,
   initialItems = 5,
   incrementBy = 5,
+  eliteKeys,
 }: Props) {
   const [visibleCount, setVisibleCount] = useState(initialItems);
 
@@ -89,6 +92,7 @@ export function RecommendationSection({
             recommendation={rec}
             showPrice={showPrice}
             showPositionGap={showPositionGap}
+            isElite={eliteKeys?.has(elitePickKey(rec.fixtureId, rec.type))}
           />
         ))}
       </div>

@@ -43,13 +43,32 @@
   border-radius: 8px;
 }
 
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
 .logoText {
   font-family: var(--font-display);
   font-size: 1.75rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--accent-color);
+  line-height: 1;
+}
+
+.glory {
+  color: var(--elite-bolt);
+}
+
+.wordmarkRule {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--elite-bolt);
 }
 
 .nav {

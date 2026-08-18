@@ -193,10 +193,10 @@ function glyph(type: MarketIconId) {
       );
     case 'ELITE':
       return (
-        <g>
-          <path className={styles.fillPrimary} d="M10 24.5h20l-1.5 4H11.5z" />
-          <path className={styles.fillSecondary} d="M11 24.5l2.5-10 4.5 5.5L20 10.5l2 9.5 4.5-5.5 2.5 10z" />
-        </g>
+        <path
+          className={styles.fillPrimary}
+          d="M22.4 8.2L13.6 20.2h6.2L17.4 31.8l10.4-13.4h-6.4L22.4 8.2z"
+        />
       );
     default:
       return <circle cx="20" cy="20" r="5" className={styles.fillPrimary} />;

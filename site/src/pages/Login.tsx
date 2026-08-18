@@ -42,7 +42,10 @@ export default function Login() {
       <div className={styles.glow} aria-hidden="true" />
       <div className={styles.compose}>
         <img src="/logo.png" alt="" className={styles.logo} />
-        <h1 className={`${styles.title} brand-display`}>AccaBaccaGlory</h1>
+        <h1 className={`${styles.title} brand-display`}>
+          AccaBacca<span className={styles.glory}>Glory</span>
+        </h1>
+        <span className={styles.titleRule} aria-hidden="true" />
         <p className={styles.tagline}>Private beta — enter the access password to continue.</p>
 
         <form className={styles.form} onSubmit={handleSubmit}>

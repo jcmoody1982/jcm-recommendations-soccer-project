@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useShortlist } from '../contexts/ShortlistContext';
 import { recommendationService } from '../services/api';
 import { RecommendationRow, ExportModal, MarketIcon } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
 import { SECTION_CONFIG } from '../utils/recommendationSections';
+import {
+  elitePickKey,
+  flattenGroupedRecommendations,
+  selectElitePicks,
+  toEliteKeySet,
+} from '../utils/elitePicks';
 import styles from './Shortlist.module.css';
 
 export default function Shortlist() {
@@ -15,6 +21,11 @@ export default function Shortlist() {
     queryKey: ['recommendations-grouped', 7],
     queryFn: () => recommendationService.getGrouped(7),
   });
+
+  const eliteKeys = useMemo(
+    () => toEliteKeySet(selectElitePicks(flattenGroupedRecommendations(allRecommendations))),
+    [allRecommendations],
+  );
 
   const shortlistedRecommendations: Recommendation[] = [];
 
@@ -92,6 +103,7 @@ export default function Shortlist() {
                       recommendation={rec}
                       showPrice={config.showPrice}
                       showPositionGap={Boolean(config.showPositionGap)}
+                      isElite={eliteKeys.has(elitePickKey(rec.fixtureId, rec.type))}
                     />
                   ))}
                 </div>

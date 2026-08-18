@@ -305,6 +305,10 @@
 }
 
 .market {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.28rem;
   color: var(--text-muted);
   font-size: 0.75rem;
   white-space: nowrap;
@@ -467,6 +471,9 @@
   }
 
   .mobileValue {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
     font-size: 0.7rem;
     color: var(--text-primary);
     font-weight: 500;

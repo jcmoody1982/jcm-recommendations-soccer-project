@@ -48,8 +48,20 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--text-primary);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.35rem;
   text-wrap: balance;
+}
+
+.glory {
+  color: var(--elite-bolt);
+}
+
+.titleRule {
+  display: block;
+  width: min(100%, 18rem);
+  height: 2px;
+  margin: 0 auto 0.75rem;
+  background: var(--elite-bolt);
 }
 
 .tagline {

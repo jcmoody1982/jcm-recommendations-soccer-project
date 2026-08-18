@@ -18,6 +18,7 @@ import {
 import {
   flattenGroupedRecommendations,
   selectElitePicks,
+  toEliteKeySet,
 } from '../utils/elitePicks';
 import {
   SECTION_ORDER,
@@ -164,6 +165,7 @@ export default function Recommendations() {
     () => selectElitePicks(flattenGroupedRecommendations(horizonGrouped)),
     [horizonGrouped]
   );
+  const eliteKeys = useMemo(() => toEliteKeySet(elitePicks), [elitePicks]);
   const availableLeagues = useMemo(() => {
     if (!groupedRecommendations) return [];
     const leagueMap = new Map<string, string>();
@@ -593,6 +595,7 @@ export default function Recommendations() {
                     type={type}
                     recommendations={recommendations}
                     initialItems={5}
+                    eliteKeys={eliteKeys}
                   />
                 );
               })}

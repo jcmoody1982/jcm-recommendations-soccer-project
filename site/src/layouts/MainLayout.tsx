@@ -57,8 +57,13 @@ export default function MainLayout() {
       <header className={styles.header}>
         <div className={styles.logo}>
           <Link to="/recommendations">
-            <img src="/logo.png" alt="AccaBaccaGlory" className={styles.logoImage} />
-            <span className={`${styles.logoText} brand-display`}>AccaBaccaGlory</span>
+            <img src="/logo.png" alt="" className={styles.logoImage} />
+            <span className={styles.wordmark}>
+              <span className={`${styles.logoText} brand-display`}>
+                AccaBacca<span className={styles.glory}>Glory</span>
+              </span>
+              <span className={styles.wordmarkRule} aria-hidden="true" />
+            </span>
           </Link>
         </div>
         

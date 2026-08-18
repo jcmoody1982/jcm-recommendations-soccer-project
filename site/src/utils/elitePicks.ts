@@ -83,3 +83,11 @@ export function flattenGroupedRecommendations(
   if (!grouped) return [];
   return Object.values(grouped).flat();
 }
+
+export function elitePickKey(fixtureId: number, type: string): string {
+  return `${fixtureId}:${type}`;
+}
+
+export function toEliteKeySet(picks: Recommendation[]): Set<string> {
+  return new Set(picks.map((pick) => elitePickKey(pick.fixtureId, pick.type)));
+}
