@@ -227,6 +227,66 @@
   letter-spacing: 0.04em;
 }
 
+.returnsPanel {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.returnsTitle {
+  margin: 0 0 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.returnsStatement {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.returnsRows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.returnsRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.returnsLabel {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.returnsValue {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--confidence-strong);
+  white-space: nowrap;
+}
+
+.returnsHint {
+  margin: 0.45rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .win { color: var(--confidence-strong); }
 .loss { color: #e07070; }
 .unsupported { color: var(--text-muted); }

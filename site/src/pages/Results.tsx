@@ -10,6 +10,7 @@ import type {
   ResultsDaySummary,
   ResultsFixture,
   ResultsPerformance,
+  ResultsPick,
 } from '../types';
 import styles from './Results.module.css';
 
@@ -61,6 +62,38 @@ function formatScore(score: number | null | undefined): string {
 function formatPrice(odds: number | null | undefined): string | null {
   if (odds == null || Number.isNaN(odds) || odds <= 0) return null;
   return odds.toFixed(2);
+}
+
+const LEVEL_STAKE_USD = 10;
+
+function flattenPicks(fixtures: ResultsFixture[]): ResultsPick[] {
+  return fixtures.flatMap((fixture) => fixture.picks);
+}
+
+function isPricedOdds(odds: number | null | undefined): odds is number {
+  return odds != null && !Number.isNaN(odds) && odds > 0;
+}
+
+function formatUsd(amount: number): string {
+  return amount.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function allWinReturns(picks: ResultsPick[], stake = LEVEL_STAKE_USD) {
+  const pricedOdds = picks.map((pick) => pick.odds).filter(isPricedOdds);
+  const singlesReturn = pricedOdds.reduce((total, odds) => total + stake * odds, 0);
+  const combinedOdds = pricedOdds.reduce((product, odds) => product * odds, 1);
+  return {
+    priced: pricedOdds.length,
+    unpriced: picks.length - pricedOdds.length,
+    singlesCount: pricedOdds.length,
+    singlesReturn,
+    accumulatorReturn: pricedOdds.length > 0 ? stake * combinedOdds : 0,
+  };
 }
 
 function formatHitRate(summary?: { hitRate: number | null } | null): string {
@@ -249,6 +282,46 @@ function PerformanceSummary({
           <span className={styles.summaryLabel}>Sample</span>
         </div>
       </div>
+    </section>
+  );
+}
+
+function ReturnsPanel({ fixtures }: { fixtures: ResultsFixture[] }) {
+  const stats = allWinReturns(flattenPicks(fixtures));
+
+  return (
+    <section className={styles.returnsPanel}>
+      <h2 className={styles.returnsTitle}>Returns</h2>
+      {stats.priced === 0 ? (
+        <p className={styles.returnsStatement}>
+          None of the Elite picks in this view have a known price, so $10 returns
+          cannot be calculated.
+        </p>
+      ) : (
+        <>
+          <p className={styles.returnsStatement}>
+            If every priced Elite pick in this view had won:
+          </p>
+          <div className={styles.returnsRows}>
+            <div className={styles.returnsRow}>
+              <span className={styles.returnsLabel}>
+                {stats.singlesCount} × $10 singles
+              </span>
+              <span className={styles.returnsValue}>{formatUsd(stats.singlesReturn)}</span>
+            </div>
+            <div className={styles.returnsRow}>
+              <span className={styles.returnsLabel}>$10 accumulator</span>
+              <span className={styles.returnsValue}>{formatUsd(stats.accumulatorReturn)}</span>
+            </div>
+          </div>
+        </>
+      )}
+      {stats.unpriced > 0 && stats.priced > 0 && (
+        <p className={styles.returnsHint}>
+          {stats.unpriced} pick{stats.unpriced === 1 ? '' : 's'} with no stored price
+          {stats.unpriced === 1 ? ' is' : ' are'} excluded.
+        </p>
+      )}
     </section>
   );
 }
@@ -827,6 +900,10 @@ export default function Results() {
         <>
           {eliteSummary && data?.snapshotDate && (
             <SummaryStrip title="Elite Pick Performance" summary={eliteSummary} tone="strong" />
+          )}
+
+          {!isLoading && !isError && eliteFixtures.length > 0 && (
+            <ReturnsPanel fixtures={eliteFixtures} />
           )}
 
           {isLoading && <div className={styles.message}>Loading elite picks…</div>}
