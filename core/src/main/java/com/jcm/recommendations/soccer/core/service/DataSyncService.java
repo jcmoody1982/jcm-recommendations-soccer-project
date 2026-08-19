@@ -20,6 +20,7 @@ public class DataSyncService {
     private final LeagueService leagueService;
     private final FixtureService fixtureService;
     private final TeamService teamService;
+    private final PlayerService playerService;
     private final RefereeService refereeService;
     private final TeamFormService teamFormService;
 
@@ -30,6 +31,7 @@ public class DataSyncService {
         int leagueCount = 0;
         int fixtureCount = 0;
         int teamCount = 0;
+        int playerCount = 0;
         int refereeCount = 0;
         int formCount = 0;
         int failedSeasons = 0;
@@ -57,6 +59,15 @@ public class DataSyncService {
                     TeamService.SyncResult teamResult = 
                             teamService.syncTeamsForSeason(seasonId, leagueName);
                     teamCount += teamResult.newCount() + teamResult.updatedCount();
+
+                    try {
+                        PlayerService.SyncResult playerResult =
+                                playerService.syncPlayersForSeason(seasonId, leagueName);
+                        playerCount += playerResult.newCount() + playerResult.updatedCount();
+                    } catch (Exception e) {
+                        log.warn("Failed to sync players: seasonId={}, league={}, error={}",
+                                seasonId, leagueName, e.getMessage());
+                    }
 
                     RefereeService.SyncResult refereeResult = 
                             refereeService.syncRefereesForSeason(seasonId, leagueName);
@@ -104,14 +115,15 @@ public class DataSyncService {
                 log.info("Daily data sync completed successfully");
             }
 
-            log.info("Sync summary: duration={}s, leagues={}, fixtures={}, teams={}, referees={}, forms={}", 
-                    duration.getSeconds(), leagueCount, fixtureCount, teamCount, refereeCount, formCount);
+            log.info("Sync summary: duration={}s, leagues={}, fixtures={}, teams={}, players={}, referees={}, forms={}",
+                    duration.getSeconds(), leagueCount, fixtureCount, teamCount, playerCount, refereeCount, formCount);
 
             return new SyncSummary(
                     duration.getSeconds(),
                     leagueCount,
                     fixtureCount,
                     teamCount,
+                    playerCount,
                     refereeCount,
                     formCount,
                     failedSeasons == 0
@@ -128,6 +140,7 @@ public class DataSyncService {
             int leaguesProcessed,
             int fixturesProcessed,
             int teamsProcessed,
+            int playersProcessed,
             int refereesProcessed,
             int formsProcessed,
             boolean success

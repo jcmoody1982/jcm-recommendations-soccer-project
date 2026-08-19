@@ -5,6 +5,7 @@ import com.jcm.recommendations.soccer.core.client.dto.MatchDto;
 import com.jcm.recommendations.soccer.core.config.ResultsProperties;
 import com.jcm.recommendations.soccer.core.repository.CompletedMatchRepository;
 import com.jcm.recommendations.soccer.core.repository.RecommendationSnapshotRepository;
+import com.jcm.recommendations.soccer.core.results.settlement.MatchGoalEvents;
 import com.jcm.recommendations.soccer.domain.CompletedMatch;
 import com.jcm.recommendations.soccer.domain.PickOutcome;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,10 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Slf4j
 public class ResultsMatchIngestService {
+
+    private static final List<String> PLAYER_PROP_TYPES = List.of("PLAYER_TO_SCORE", "PLAYER_TO_ASSIST");
+    private static final List<PickOutcome> PLAYER_PROP_OPEN_OUTCOMES =
+            List.of(PickOutcome.PENDING, PickOutcome.UNSUPPORTED);
 
     private final FootyStatsApiClient apiClient;
     private final CompletedMatchRepository completedMatchRepository;
@@ -64,7 +69,12 @@ public class ResultsMatchIngestService {
         List<Long> pendingFixtureIds = snapshotRepository
                 .findDistinctFixtureIdsByOutcomeAndSnapshotDateGreaterThanEqual(
                         PickOutcome.PENDING, lookbackStart);
-        FallbackResult fallback = fallbackFetchPendingFixtures(pendingFixtureIds, yesterday, touched);
+        Set<Long> playerPropFixtureIds = new LinkedHashSet<>(
+                snapshotRepository.findDistinctFixtureIdsByTypesAndOutcomesSince(
+                        PLAYER_PROP_TYPES, PLAYER_PROP_OPEN_OUTCOMES, lookbackStart));
+        Set<Long> fallbackIds = new LinkedHashSet<>(pendingFixtureIds);
+        fallbackIds.addAll(playerPropFixtureIds);
+        FallbackResult fallback = fallbackFetchPendingFixtures(fallbackIds, playerPropFixtureIds, yesterday, touched);
 
         IngestSummary summary = new IngestSummary(
                 yesterday, dates.size(), upserted + fallback.upserts(), fallback.fetches(), touched);
@@ -85,7 +95,12 @@ public class ResultsMatchIngestService {
 
         List<Long> pendingFixtureIds = snapshotRepository
                 .findDistinctFixtureIdsByOutcomeAndSnapshotDate(PickOutcome.PENDING, date);
-        FallbackResult fallback = fallbackFetchPendingFixtures(pendingFixtureIds, date, touched);
+        Set<Long> playerPropFixtureIds = new LinkedHashSet<>(
+                snapshotRepository.findDistinctFixtureIdsByTypesAndOutcomesOnDate(
+                        PLAYER_PROP_TYPES, PLAYER_PROP_OPEN_OUTCOMES, date));
+        Set<Long> fallbackIds = new LinkedHashSet<>(pendingFixtureIds);
+        fallbackIds.addAll(playerPropFixtureIds);
+        FallbackResult fallback = fallbackFetchPendingFixtures(fallbackIds, playerPropFixtureIds, date, touched);
 
         IngestSummary summary = new IngestSummary(
                 date, 1, upserted + fallback.upserts(), fallback.fetches(), touched);
@@ -109,12 +124,15 @@ public class ResultsMatchIngestService {
     }
 
     private FallbackResult fallbackFetchPendingFixtures(
-            Collection<Long> pendingFixtureIds, LocalDate sourceDate, Set<Long> touched) {
+            Collection<Long> pendingFixtureIds,
+            Set<Long> playerPropFixtureIds,
+            LocalDate sourceDate,
+            Set<Long> touched) {
         int fetches = 0;
         int upserts = 0;
         for (Long fixtureId : pendingFixtureIds) {
             CompletedMatch existing = completedMatchRepository.findById(fixtureId).orElse(null);
-            if (existing != null && isCompleteStatus(existing.getStatus())) {
+            if (!needsMatchDetail(existing, playerPropFixtureIds.contains(fixtureId))) {
                 touched.add(fixtureId);
                 continue;
             }
@@ -147,7 +165,31 @@ public class ResultsMatchIngestService {
         row.setAwayRedCards(nonNegativeOrNull(dto.getTeamBRedCards()));
         row.setSourceDate(sourceDate);
         row.setFetchedAt(Instant.now());
+        if (dto.getTeamAGoalDetails() != null || dto.getTeamBGoalDetails() != null) {
+            row.setGoalEventsJson(MatchGoalEvents.toJson(
+                    MatchGoalEvents.fromDetails(dto.getTeamAGoalDetails(), dto.getTeamBGoalDetails())));
+        }
         completedMatchRepository.save(row);
+    }
+
+    private static boolean needsMatchDetail(CompletedMatch existing, boolean playerPropFixture) {
+        if (existing == null || !isCompleteStatus(existing.getStatus())) {
+            return true;
+        }
+        if (!playerPropFixture) {
+            return false;
+        }
+        return existing.getGoalEventsJson() == null || needsRetryEmptyGoalDetails(existing);
+    }
+
+    private static boolean needsRetryEmptyGoalDetails(CompletedMatch existing) {
+        int total = (existing.getHomeGoals() == null ? 0 : existing.getHomeGoals())
+                + (existing.getAwayGoals() == null ? 0 : existing.getAwayGoals());
+        if (total <= 0) {
+            return false;
+        }
+        List<MatchGoalEvents.StoredGoalEvent> events = MatchGoalEvents.parse(existing.getGoalEventsJson());
+        return events != null && events.isEmpty();
     }
 
     private static String normalizeStatus(String status) {

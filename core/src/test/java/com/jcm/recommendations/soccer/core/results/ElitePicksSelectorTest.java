@@ -19,6 +19,7 @@ class ElitePicksSelectorTest {
                 snap(2L, date, 100L, "MATCH_RESULT", "STRONG", 95.0, 2.0, 1000L),
                 snap(3L, date, 200L, "DRAW", "MODERATE", 99.0, 1.5, 2000L),
                 snap(4L, date, 300L, "BOOKING_POINTS", "STRONG", 99.0, 1.5, 3000L),
+                snap(14L, date, 1300L, "PLAYER_TO_SCORE", "STRONG", 99.0, 1.4, 13000L),
                 snap(5L, date, 400L, "OVER_GOALS", "STRONG", 80.0, 1.9, 4000L),
                 snap(6L, date, 500L, "UNDER_GOALS", "STRONG", 79.0, 2.1, 5000L),
                 snap(7L, date, 600L, "CLEAN_SHEET", "STRONG", 78.0, 2.2, 6000L),
@@ -37,6 +38,7 @@ class ElitePicksSelectorTest {
         assertThat(elite.getFirst().getType()).isEqualTo("MATCH_RESULT");
         assertThat(elite.stream().map(RecommendationSnapshot::getFixtureId).distinct().count()).isEqualTo(10);
         assertThat(elite).noneMatch(r -> "BOOKING_POINTS".equals(r.getType()));
+        assertThat(elite).noneMatch(r -> "PLAYER_TO_SCORE".equals(r.getType()));
         assertThat(elite).noneMatch(r -> "MODERATE".equalsIgnoreCase(r.getConfidence()));
         assertThat(elite.getLast().getFixtureId()).isEqualTo(1200L);
     }

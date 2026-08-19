@@ -101,6 +101,24 @@ public class RecommendationController {
         return ResponseEntity.ok(recommendations);
     }
 
+    @GetMapping("/player-to-score")
+    public ResponseEntity<List<Recommendation>> getPlayerToScoreRecommendations(
+            @RequestParam(defaultValue = "7") double daysAhead) {
+        log.info("GET /api/recommendations/player-to-score requested: daysAhead={}", daysAhead);
+        List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
+                RecommendationType.PLAYER_TO_SCORE, daysAhead);
+        return ResponseEntity.ok(recommendations);
+    }
+
+    @GetMapping("/player-to-assist")
+    public ResponseEntity<List<Recommendation>> getPlayerToAssistRecommendations(
+            @RequestParam(defaultValue = "7") double daysAhead) {
+        log.info("GET /api/recommendations/player-to-assist requested: daysAhead={}", daysAhead);
+        List<Recommendation> recommendations = recommendationService.getRecommendationsByType(
+                RecommendationType.PLAYER_TO_ASSIST, daysAhead);
+        return ResponseEntity.ok(recommendations);
+    }
+
     @GetMapping("/under-goals")
     public ResponseEntity<List<Recommendation>> getUnderGoalsRecommendations(
             @RequestParam(defaultValue = "7") double daysAhead) {

@@ -48,7 +48,7 @@ public class SettlementService {
                 snapshotRepository.findByOutcome(PickOutcome.PENDING));
         // One-time / catch-up: re-grade corners & bookings previously marked UNSUPPORTED before graders existed
         for (RecommendationSnapshot unsupported : snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)) {
-            if (isCornersOrBookingsType(unsupported.getType())) {
+            if (isCornersOrBookingsType(unsupported.getType()) || isPlayerPropType(unsupported.getType())) {
                 candidates.add(unsupported);
             }
         }
@@ -116,6 +116,10 @@ public class SettlementService {
                 || "BOOKING_POINTS".equals(typeName);
     }
 
+    private static boolean isPlayerPropType(String typeName) {
+        return "PLAYER_TO_SCORE".equals(typeName) || "PLAYER_TO_ASSIST".equals(typeName);
+    }
+
     private void applyResolved(RecommendationSnapshot snapshot, GradeResult result, CompletedMatch match) {
         snapshot.setOutcome(result.outcome());
         snapshot.setResolvedAt(Instant.now());
@@ -141,6 +145,7 @@ public class SettlementService {
         payload.put("awayYellowCards", match.getAwayYellowCards());
         payload.put("homeRedCards", match.getHomeRedCards());
         payload.put("awayRedCards", match.getAwayRedCards());
+        payload.put("goalEventsJson", match.getGoalEventsJson());
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException e) {

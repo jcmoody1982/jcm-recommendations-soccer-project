@@ -1,6 +1,7 @@
 package com.jcm.recommendations.soccer.core.results;
 
 import com.jcm.recommendations.soccer.core.client.FootyStatsApiClient;
+import com.jcm.recommendations.soccer.core.client.dto.GoalDetailDto;
 import com.jcm.recommendations.soccer.core.client.dto.MatchDto;
 import com.jcm.recommendations.soccer.core.config.ResultsProperties;
 import com.jcm.recommendations.soccer.core.repository.CompletedMatchRepository;
@@ -22,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -47,6 +49,10 @@ class ResultsMatchIngestServiceTest {
         properties.setPendingLookbackDays(7);
         service = new ResultsMatchIngestService(
                 apiClient, completedMatchRepository, snapshotRepository, properties);
+        lenient().when(snapshotRepository.findDistinctFixtureIdsByTypesAndOutcomesOnDate(any(), any(), any()))
+                .thenReturn(List.of());
+        lenient().when(snapshotRepository.findDistinctFixtureIdsByTypesAndOutcomesSince(any(), any(), any()))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -119,6 +125,36 @@ class ResultsMatchIngestServiceTest {
         assertThat(saved.getSourceDate()).isEqualTo(date);
         assertThat(saved.getFetchedAt()).isNotNull();
         verify(apiClient, never()).fetchMatch(55L);
+    }
+
+    @Test
+    void fallbackFetchesMatchForPlayerPropWhenGoalEventsMissing() {
+        LocalDate date = LocalDate.of(2026, 8, 3);
+        when(apiClient.fetchTodaysMatches("2026-08-03", "Europe/London"))
+                .thenReturn(List.of(match(100L, "complete", 2, 0)));
+        when(snapshotRepository.findDistinctFixtureIdsByOutcomeAndSnapshotDate(PickOutcome.PENDING, date))
+                .thenReturn(List.of(100L));
+        when(snapshotRepository.findDistinctFixtureIdsByTypesAndOutcomesOnDate(any(), any(), eq(date)))
+                .thenReturn(List.of(100L));
+        when(completedMatchRepository.findById(100L)).thenAnswer(inv -> Optional.of(
+                CompletedMatch.builder().fixtureId(100L).status("complete").homeGoals(2).awayGoals(0).build()));
+        MatchDto detailed = match(100L, "complete", 2, 0);
+        GoalDetailDto goal = new GoalDetailDto();
+        goal.setPlayerId(8298L);
+        goal.setAssistPlayerId(4281L);
+        goal.setTime("17");
+        detailed.setTeamAGoalDetails(List.of(goal));
+        detailed.setTeamBGoalDetails(List.of());
+        when(apiClient.fetchMatch(100L)).thenReturn(detailed);
+        when(completedMatchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ResultsMatchIngestService.IngestSummary summary = service.ingestForDate(date);
+
+        assertThat(summary.fallbackFetches()).isEqualTo(1);
+        verify(apiClient).fetchMatch(100L);
+        ArgumentCaptor<CompletedMatch> captor = ArgumentCaptor.forClass(CompletedMatch.class);
+        verify(completedMatchRepository, times(2)).save(captor.capture());
+        assertThat(captor.getValue().getGoalEventsJson()).contains("8298").contains("4281");
     }
 
     @Test

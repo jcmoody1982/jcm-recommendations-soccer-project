@@ -4,6 +4,8 @@ import com.jcm.recommendations.soccer.domain.*;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class FixtureContext {
@@ -24,6 +26,9 @@ public class FixtureContext {
     private TeamRecentForm awayTeamForm;
     
     private RefereeStats refereeStats;
+
+    private List<PlayerSeasonStats> homePlayers;
+    private List<PlayerSeasonStats> awayPlayers;
     
     public boolean hasCompleteData() {
         return fixture != null 
@@ -47,5 +52,13 @@ public class FixtureContext {
     
     public boolean hasRefereeStats() {
         return refereeStats != null;
+    }
+
+    public boolean hasPlayerStats() {
+        return !isEmpty(homePlayers) || !isEmpty(awayPlayers);
+    }
+
+    private static boolean isEmpty(List<?> list) {
+        return list == null || list.isEmpty();
     }
 }

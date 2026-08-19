@@ -1,12 +1,16 @@
 package com.jcm.recommendations.soccer.core.results.settlement;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
 import com.jcm.recommendations.soccer.domain.CompletedMatch;
 import com.jcm.recommendations.soccer.domain.RecommendationSnapshot;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,6 +26,8 @@ public class PickSettlementGrader {
     private static final Pattern OVER_UNDER_LINE = Pattern.compile(
             "(?i)(Over|Under)\\s+(\\d+(?:\\.\\d+)?)\\s*"
                     + "(?:Goals|HT Goals|2H Goals|First Half Goals|Second Half Goals|Corners|Booking Points)?");
+
+    private static final ObjectMapper FACTORS_MAPPER = new ObjectMapper();
 
     public GradeResult grade(RecommendationSnapshot snapshot, CompletedMatch match) {
         RecommendationType type;
@@ -47,6 +53,8 @@ public class PickSettlementGrader {
             case TOP_VS_BOTTOM, WINNING_FORM_MISMATCH, LOSING_FORM_MISMATCH, HOME_AWAY_SPECIALIST ->
                     gradeTeamOrDraw(snapshot, match, false);
             case VALUE_BET -> gradeValueBet(snapshot, match);
+            case PLAYER_TO_SCORE -> gradePlayerProp(snapshot, match, true);
+            case PLAYER_TO_ASSIST -> gradePlayerProp(snapshot, match, false);
         };
     }
 
@@ -253,6 +261,49 @@ public class PickSettlementGrader {
             return gradeBookingPoints(market, match);
         }
         return GradeResult.unsupported("Unparseable value bet market: " + market);
+    }
+
+    private GradeResult gradePlayerProp(RecommendationSnapshot snapshot, CompletedMatch match, boolean toScore) {
+        Optional<Integer[]> ft = ftGoals(match);
+        if (ft.isEmpty()) {
+            return GradeResult.pending("Missing FT goals");
+        }
+        List<MatchGoalEvents.StoredGoalEvent> events = MatchGoalEvents.parse(match.getGoalEventsJson());
+        if (events == null) {
+            return GradeResult.pending(toScore
+                    ? "Player goal events not ingested yet"
+                    : "Player assist events not ingested yet");
+        }
+        int total = ft.get()[0] + ft.get()[1];
+        if (total > 0 && events.isEmpty()) {
+            return GradeResult.pending("Goal details empty despite score");
+        }
+        Long playerId = playerIdFromSnapshot(snapshot);
+        if (playerId == null) {
+            return GradeResult.unsupported("Missing playerId on snapshot");
+        }
+        Set<Long> ids = toScore
+                ? MatchGoalEvents.scoringPlayerIds(events)
+                : MatchGoalEvents.assistingPlayerIds(events);
+        return ids.contains(playerId) ? GradeResult.win() : GradeResult.loss();
+    }
+
+    private static Long playerIdFromSnapshot(RecommendationSnapshot snapshot) {
+        String json = snapshot.getFactorsJson();
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = FACTORS_MAPPER.readTree(json);
+            JsonNode node = root.get("playerId");
+            if (node == null || node.isNull() || !node.isNumber()) {
+                return null;
+            }
+            long id = node.longValue();
+            return id > 0 ? id : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static Optional<Integer[]> ftGoals(CompletedMatch match) {

@@ -142,6 +142,23 @@ function glyph(type: MarketIconId) {
           <text x="20" y="33" textAnchor="middle" className={styles.halfMark} style={{ fontSize: '7.5px' }}>2.5</text>
         </g>
       );
+    case 'PLAYER_TO_SCORE':
+      return (
+        <g>
+          <circle cx="20" cy="16" r="4" className={styles.strokePrimary} />
+          <path className={styles.strokePrimary} d="M20 20.5v6.5M16 32.5l4-5.5 4 5.5" strokeWidth="1.8" />
+          <circle cx="28.5" cy="12.5" r="2.4" className={styles.fillSecondary} />
+        </g>
+      );
+    case 'PLAYER_TO_ASSIST':
+      return (
+        <g>
+          <circle cx="14.5" cy="16" r="3.4" className={styles.strokePrimary} />
+          <path className={styles.strokePrimary} d="M14.5 19.8v6.2M11.5 31.5l3-5.4 3 5.4" strokeWidth="1.8" />
+          <path className={styles.strokeSecondary} d="M19 18.5h8.5" strokeWidth="1.8" />
+          <path className={styles.strokeSecondary} d="M24.5 15.5L28.5 18.5 24.5 21.5" strokeWidth="1.8" />
+        </g>
+      );
     case 'UNDER_GOALS':
       return (
         <g>

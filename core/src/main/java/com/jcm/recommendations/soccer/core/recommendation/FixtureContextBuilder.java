@@ -11,6 +11,8 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -24,6 +26,7 @@ public class FixtureContextBuilder {
     private final TeamSeasonStatsRepository teamSeasonStatsRepository;
     private final TeamRecentFormRepository teamRecentFormRepository;
     private final RefereeStatsRepository refereeStatsRepository;
+    private final PlayerSeasonStatsRepository playerSeasonStatsRepository;
 
     public FixtureContext buildContext(Fixture fixture) {
         log.debug("Building context for fixture: fixtureId={}", fixture.getId());
@@ -58,6 +61,16 @@ public class FixtureContextBuilder {
                 fixture.getRefereeId(), fixture.getSeasonId()).orElse(null);
         }
 
+        List<PlayerSeasonStats> homePlayers = emptyList();
+        List<PlayerSeasonStats> awayPlayers = emptyList();
+        if (fixture.getHomeTeamId() != null && fixture.getAwayTeamId() != null) {
+            List<PlayerSeasonStats> players = playerSeasonStatsRepository.findByTeamIdsAndSeasonIds(
+                    List.of(fixture.getHomeTeamId(), fixture.getAwayTeamId()),
+                    List.of(fixture.getSeasonId()));
+            homePlayers = playersForTeam(players, fixture.getHomeTeamId(), fixture.getSeasonId());
+            awayPlayers = playersForTeam(players, fixture.getAwayTeamId(), fixture.getSeasonId());
+        }
+
         return FixtureContext.builder()
                 .fixture(fixture)
                 .odds(odds)
@@ -70,6 +83,8 @@ public class FixtureContextBuilder {
                 .homeTeamForm(homeForm)
                 .awayTeamForm(awayForm)
                 .refereeStats(refereeStats)
+                .homePlayers(homePlayers)
+                .awayPlayers(awayPlayers)
                 .build();
     }
 
@@ -103,6 +118,7 @@ public class FixtureContextBuilder {
         Map<String, TeamSeasonStats> teamStatsMap = fetchTeamStatsMap(teamIds, seasonIds);
         Map<Long, TeamRecentForm> teamFormMap = fetchTeamFormMap(teamIds);
         Map<String, RefereeStats> refereeStatsMap = fetchRefereeStatsMap(refereeIds, seasonIds);
+        Map<String, List<PlayerSeasonStats>> playersMap = fetchPlayersMap(teamIds, seasonIds);
         
         long fetchTime = System.currentTimeMillis() - startTime;
         log.debug("Batch data fetched in {}ms: odds={}, potentials={}, leagues={}, teams={}, teamStats={}, teamForms={}, refereeStats={}",
@@ -116,7 +132,7 @@ public class FixtureContextBuilder {
         for (Fixture fixture : fixtures) {
             FixtureContext context = buildContextFromMaps(
                     fixture, oddsMap, potentialsMap, leagueMap, teamMap, 
-                    teamStatsMap, teamFormMap, refereeStatsMap);
+                    teamStatsMap, teamFormMap, refereeStatsMap, playersMap);
             
             if (context.hasCompleteData()) {
                 contexts.add(context);
@@ -141,7 +157,8 @@ public class FixtureContextBuilder {
             Map<Long, Team> teamMap,
             Map<String, TeamSeasonStats> teamStatsMap,
             Map<Long, TeamRecentForm> teamFormMap,
-            Map<String, RefereeStats> refereeStatsMap) {
+            Map<String, RefereeStats> refereeStatsMap,
+            Map<String, List<PlayerSeasonStats>> playersMap) {
         
         Long fixtureId = fixture.getId();
         Long seasonId = fixture.getSeasonId();
@@ -164,6 +181,12 @@ public class FixtureContextBuilder {
                 .homeTeamForm(homeTeamId != null ? teamFormMap.get(homeTeamId) : null)
                 .awayTeamForm(awayTeamId != null ? teamFormMap.get(awayTeamId) : null)
                 .refereeStats(refereeId != null ? refereeStatsMap.get(refereeStatsKey(refereeId, seasonId)) : null)
+                .homePlayers(homeTeamId != null
+                        ? playersMap.getOrDefault(teamStatsKey(homeTeamId, seasonId), emptyList())
+                        : emptyList())
+                .awayPlayers(awayTeamId != null
+                        ? playersMap.getOrDefault(teamStatsKey(awayTeamId, seasonId), emptyList())
+                        : emptyList())
                 .build();
     }
     
@@ -217,6 +240,49 @@ public class FixtureContextBuilder {
                         (existing, replacement) -> existing));
     }
     
+    private Map<String, List<PlayerSeasonStats>> fetchPlayersMap(Set<Long> teamIds, Set<Long> seasonIds) {
+        if (teamIds.isEmpty() || seasonIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, List<PlayerSeasonStats>> grouped = new HashMap<>();
+        for (PlayerSeasonStats stats : playerSeasonStatsRepository.findByTeamIdsAndSeasonIds(teamIds, seasonIds)) {
+            addPlayerToGroup(grouped, stats.getClubTeamId(), stats.getSeasonId(), stats);
+            addPlayerToGroup(grouped, stats.getClubTeam2Id(), stats.getSeasonId(), stats);
+        }
+        return grouped;
+    }
+
+    private static void addPlayerToGroup(
+            Map<String, List<PlayerSeasonStats>> grouped,
+            Long teamId,
+            Long seasonId,
+            PlayerSeasonStats stats) {
+        if (teamId == null || seasonId == null) {
+            return;
+        }
+        grouped.computeIfAbsent(teamId + ":" + seasonId, key -> new ArrayList<>()).add(stats);
+    }
+
+    private static List<PlayerSeasonStats> playersForTeam(
+            List<PlayerSeasonStats> players, Long teamId, Long seasonId) {
+        if (players == null || players.isEmpty() || teamId == null) {
+            return emptyList();
+        }
+        return players.stream()
+                .filter(player -> belongsToTeam(player, teamId, seasonId))
+                .toList();
+    }
+
+    private static boolean belongsToTeam(PlayerSeasonStats player, Long teamId, Long seasonId) {
+        if (player == null || teamId == null) {
+            return false;
+        }
+        if (seasonId != null && player.getSeasonId() != null && !seasonId.equals(player.getSeasonId())) {
+            return false;
+        }
+        return teamId.equals(player.getClubTeamId()) || teamId.equals(player.getClubTeam2Id());
+    }
+
     private String teamStatsKey(Long teamId, Long seasonId) {
         return teamId + ":" + seasonId;
     }

@@ -20,7 +20,9 @@ public enum RecommendationType {
     RESULT_BTTS("Result + BTTS", "UC-025"),
     TOP_VS_BOTTOM("Top vs Bottom", "UC-026"),
     OVER_15_GOALS("Over 1.5 Goals", "UC-038"),
-    OVER_25_GOALS("Over 2.5 Goals", "UC-039");
+    OVER_25_GOALS("Over 2.5 Goals", "UC-039"),
+    PLAYER_TO_SCORE("Player to Score", "UC-040"),
+    PLAYER_TO_ASSIST("Player to Assist", "UC-041");
 
     private final String displayName;
     private final String useCaseId;

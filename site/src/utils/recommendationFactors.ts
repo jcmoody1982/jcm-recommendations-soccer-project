@@ -14,6 +14,8 @@ const SKIP_KEYS = new Set([
   'xgDataAvailable', // all markets — not useful in the customer Info panel
   'drawsDeferredToDrawEngine',
   'xgDominanceAppliedAsMultiplier',
+  'playerId',
+  'marketVerb',
   // Match Result: multipliers are informational only (not applied to score)
   'homeXgDominanceMultiplier',
   'awayXgDominanceMultiplier',
@@ -127,11 +129,24 @@ const TOTAL_GOALS_OVER_FACTOR_ORDER: readonly string[] = [
   'calculatedScore',
 ];
 
+const PLAYER_PROP_FACTOR_ORDER: readonly string[] = [
+  'playerName',
+  'teamName',
+  'per90',
+  'appearances',
+  'minutes',
+  'opponentConcededAvg',
+  'rankInClubTopScorer',
+  'calculatedScore',
+];
+
 const FACTOR_ORDER_BY_TYPE: Partial<Record<RecommendationType, readonly string[]>> = {
   BTTS: BTTS_FACTOR_ORDER,
   DOUBLE_CHANCE: DOUBLE_CHANCE_FACTOR_ORDER,
   OVER_15_GOALS: TOTAL_GOALS_OVER_FACTOR_ORDER,
   OVER_25_GOALS: TOTAL_GOALS_OVER_FACTOR_ORDER,
+  PLAYER_TO_SCORE: PLAYER_PROP_FACTOR_ORDER,
+  PLAYER_TO_ASSIST: PLAYER_PROP_FACTOR_ORDER,
 };
 
 const MAX_FACTORS = 8;

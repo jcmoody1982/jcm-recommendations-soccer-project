@@ -19,6 +19,8 @@ export const SECTION_ORDER: RecommendationType[] = [
   'TOP_VS_BOTTOM',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
+  'PLAYER_TO_SCORE',
+  'PLAYER_TO_ASSIST',
   'DRAW',
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
@@ -77,6 +79,18 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
     scoreLabel: 'Probability',
     scoreUnit: '%',
     showPrice: true,
+  },
+  PLAYER_TO_SCORE: {
+    title: 'Player to Score',
+    scoreLabel: 'Probability',
+    scoreUnit: '%',
+    showPrice: false,
+  },
+  PLAYER_TO_ASSIST: {
+    title: 'Player to Assist',
+    scoreLabel: 'Probability',
+    scoreUnit: '%',
+    showPrice: false,
   },
   DRAW: {
     title: 'Draw',

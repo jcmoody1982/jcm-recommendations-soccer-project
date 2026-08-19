@@ -267,6 +267,47 @@ class PickSettlementGraderTest {
         assertThat(grader.grade(snap, complete(1, 1)).outcome()).isEqualTo(PickOutcome.LOSS);
     }
 
+    @Test
+    void playerPropsStayPendingUntilGoalEventsAreIngested() {
+        GradeResult toScore = grader.grade(snapshot("PLAYER_TO_SCORE", "Mohamed Salah to score"), complete(2, 1));
+        GradeResult toAssist = grader.grade(snapshot("PLAYER_TO_ASSIST", "Bruno Fernandes to assist"), complete(2, 1));
+        assertThat(toScore.outcome()).isEqualTo(PickOutcome.PENDING);
+        assertThat(toScore.detail()).contains("goal events");
+        assertThat(toAssist.outcome()).isEqualTo(PickOutcome.PENDING);
+        assertThat(toAssist.detail()).contains("assist events");
+    }
+
+    @Test
+    void playerToScoreWinsWhenPlayerIdIsInGoalDetails() {
+        CompletedMatch match = complete(3, 0);
+        match.setGoalEventsJson("[{\"playerId\":8298,\"assistPlayerId\":4281,\"extra\":null,\"time\":\"17\"}]");
+        RecommendationSnapshot snap = snapshot("PLAYER_TO_SCORE", "Mohamed Salah to score");
+        snap.setFactorsJson("{\"playerId\":8298}");
+        assertThat(grader.grade(snap, match).outcome()).isEqualTo(PickOutcome.WIN);
+
+        RecommendationSnapshot miss = snapshot("PLAYER_TO_SCORE", "Squad Forward to score");
+        miss.setFactorsJson("{\"playerId\":11}");
+        assertThat(grader.grade(miss, match).outcome()).isEqualTo(PickOutcome.LOSS);
+    }
+
+    @Test
+    void playerToAssistWinsWhenPlayerIdAssisted() {
+        CompletedMatch match = complete(3, 0);
+        match.setGoalEventsJson("[{\"playerId\":8298,\"assistPlayerId\":4281,\"extra\":null,\"time\":\"17\"}]");
+        RecommendationSnapshot snap = snapshot("PLAYER_TO_ASSIST", "Bruno Fernandes to assist");
+        snap.setFactorsJson("{\"playerId\":4281}");
+        assertThat(grader.grade(snap, match).outcome()).isEqualTo(PickOutcome.WIN);
+    }
+
+    @Test
+    void playerToScoreIgnoresOwnGoals() {
+        CompletedMatch match = complete(1, 0);
+        match.setGoalEventsJson("[{\"playerId\":99,\"assistPlayerId\":12,\"extra\":\"Own Goal\",\"time\":\"70\"}]");
+        RecommendationSnapshot snap = snapshot("PLAYER_TO_SCORE", "Defender to score");
+        snap.setFactorsJson("{\"playerId\":99}");
+        assertThat(grader.grade(snap, match).outcome()).isEqualTo(PickOutcome.LOSS);
+    }
+
     private static RecommendationSnapshot snapshot(String type, String market) {
         return RecommendationSnapshot.builder()
                 .fixtureId(1L)

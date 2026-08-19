@@ -160,6 +160,10 @@ class RecommendationServiceTest {
         assertThat(result.get(RecommendationType.OVER_15_GOALS)).isEmpty();
         assertThat(result).containsKey(RecommendationType.OVER_25_GOALS);
         assertThat(result.get(RecommendationType.OVER_25_GOALS)).isEmpty();
+        assertThat(result).containsKey(RecommendationType.PLAYER_TO_SCORE);
+        assertThat(result.get(RecommendationType.PLAYER_TO_SCORE)).isEmpty();
+        assertThat(result).containsKey(RecommendationType.PLAYER_TO_ASSIST);
+        assertThat(result.get(RecommendationType.PLAYER_TO_ASSIST)).isEmpty();
     }
 
     @Test

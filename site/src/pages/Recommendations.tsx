@@ -27,7 +27,12 @@ import {
 import styles from './Recommendations.module.css';
 
 /** Always render these boards so a Strong-only view is not mistaken for a missing market. */
-const PINNED_EMPTY_TYPES: RecommendationType[] = ['OVER_15_GOALS', 'OVER_25_GOALS'];
+const PINNED_EMPTY_TYPES: RecommendationType[] = [
+  'OVER_15_GOALS',
+  'OVER_25_GOALS',
+  'PLAYER_TO_SCORE',
+  'PLAYER_TO_ASSIST',
+];
 
 /** Fetch horizon when viewing all kickoffs (Soon/Today/Tomorrow set days automatically). */
 const HORIZON_OPTIONS = [3, 7] as const;

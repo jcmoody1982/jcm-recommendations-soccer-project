@@ -47,4 +47,8 @@ public class CompletedMatch {
     private LocalDate sourceDate;
 
     private Instant fetchedAt;
+
+    /** JSON array of player goal events from /match ({@code team_a/b_goal_details}). Null until fetched. */
+    @Column(columnDefinition = "TEXT")
+    private String goalEventsJson;
 }

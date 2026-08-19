@@ -10,6 +10,8 @@ const typeLabels: Record<string, string> = {
   OVER_GOALS: 'Over Goals',
   OVER_15_GOALS: 'Over 1.5',
   OVER_25_GOALS: 'Over 2.5',
+  PLAYER_TO_SCORE: 'To Score',
+  PLAYER_TO_ASSIST: 'To Assist',
   UNDER_GOALS: 'Under Goals',
   BOOKING_POINTS: 'Booking Points',
   VALUE_BET: 'Value Bet',

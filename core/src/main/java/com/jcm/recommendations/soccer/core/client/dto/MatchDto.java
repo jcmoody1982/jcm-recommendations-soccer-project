@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MatchDto {
@@ -172,4 +174,10 @@ public class MatchDto {
 
     @JsonProperty("offsides_potential")
     private Double offsidesPotential;
+
+    @JsonProperty("team_a_goal_details")
+    private List<GoalDetailDto> teamAGoalDetails;
+
+    @JsonProperty("team_b_goal_details")
+    private List<GoalDetailDto> teamBGoalDetails;
 }

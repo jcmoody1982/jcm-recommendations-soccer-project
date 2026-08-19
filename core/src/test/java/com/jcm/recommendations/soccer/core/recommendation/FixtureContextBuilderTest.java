@@ -34,6 +34,8 @@ class FixtureContextBuilderTest {
     private TeamRecentFormRepository teamRecentFormRepository;
     @Mock
     private RefereeStatsRepository refereeStatsRepository;
+    @Mock
+    private PlayerSeasonStatsRepository playerSeasonStatsRepository;
 
     private FixtureContextBuilder contextBuilder;
 
@@ -47,7 +49,8 @@ class FixtureContextBuilderTest {
                 teamRepository,
                 teamSeasonStatsRepository,
                 teamRecentFormRepository,
-                refereeStatsRepository
+                refereeStatsRepository,
+                playerSeasonStatsRepository
         );
     }
 
@@ -57,7 +60,8 @@ class FixtureContextBuilderTest {
         
         assertThat(result).isEmpty();
         verifyNoInteractions(fixtureOddsRepository, fixturePotentialsRepository, leagueRepository,
-                teamRepository, teamSeasonStatsRepository, teamRecentFormRepository, refereeStatsRepository);
+                teamRepository, teamSeasonStatsRepository, teamRecentFormRepository, refereeStatsRepository,
+                playerSeasonStatsRepository);
     }
 
     @Test
@@ -86,6 +90,8 @@ class FixtureContextBuilderTest {
         when(teamRecentFormRepository.findByTeamIdIn(anyCollection())).thenReturn(Collections.emptyList());
         when(refereeStatsRepository.findByRefereeIdsAndSeasonIds(anyCollection(), anyCollection()))
                 .thenReturn(Collections.emptyList());
+        when(playerSeasonStatsRepository.findByTeamIdsAndSeasonIds(anyCollection(), anyCollection()))
+                .thenReturn(Collections.emptyList());
 
         List<FixtureContext> result = contextBuilder.buildContextsForFixtures(fixtures);
 
@@ -98,6 +104,7 @@ class FixtureContextBuilderTest {
         verify(teamSeasonStatsRepository, times(1)).findByTeamIdsAndSeasonIds(anyCollection(), anyCollection());
         verify(teamRecentFormRepository, times(1)).findByTeamIdIn(anyCollection());
         verify(refereeStatsRepository, times(1)).findByRefereeIdsAndSeasonIds(anyCollection(), anyCollection());
+        verify(playerSeasonStatsRepository, times(1)).findByTeamIdsAndSeasonIds(anyCollection(), anyCollection());
     }
 
     @Test
@@ -125,6 +132,8 @@ class FixtureContextBuilderTest {
         when(teamRecentFormRepository.findByTeamIdIn(anyCollection())).thenReturn(List.of(homeForm, awayForm));
         when(refereeStatsRepository.findByRefereeIdsAndSeasonIds(anyCollection(), anyCollection()))
                 .thenReturn(List.of(refereeStats));
+        when(playerSeasonStatsRepository.findByTeamIdsAndSeasonIds(anyCollection(), anyCollection()))
+                .thenReturn(Collections.emptyList());
 
         List<FixtureContext> result = contextBuilder.buildContextsForFixtures(fixtures);
 
@@ -162,6 +171,8 @@ class FixtureContextBuilderTest {
         when(teamSeasonStatsRepository.findByTeamIdsAndSeasonIds(anyCollection(), anyCollection()))
                 .thenReturn(List.of(homeStats, awayStats));
         when(teamRecentFormRepository.findByTeamIdIn(anyCollection())).thenReturn(Collections.emptyList());
+        when(playerSeasonStatsRepository.findByTeamIdsAndSeasonIds(anyCollection(), anyCollection()))
+                .thenReturn(Collections.emptyList());
 
         List<FixtureContext> result = contextBuilder.buildContextsForFixtures(fixtures);
 
@@ -189,6 +200,8 @@ class FixtureContextBuilderTest {
         when(teamRecentFormRepository.findByTeamId(10L)).thenReturn(Optional.empty());
         when(teamRecentFormRepository.findByTeamId(11L)).thenReturn(Optional.empty());
         when(refereeStatsRepository.findByRefereeIdAndSeasonId(50L, 100L)).thenReturn(Optional.empty());
+        when(playerSeasonStatsRepository.findByTeamIdsAndSeasonIds(anyCollection(), anyCollection()))
+                .thenReturn(Collections.emptyList());
 
         FixtureContext result = contextBuilder.buildContext(fixture);
 

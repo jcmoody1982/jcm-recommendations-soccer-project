@@ -130,6 +130,38 @@ class SettlementServiceTest {
     }
 
     @Test
+    void regradesPreviouslyUnsupportedPlayerToScoreWhenGoalEventsExist() {
+        LocalDate today = LocalDate.now(properties.zoneId());
+        RecommendationSnapshot snap = RecommendationSnapshot.builder()
+                .id(11L)
+                .snapshotDate(today)
+                .fixtureId(1L)
+                .type("PLAYER_TO_SCORE")
+                .market("Mohamed Salah to score")
+                .factorsJson("{\"playerId\":8298}")
+                .outcome(PickOutcome.UNSUPPORTED)
+                .build();
+        when(snapshotRepository.findByOutcome(PickOutcome.PENDING)).thenReturn(List.of());
+        when(snapshotRepository.findByOutcome(PickOutcome.UNSUPPORTED)).thenReturn(List.of(snap));
+        when(completedMatchRepository.findById(1L)).thenReturn(Optional.of(
+                CompletedMatch.builder()
+                        .fixtureId(1L)
+                        .status("complete")
+                        .homeGoals(2)
+                        .awayGoals(0)
+                        .goalEventsJson("[{\"playerId\":8298,\"assistPlayerId\":4281}]")
+                        .build()));
+        when(snapshotRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SettlementService.SettlementSummary summary = service.settlePending();
+
+        assertThat(summary.resolved()).isEqualTo(1);
+        ArgumentCaptor<RecommendationSnapshot> captor = ArgumentCaptor.forClass(RecommendationSnapshot.class);
+        verify(snapshotRepository).save(captor.capture());
+        assertThat(captor.getValue().getOutcome()).isEqualTo(PickOutcome.WIN);
+    }
+
+    @Test
     void expiresPendingOutsideLookback() {
         LocalDate old = LocalDate.now(properties.zoneId()).minusDays(10);
         RecommendationSnapshot snap = pending(old, "BTTS", "BTTS Yes");

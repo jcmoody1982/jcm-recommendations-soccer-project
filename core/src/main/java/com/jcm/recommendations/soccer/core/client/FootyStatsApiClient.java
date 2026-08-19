@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jcm.recommendations.soccer.core.client.dto.ApiResponse;
 import com.jcm.recommendations.soccer.core.client.dto.LeagueDto;
 import com.jcm.recommendations.soccer.core.client.dto.MatchDto;
+import com.jcm.recommendations.soccer.core.client.dto.PlayerDto;
 import com.jcm.recommendations.soccer.core.client.dto.RefereeDto;
 import com.jcm.recommendations.soccer.core.client.dto.TeamDto;
 import com.jcm.recommendations.soccer.core.config.FootyStatsApiConfig;
@@ -154,6 +155,51 @@ public class FootyStatsApiClient {
         } catch (Exception e) {
             log.error("Error parsing referees response: seasonId={}, error={}", seasonId, e.getMessage(), e);
             throw new ApiException("Error parsing referees response", e);
+        }
+    }
+
+    public List<PlayerDto> fetchLeaguePlayers(Long seasonId) {
+        log.info("Fetching league players for season: seasonId={}", seasonId);
+        List<PlayerDto> all = new ArrayList<>();
+        int page = 1;
+        int maxPage = 1;
+        try {
+            do {
+                String url = UriComponentsBuilder.fromUriString(config.getBaseUrl())
+                        .path("/league-players")
+                        .queryParam("key", config.getKey())
+                        .queryParam("season_id", seasonId)
+                        .queryParam("include", "stats")
+                        .queryParam("page", page)
+                        .toUriString();
+
+                String response = restTemplate.getForObject(url, String.class);
+                ApiResponse<PlayerDto> apiResponse = objectMapper.readValue(
+                        response, new TypeReference<ApiResponse<PlayerDto>>() {});
+
+                if (apiResponse == null || !apiResponse.isSuccess() || apiResponse.getData() == null) {
+                    log.warn("API returned unsuccessful response for league-players: seasonId={}, page={}",
+                            seasonId, page);
+                    break;
+                }
+
+                all.addAll(apiResponse.getData());
+                if (apiResponse.getPager() != null && apiResponse.getPager().getMaxPage() > 0) {
+                    maxPage = apiResponse.getPager().getMaxPage();
+                } else {
+                    maxPage = page;
+                }
+                page++;
+            } while (page <= maxPage);
+
+            log.info("League players fetched: seasonId={}, count={}, pages={}", seasonId, all.size(), maxPage);
+            return all;
+        } catch (RestClientException e) {
+            log.error("Failed to fetch league players: seasonId={}, error={}", seasonId, e.getMessage(), e);
+            throw new ApiException("Failed to fetch league players for season " + seasonId, e);
+        } catch (Exception e) {
+            log.error("Error parsing league players: seasonId={}, error={}", seasonId, e.getMessage(), e);
+            throw new ApiException("Error parsing league players for season " + seasonId, e);
         }
     }
 

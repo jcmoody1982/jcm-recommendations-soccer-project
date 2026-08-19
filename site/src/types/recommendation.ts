@@ -20,7 +20,9 @@ export type RecommendationType =
   | 'DRAW'
   | 'DOUBLE_CHANCE'
   | 'RESULT_BTTS'
-  | 'TOP_VS_BOTTOM';
+  | 'TOP_VS_BOTTOM'
+  | 'PLAYER_TO_SCORE'
+  | 'PLAYER_TO_ASSIST';
 
 export interface Recommendation {
   fixtureId: number;
