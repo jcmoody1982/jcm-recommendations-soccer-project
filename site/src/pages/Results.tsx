@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { resultsService } from '../services/api';
 import { EliteBolt } from '../components';
+import { SECTION_ORDER, sectionTitle } from '../utils/recommendationSections';
 import type {
   DayResults,
   PerformanceBucket,
@@ -12,6 +13,7 @@ import type {
   ResultsFixture,
   ResultsPerformance,
   ResultsPick,
+  TypePerformance,
 } from '../types';
 import styles from './Results.module.css';
 
@@ -48,7 +50,26 @@ function formatKickoff(unix: number | null | undefined): string {
 }
 
 function formatType(type: string): string {
-  return type.replaceAll('_', ' ');
+  return sectionTitle(type);
+}
+
+function orderTypeRows(rows: TypePerformance[]): TypePerformance[] {
+  const byType = new Map(rows.map((row) => [row.type, row]));
+  const ordered: TypePerformance[] = [];
+  for (const type of SECTION_ORDER) {
+    const row = byType.get(type);
+    if (row) {
+      ordered.push(row);
+      byType.delete(type);
+    }
+  }
+  for (const row of rows) {
+    if (byType.has(row.type)) {
+      ordered.push(row);
+      byType.delete(row.type);
+    }
+  }
+  return ordered;
 }
 
 function outcomeLabel(outcome: string): string {
@@ -787,7 +808,7 @@ function PerformancePanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {data.byType.map((row) => (
+                  {orderTypeRows(data.byType).map((row) => (
                     <tr key={row.type}>
                       <td>{formatType(row.type)}</td>
                       <td>{row.overall.sampleSize}</td>

@@ -1,6 +1,7 @@
 package com.jcm.recommendations.soccer.core.results;
 
 import com.jcm.recommendations.soccer.core.config.ResultsProperties;
+import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
 import com.jcm.recommendations.soccer.core.repository.RecommendationSnapshotRepository;
 import com.jcm.recommendations.soccer.domain.PickOutcome;
 import com.jcm.recommendations.soccer.domain.RecommendationSnapshot;
@@ -61,7 +62,7 @@ class ResultsPerformanceServiceTest {
         assertThat(view.byConfidence().get("MODERATE").wins()).isEqualTo(0);
         assertThat(view.byConfidence().get("MODERATE").losses()).isEqualTo(1);
 
-        assertThat(view.byType()).hasSize(3);
+        assertThat(view.byType()).hasSize(RecommendationType.values().length);
         ResultsPerformanceService.TypePerformance btts = view.byType().stream()
                 .filter(t -> "BTTS".equals(t.type()))
                 .findFirst()
@@ -69,6 +70,17 @@ class ResultsPerformanceServiceTest {
         assertThat(btts.overall().wins()).isEqualTo(1);
         assertThat(btts.overall().losses()).isEqualTo(1);
         assertThat(btts.overall().hitRate()).isEqualTo(50.0);
+
+        ResultsPerformanceService.TypePerformance over15 = view.byType().stream()
+                .filter(t -> "OVER_15_GOALS".equals(t.type()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(over15.overall().sampleSize()).isEqualTo(0);
+        ResultsPerformanceService.TypePerformance over25 = view.byType().stream()
+                .filter(t -> "OVER_25_GOALS".equals(t.type()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(over25.overall().sampleSize()).isEqualTo(0);
     }
 
     @Test

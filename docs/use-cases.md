@@ -3289,6 +3289,7 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 - Hit rate by confidence (Strong vs Moderate)
 - Hit rate by recommendation type (with Strong/Moderate breakdown)
 - Sample size per bucket
+- By-type table includes **every** `RecommendationType` (Over 1.5 / Over 2.5 included) even when the window has no snapshots yet (sample 0 / not enough data)
 
 **UI:**
 - View toggle on Results: **1 - Daily Dashboard** (UC-034) | **2 - Overall Performance Tracker** (UC-035) | **3 - Elite Pick Performance** (UC-037)

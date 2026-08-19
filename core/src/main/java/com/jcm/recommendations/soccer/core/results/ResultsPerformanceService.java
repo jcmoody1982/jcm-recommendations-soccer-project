@@ -1,6 +1,7 @@
 package com.jcm.recommendations.soccer.core.results;
 
 import com.jcm.recommendations.soccer.core.config.ResultsProperties;
+import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
 import com.jcm.recommendations.soccer.core.repository.RecommendationSnapshotRepository;
 import com.jcm.recommendations.soccer.domain.PickOutcome;
 import com.jcm.recommendations.soccer.domain.RecommendationSnapshot;
@@ -67,6 +68,9 @@ public class ResultsPerformanceService {
         );
 
         Map<String, List<RecommendationSnapshot>> byType = new LinkedHashMap<>();
+        for (RecommendationType type : RecommendationType.values()) {
+            byType.put(type.name(), new ArrayList<>());
+        }
         for (RecommendationSnapshot row : rows) {
             String type = row.getType() == null ? "UNKNOWN" : row.getType();
             byType.computeIfAbsent(type, key -> new ArrayList<>()).add(row);
