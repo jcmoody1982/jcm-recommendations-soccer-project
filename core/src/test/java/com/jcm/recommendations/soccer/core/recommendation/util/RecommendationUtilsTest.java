@@ -60,6 +60,14 @@ class RecommendationUtilsTest {
         void safePercentage_returnsValueWhenNotNull() {
             assertEquals(75.5, RecommendationUtils.safePercentage(75.5));
         }
+
+        @Test
+        @DisplayName("safePercentage scales 0-1 rates to 0-100")
+        void safePercentage_scalesUnitIntervalToPercent() {
+            assertEquals(74.0, RecommendationUtils.safePercentage(0.74), 0.0001);
+            assertEquals(100.0, RecommendationUtils.safePercentage(1.0), 0.0001);
+            assertEquals(0.0, RecommendationUtils.safePercentage(0.0), 0.0001);
+        }
     }
 
     @Nested

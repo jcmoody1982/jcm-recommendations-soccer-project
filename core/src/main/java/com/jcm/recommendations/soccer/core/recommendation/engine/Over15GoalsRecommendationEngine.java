@@ -18,12 +18,15 @@ public class Over15GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             "over15Pct",
             "apiO15Potential",
             1.8,
-            78.0,
-            65.0,
+            72.0,
+            58.0,
             2.4,
             5.0,
             2.2,
-            4.0
+            4.0,
+            1.5,
+            12.0,
+            18.0
     );
 
     @Override
@@ -33,12 +36,32 @@ public class Over15GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
 
     @Override
     protected Double seasonOverPercentage(TeamSeasonStats stats) {
-        return stats != null ? stats.getSeasonOver15PercentageOverall() : null;
+        if (stats == null) {
+            return null;
+        }
+        if (stats.getSeasonOver15PercentageOverall() != null) {
+            return stats.getSeasonOver15PercentageOverall();
+        }
+        if (stats.getSeasonOver15Overall() != null
+                && stats.getMatchesPlayed() != null
+                && stats.getMatchesPlayed() > 0) {
+            return 100.0 * stats.getSeasonOver15Overall() / stats.getMatchesPlayed();
+        }
+        return null;
     }
 
     @Override
     protected Double formOverPercentage(TeamRecentForm form) {
-        return form != null ? form.getOver15PercentageOverall() : null;
+        if (form == null) {
+            return null;
+        }
+        if (form.getOver15PercentageOverall() != null) {
+            return form.getOver15PercentageOverall();
+        }
+        if (form.getOver15Overall() != null) {
+            return 100.0 * form.getOver15Overall() / 5.0;
+        }
+        return null;
     }
 
     @Override

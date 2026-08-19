@@ -51,7 +51,10 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
             double highScoringCombinedThreshold,
             double highScoringBoost,
             double xgCombinedThreshold,
-            double xgBoost
+            double xgBoost,
+            double line,
+            double expectedGoalsLiftPerGoal,
+            double expectedGoalsLiftCap
     ) {}
 
     protected abstract LineSpec spec();
@@ -95,7 +98,7 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
             return Optional.empty();
         }
 
-        double score = calculateScore(context, spec, homeOverPct, awayOverPct);
+        double score = calculateScore(context, spec, homeOverPct, awayOverPct, expectedGoals);
         ConfidenceLevel confidence = determineConfidence(score, spec);
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
@@ -154,10 +157,15 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         if (formPct == null) {
             return seasonPct;
         }
-        return (seasonPct * 0.5) + (formPct * 0.5);
+        return (seasonPct * 0.5) + (normalizePercentage(formPct) * 0.5);
     }
 
-    private double calculateScore(FixtureContext context, LineSpec spec, double homeOverPct, double awayOverPct) {
+    private double calculateScore(
+            FixtureContext context,
+            LineSpec spec,
+            double homeOverPct,
+            double awayOverPct,
+            double expectedGoals) {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
@@ -169,7 +177,7 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         double api = 50.0;
         Double potential = apiPotential(context);
         if (potential != null) {
-            api = potential;
+            api = normalizePercentage(potential);
         }
 
         double score;
@@ -202,7 +210,16 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
 
         score += highScoringBoost(homeStats, awayStats, spec);
         score += xgBoost(homeStats, awayStats, spec);
+        score += expectedGoalsLift(expectedGoals, spec);
         return clampScore(score);
+    }
+
+    private double expectedGoalsLift(double expectedGoals, LineSpec spec) {
+        if (spec.expectedGoalsLiftPerGoal() <= 0) {
+            return 0.0;
+        }
+        double lift = (expectedGoals - spec.line()) * spec.expectedGoalsLiftPerGoal();
+        return Math.max(0.0, Math.min(spec.expectedGoalsLiftCap(), lift));
     }
 
     private double highScoringBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats, LineSpec spec) {
@@ -280,7 +297,12 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
 
         Double potential = apiPotential(context);
         if (potential != null) {
-            factors.put(spec.apiPotentialFactorKey(), potential);
+            factors.put(spec.apiPotentialFactorKey(), normalizePercentage(potential));
+        }
+        double expectedLift = expectedGoalsLift(expectedGoals, spec);
+        factors.put("expectedGoalsLiftApplied", expectedLift > 0);
+        if (expectedLift > 0) {
+            factors.put("expectedGoalsLiftAmount", expectedLift);
         }
 
         double combinedGoalsAvg = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;

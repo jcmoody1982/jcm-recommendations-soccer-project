@@ -54,7 +54,7 @@ class Over25GoalsRecommendationEngineTest {
     @Test
     @DisplayName("analyze with very weak Over 2.5 rates still falls below Moderate")
     void analyze_withWeakOver25Rates_returnsEmpty() {
-        Optional<Recommendation> result = engine.analyze(contextWithGoalStats(2.5, 1.8, 1.0, 1.4, 30.0, 25.0));
+        Optional<Recommendation> result = engine.analyze(contextWithGoalStats(2.5, 1.8, 1.0, 1.4, 12.0, 10.0));
 
         assertThat(result).isEmpty();
     }

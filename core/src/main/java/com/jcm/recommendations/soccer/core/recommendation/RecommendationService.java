@@ -158,8 +158,13 @@ public class RecommendationService {
 
         List<Recommendation> all = generateAllRecommendations(daysAhead);
 
-        Map<RecommendationType, List<Recommendation>> grouped = all.stream()
-                .collect(Collectors.groupingBy(Recommendation::getType));
+        Map<RecommendationType, List<Recommendation>> grouped = new EnumMap<>(RecommendationType.class);
+        for (RecommendationType type : RecommendationType.values()) {
+            grouped.put(type, new ArrayList<>());
+        }
+        for (Recommendation rec : all) {
+            grouped.get(rec.getType()).add(rec);
+        }
 
         // Apply type-specific sorting
         grouped.forEach((type, recommendations) -> {

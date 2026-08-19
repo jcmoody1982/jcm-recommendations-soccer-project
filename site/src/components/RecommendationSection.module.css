@@ -26,6 +26,13 @@
   font-weight: 400;
 }
 
+.emptyHint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
 .eliteBlurb {
   margin: -0.35rem 0 0.65rem;
   color: var(--text-muted);

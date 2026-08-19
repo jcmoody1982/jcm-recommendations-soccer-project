@@ -12,6 +12,7 @@ interface Props {
   initialItems?: number;
   incrementBy?: number;
   eliteKeys?: Set<string>;
+  emptyHint?: string;
 }
 
 function headerClassName(showPrice: boolean, showPositionGap: boolean): string {
@@ -34,6 +35,7 @@ export function RecommendationSection({
   initialItems = 5,
   incrementBy = 5,
   eliteKeys,
+  emptyHint,
 }: Props) {
   const [visibleCount, setVisibleCount] = useState(initialItems);
 
@@ -54,7 +56,19 @@ export function RecommendationSection({
   const remainingCount = recommendations.length - visibleCount;
 
   if (recommendations.length === 0) {
-    return null;
+    if (!emptyHint) {
+      return null;
+    }
+    return (
+      <section className={styles.section} id={sectionDomId(type)}>
+        <h2 className={styles.header}>
+          <MarketIcon type={type} title={config.title} />
+          <span className={styles.title}>{config.title}</span>
+          <span className={styles.count}>0 picks</span>
+        </h2>
+        <p className={styles.emptyHint}>{emptyHint}</p>
+      </section>
+    );
   }
 
   const handleShowMore = () => {

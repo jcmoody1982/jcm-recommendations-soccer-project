@@ -31,11 +31,22 @@ public final class RecommendationUtils {
     }
 
     public static double safePercentage(Double value) {
-        return value != null ? value : 50.0;
+        return value == null ? 50.0 : normalizePercentage(value);
     }
 
     public static double safePercentage(Double value, double defaultValue) {
-        return value != null ? value : defaultValue;
+        return value == null ? defaultValue : normalizePercentage(value);
+    }
+
+    /**
+     * FootyStats sometimes emits rates as 0–1 (0.74) and sometimes as 0–100 (74).
+     * Values in (0, 1] are treated as fractions. Exact 0 stays 0.
+     */
+    public static double normalizePercentage(double value) {
+        if (value > 0.0 && value <= 1.0) {
+            return value * 100.0;
+        }
+        return value;
     }
 
     // ===== Goals calculations =====

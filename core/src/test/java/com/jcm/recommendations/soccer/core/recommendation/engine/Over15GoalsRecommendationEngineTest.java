@@ -1,5 +1,6 @@
 package com.jcm.recommendations.soccer.core.recommendation.engine;
 
+import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
@@ -59,6 +60,54 @@ class Over15GoalsRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Over 1.5 Goals");
+    }
+
+    @Test
+    @DisplayName("analyze treats 0-1 Over 1.5 rates as percentages")
+    void analyze_withUnitIntervalOver15Rates_recommends() {
+        Optional<Recommendation> result = engine.analyze(contextWithGoalStats(1.5, 1.3, 1.2, 1.4, 0.78, 0.74));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getType()).isEqualTo(RecommendationType.OVER_15_GOALS);
+        assertThat((Double) result.get().getFactors().get("over15PctHome")).isGreaterThan(50.0);
+    }
+
+    @Test
+    @DisplayName("analyze derives Over 1.5 rate from match counts when percentage is missing")
+    void analyze_withOver15CountsOnly_recommends() {
+        Optional<Recommendation> result = engine.analyze(contextWithOver15Counts(1.5, 1.3, 1.2, 1.4, 8, 7));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Over 1.5 Goals");
+    }
+
+    @Test
+    @DisplayName("analyzeAll skips a fixture that throws and still scores the rest")
+    void analyzeAll_skipsThrowingFixture() {
+        FixtureContext good = highScoringContext();
+        FixtureContext bad = FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home"))
+                .awayTeam(createTeam(2L, "Away"))
+                .homeTeamStats(null)
+                .awayTeamStats(null)
+                .build();
+        RecommendationEngine throwing = new RecommendationEngine() {
+            @Override
+            public RecommendationType getType() {
+                return RecommendationType.OVER_15_GOALS;
+            }
+
+            @Override
+            public Optional<Recommendation> analyze(FixtureContext context) {
+                if (context.getHomeTeamStats() == null) {
+                    throw new NullPointerException("incomplete fixture");
+                }
+                return engine.analyze(context);
+            }
+        };
+
+        assertThat(throwing.analyzeAll(java.util.List.of(bad, good))).hasSize(1);
     }
 
     @Test
@@ -153,6 +202,54 @@ class Over15GoalsRecommendationEngineTest {
         FixturePotentials potentials = FixturePotentials.builder()
                 .fixtureId(1000L)
                 .o15Potential(80.0)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .odds(odds)
+                .potentials(potentials)
+                .build();
+    }
+
+    private FixtureContext contextWithOver15Counts(
+            double homeScored, double awayScored, double homeConceded, double awayConceded,
+            int homeOver15, int awayOver15) {
+        int matches = 10;
+
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(matches)
+                .seasonGoalsHome((int) (homeScored * matches))
+                .seasonGoalsAway((int) (homeScored * 0.8 * matches))
+                .seasonConcededHome((int) (homeConceded * matches))
+                .seasonConcededAway((int) (homeConceded * 1.2 * matches))
+                .seasonOver15Overall(homeOver15)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(matches)
+                .seasonGoalsHome((int) (awayScored * 1.1 * matches))
+                .seasonGoalsAway((int) (awayScored * matches))
+                .seasonConcededHome((int) (awayConceded * 0.9 * matches))
+                .seasonConcededAway((int) (awayConceded * matches))
+                .seasonOver15Overall(awayOver15)
+                .build();
+
+        FixtureOdds odds = FixtureOdds.builder()
+                .fixtureId(1000L)
+                .oddsFtOver15(1.28)
+                .build();
+
+        FixturePotentials potentials = FixturePotentials.builder()
+                .fixtureId(1000L)
+                .o15Potential(0.72)
                 .build();
 
         return FixtureContext.builder()

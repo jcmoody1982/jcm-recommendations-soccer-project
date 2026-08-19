@@ -26,6 +26,9 @@ import {
 } from '../utils/recommendationSections';
 import styles from './Recommendations.module.css';
 
+/** Always render these boards so a Strong-only view is not mistaken for a missing market. */
+const PINNED_EMPTY_TYPES: RecommendationType[] = ['OVER_15_GOALS', 'OVER_25_GOALS'];
+
 /** Fetch horizon when viewing all kickoffs (Soon/Today/Tomorrow set days automatically). */
 const HORIZON_OPTIONS = [3, 7] as const;
 const DEFAULT_HORIZON = 7;
@@ -324,7 +327,7 @@ export default function Recommendations() {
   ]);
 
   const typesWithPicks = useMemo(
-    () => SECTION_ORDER.filter((type) => (typeCounts[type] || 0) > 0),
+    () => SECTION_ORDER.filter((type) => (typeCounts[type] || 0) > 0 || PINNED_EMPTY_TYPES.includes(type)),
     [typeCounts]
   );
 
@@ -579,7 +582,7 @@ export default function Recommendations() {
         </div>
       ) : (
         <>
-          {filteredRecommendations && totalCount > 0 ? (
+          {filteredRecommendations && (totalCount > 0 || PINNED_EMPTY_TYPES.some((type) => typeFilter === 'ALL' || typeFilter === type)) ? (
             <div className={styles.sections}>
               {SECTION_ORDER.map((type) => {
                 if (typeFilter !== 'ALL' && type !== typeFilter) {
@@ -587,7 +590,21 @@ export default function Recommendations() {
                 }
                 const recommendations = filteredRecommendations[type] || [];
                 if (recommendations.length === 0) {
-                  return null;
+                  if (!PINNED_EMPTY_TYPES.includes(type)) {
+                    return null;
+                  }
+                  return (
+                    <RecommendationSection
+                      key={type}
+                      type={type}
+                      recommendations={recommendations}
+                      emptyHint={
+                        confidenceFilter === 'strong'
+                          ? 'No Strong picks in this window. These lines often grade Moderate — switch to Strong + Moderate.'
+                          : 'No picks in this window.'
+                      }
+                    />
+                  );
                 }
                 return (
                   <RecommendationSection
@@ -606,7 +623,7 @@ export default function Recommendations() {
                 {kickoffWindow !== 'all'
                   ? 'No recommendations in that kickoff window.'
                   : confidenceFilter === 'strong'
-                    ? 'No Strong recommendations match these filters.'
+                    ? 'No Strong recommendations match these filters. Over 1.5 and Over 2.5 often grade Moderate — try Strong + Moderate.'
                     : 'No recommendations found.'}
               </p>
               {hasActiveFilters && (

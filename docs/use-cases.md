@@ -2202,15 +2202,16 @@ Else: season O1.5 %
 **Boosts:**
 - Combined goals average ≥ 2.4 → +5%
 - Combined xG for ≥ 2.2 → +4%
+- Expected goals above the 1.5 line → up to +18 (12 per goal of excess)
 
 **Filters (all must pass):**
 - Expected goals ≥ 1.8
 - Score ≥ Moderate threshold
 
 **Thresholds:**
-- **Strong:** Score ≥ 78%
-- **Moderate:** Score 65–77%
-- **Weak:** Score < 65% (filtered out)
+- **Strong:** Score ≥ 72%
+- **Moderate:** Score 58–71%
+- **Weak:** Score < 58% (filtered out)
 
 **Market:** Always `Over 1.5 Goals`. Odds from `odds_ft_over15`.
 
@@ -2243,15 +2244,16 @@ Else: season O1.5 %
 **Boosts:**
 - Combined goals average ≥ 3.0 → +5%
 - Combined xG for ≥ 2.8 → +4%
+- Expected goals above the 2.5 line → up to +12 (8 per goal of excess)
 
 **Filters (all must pass):**
 - Expected goals ≥ 2.5
 - Score ≥ Moderate threshold
 
 **Thresholds:**
-- **Strong:** Score ≥ 80%
-- **Moderate:** Score 65–79%
-- **Weak:** Score < 65% (filtered out)
+- **Strong:** Score ≥ 78%
+- **Moderate:** Score 62–77%
+- **Weak:** Score < 62% (filtered out)
 
 **Market:** Always `Over 2.5 Goals`. Odds from `odds_ft_over25`.
 

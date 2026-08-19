@@ -18,12 +18,15 @@ public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             "over25Pct",
             "apiO25Potential",
             2.5,
-            80.0,
-            65.0,
+            78.0,
+            62.0,
             3.0,
             5.0,
             2.8,
-            4.0
+            4.0,
+            2.5,
+            8.0,
+            12.0
     );
 
     @Override
@@ -33,12 +36,32 @@ public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
 
     @Override
     protected Double seasonOverPercentage(TeamSeasonStats stats) {
-        return stats != null ? stats.getSeasonOver25PercentageOverall() : null;
+        if (stats == null) {
+            return null;
+        }
+        if (stats.getSeasonOver25PercentageOverall() != null) {
+            return stats.getSeasonOver25PercentageOverall();
+        }
+        if (stats.getSeasonOver25Overall() != null
+                && stats.getMatchesPlayed() != null
+                && stats.getMatchesPlayed() > 0) {
+            return 100.0 * stats.getSeasonOver25Overall() / stats.getMatchesPlayed();
+        }
+        return null;
     }
 
     @Override
     protected Double formOverPercentage(TeamRecentForm form) {
-        return form != null ? form.getOver25PercentageOverall() : null;
+        if (form == null) {
+            return null;
+        }
+        if (form.getOver25PercentageOverall() != null) {
+            return form.getOver25PercentageOverall();
+        }
+        if (form.getOver25Overall() != null) {
+            return 100.0 * form.getOver25Overall() / 5.0;
+        }
+        return null;
     }
 
     @Override
