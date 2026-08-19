@@ -18,7 +18,6 @@ public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             "over25Pct",
             "apiO25Potential",
             2.5,
-            48.0,
             80.0,
             65.0,
             3.0,

@@ -18,7 +18,6 @@ public class Over15GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             "over15Pct",
             "apiO15Potential",
             1.8,
-            62.0,
             78.0,
             65.0,
             2.4,

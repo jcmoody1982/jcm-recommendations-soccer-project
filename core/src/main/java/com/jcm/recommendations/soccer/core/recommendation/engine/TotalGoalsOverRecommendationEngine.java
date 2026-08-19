@@ -46,7 +46,6 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
             String overPctFactorKeyPrefix,
             String apiPotentialFactorKey,
             double filterMinExpectedGoals,
-            double filterMinAvgOverPct,
             double thresholdStrong,
             double thresholdModerate,
             double highScoringCombinedThreshold,
@@ -89,11 +88,10 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         double expectedGoals = calculateExpectedGoals(homeStats, awayStats);
         double homeOverPct = blendedOverPercentage(homeStats, context.hasRecentForm() ? context.getHomeTeamForm() : null);
         double awayOverPct = blendedOverPercentage(awayStats, context.hasRecentForm() ? context.getAwayTeamForm() : null);
-        double avgOverPct = (homeOverPct + awayOverPct) / 2.0;
 
-        if (expectedGoals < spec.filterMinExpectedGoals() || avgOverPct < spec.filterMinAvgOverPct()) {
-            log.debug("Fixture failed {} filter: fixtureId={}, expectedGoals={}, avgOverPct={}",
-                    spec.market(), context.getFixture().getId(), expectedGoals, avgOverPct);
+        if (expectedGoals < spec.filterMinExpectedGoals()) {
+            log.debug("Fixture failed {} filter: fixtureId={}, expectedGoals={}",
+                    spec.market(), context.getFixture().getId(), expectedGoals);
             return Optional.empty();
         }
 

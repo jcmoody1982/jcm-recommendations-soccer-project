@@ -2205,7 +2205,6 @@ Else: season O1.5 %
 
 **Filters (all must pass):**
 - Expected goals ≥ 1.8
-- Average Over 1.5 % (both teams) ≥ 62%
 - Score ≥ Moderate threshold
 
 **Thresholds:**
@@ -2247,7 +2246,6 @@ Else: season O1.5 %
 
 **Filters (all must pass):**
 - Expected goals ≥ 2.5
-- Average Over 2.5 % (both teams) ≥ 48%
 - Score ≥ Moderate threshold
 
 **Thresholds:**

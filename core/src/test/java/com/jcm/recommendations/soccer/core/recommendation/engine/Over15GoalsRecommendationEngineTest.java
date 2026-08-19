@@ -53,11 +53,12 @@ class Over15GoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze with weak Over 1.5 rates returns empty even when expected goals are high")
-    void analyze_withWeakOver15Rates_returnsEmpty() {
-        Optional<Recommendation> result = engine.analyze(contextWithGoalStats(2.5, 1.8, 1.0, 1.4, 40.0, 35.0));
+    @DisplayName("analyze still recommends when Over 1.5 rates are modest if expected goals are high")
+    void analyze_withModestOver15Rates_stillRecommends() {
+        Optional<Recommendation> result = engine.analyze(contextWithGoalStats(2.5, 1.8, 1.0, 1.4, 55.0, 55.0));
 
-        assertThat(result).isEmpty();
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Over 1.5 Goals");
     }
 
     @Test
