@@ -112,11 +112,16 @@
 }
 
 .imagePreview {
-  width: 320px;
+  width: 340px;
   background: #ffffff;
   border-radius: 12px;
   padding: 1.25rem;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  /* Keep market icons readable on the white export card regardless of app theme. */
+  --market-icon-bg: #eef0ff;
+  --market-icon-primary: #4338ca;
+  --market-icon-secondary: #6366f1;
+  --market-icon-on-primary: #ffffff;
 }
 
 .exportHeader {
@@ -143,7 +148,33 @@
 .exportPicks {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
+}
+
+.exportGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.exportGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.1rem;
+}
+
+.exportGroupIcon {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.exportGroupTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #4338ca;
 }
 
 .exportPick {
@@ -175,11 +206,33 @@
   object-fit: contain;
 }
 
+.exportLeaguePlaceholder {
+  width: 28px;
+  height: 28px;
+  background: white;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
 .exportPickInfo {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;
+}
+
+.exportLeagueName {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .exportDate {
@@ -219,11 +272,20 @@
   text-overflow: ellipsis;
 }
 
+.exportPickMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-left: 0.25rem;
+}
+
 .exportPickSelection {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding-left: 0.25rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .exportConfidence {
@@ -234,12 +296,26 @@
   font-size: 0.8rem;
   color: #4338ca;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .exportOdds {
   font-size: 0.8rem;
   color: #666;
   font-weight: 500;
+  flex-shrink: 0;
+}
+
+.exportScore {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  background: #eef0ff;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
 }
 
 .exportFooter {
