@@ -1701,8 +1701,8 @@ Fixture Timing:
 ```
 
 **Thresholds:**
-- **Strong:** Draw Score ≥ 40 AND odds_ft_x in **2.80–3.80** (mid-price band; longshots stay at most Moderate)
-- **Moderate:** Draw Score ≥ 28 (including score ≥ 40 when odds are missing or outside the Strong band)
+- **Strong:** Not emitted (capped at Moderate until draw score calibration improves hit rate)
+- **Moderate:** Draw Score ≥ 28
 - **Weak:** Draw Score < 28
 
 **Factors Tracked:**
