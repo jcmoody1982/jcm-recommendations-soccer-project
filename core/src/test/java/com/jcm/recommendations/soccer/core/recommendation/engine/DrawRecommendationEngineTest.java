@@ -183,16 +183,14 @@ class DrawRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("STRONG requires score >= 40 and draw odds in 2.80-3.80 band")
-    void determineConfidence_strongOnlyInOddsBand() {
+    @DisplayName("Draw confidence is capped at MODERATE (no STRONG tier)")
+    void determineConfidence_cappedAtModerate() {
         FixtureContext inBand = contextWithDrawOdds(3.50);
         FixtureContext longshot = contextWithDrawOdds(6.00);
-        FixtureContext shortPrice = contextWithDrawOdds(2.50);
         FixtureContext noOdds = createEvenlyMatchedContext();
 
-        assertThat(engine.determineConfidence(42.0, inBand)).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(engine.determineConfidence(55.0, inBand)).isEqualTo(ConfidenceLevel.MODERATE);
         assertThat(engine.determineConfidence(42.0, longshot)).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(engine.determineConfidence(42.0, shortPrice)).isEqualTo(ConfidenceLevel.MODERATE);
         assertThat(engine.determineConfidence(42.0, noOdds)).isEqualTo(ConfidenceLevel.MODERATE);
         assertThat(engine.determineConfidence(30.0, inBand)).isEqualTo(ConfidenceLevel.MODERATE);
         assertThat(engine.determineConfidence(20.0, inBand)).isEqualTo(ConfidenceLevel.WEAK);
