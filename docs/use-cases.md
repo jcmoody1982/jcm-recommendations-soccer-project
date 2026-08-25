@@ -545,18 +545,19 @@ If xG data available:
 
 *Base model (preferred weights; renormalized when signals missing):*
 ```
-Expected Booking Points = weighted average of available signals (all in points):
-  - Home cards avg (season, home) × 10            × 0.14
-  - Away cards avg (season, away) × 10            × 0.14
-  - Home cards avg (form, home) × 10              × 0.10
-  - Away cards avg (form, away) × 10              × 0.10
-  - Referee cards/match × 10 × reliability        × 0.20
-  - Referee O3.5% → soft points × reliability     × 0.08
-  - Red card risk (ref rate × 25) × reliability   × 0.06
-  - API cards_potential × 10                      × 0.18
+Expected Booking Points = weighted average of match-level signals (all in points):
+  - (Home cards avg season + Away cards avg season) × 10     × 0.28
+  - (Home cards avg form + Away cards avg form) × 10         × 0.20  (when form present)
+  - Referee cards/match × 10 × reliability                     × 0.20
+  - Referee O3.5% → soft points × reliability                  × 0.08
+  - Red card risk (ref rate × 25) × reliability                × 0.06
+  - API cards_potential (match card count) × 10                × 0.18
 + Match intensity points (additive, not multiplier)
 + Graded boosts (capped)
 ```
+
+Team season/form signals are **summed across both sides** before ×10 so the model estimates
+match total booking points, not the average of per-team contributions.
 
 **P0 — `cards_potential` scale:**
 ```

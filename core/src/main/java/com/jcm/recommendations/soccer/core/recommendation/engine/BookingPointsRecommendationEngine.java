@@ -22,9 +22,9 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
  * UC-008: Booking Points recommendations (Yellow=10, Red=25).
  *
  * P0–P2 (no form-sample dampening):
- * - {@code cards_potential} is expected <em>card count</em> → convert ×10; omit if missing
- * - Require edge vs line before tipping; mid-range fixtures return empty
- * - Model units are expected booking points (card-count ×10 + red risk)
+ * - Team season/form card avgs are per-side counts → sum home + away, then ×10 for match BP
+ * - {@code cards_potential} is expected match card count → convert ×10; omit if missing
+ * - All signals are match-level booking points before the weighted blend
  * - Prefer lines with buffer via min edge; settlement voids exact line (push)
  * - Soften boosts + additive intensity (not ×1.2 multiplier)
  * - Without referee: never STRONG; apply referee reliability to ref signals
@@ -36,11 +36,9 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
     private static final int YELLOW_CARD_POINTS = 10;
     private static final int RED_CARD_POINTS = 25;
 
-    // Preferred weights (renormalized when signals missing)
-    private static final double WEIGHT_HOME_CARDS_SEASON = 0.14;
-    private static final double WEIGHT_AWAY_CARDS_SEASON = 0.14;
-    private static final double WEIGHT_HOME_CARDS_FORM = 0.10;
-    private static final double WEIGHT_AWAY_CARDS_FORM = 0.10;
+    // Preferred weights (renormalized when signals missing) — all signal values are match totals in points
+    private static final double WEIGHT_TEAM_CARDS_SEASON = 0.28;
+    private static final double WEIGHT_TEAM_CARDS_FORM = 0.20;
     private static final double WEIGHT_REFEREE_CARDS = 0.20;
     private static final double WEIGHT_REFEREE_O35_CARDS = 0.08;
     private static final double WEIGHT_RED_CARD_RISK = 0.06;
@@ -130,21 +128,23 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
 
         Double homeCardsSeason = homeStats.getCardsAvgHome();
         Double awayCardsSeason = awayStats.getCardsAvgAway();
-        if (homeCardsSeason != null) {
-            signals.add(new WeightedSignal("homeCardsSeason", homeCardsSeason * YELLOW_CARD_POINTS, WEIGHT_HOME_CARDS_SEASON));
-        }
-        if (awayCardsSeason != null) {
-            signals.add(new WeightedSignal("awayCardsSeason", awayCardsSeason * YELLOW_CARD_POINTS, WEIGHT_AWAY_CARDS_SEASON));
+        if (homeCardsSeason != null && awayCardsSeason != null) {
+            double matchCardsSeason = homeCardsSeason + awayCardsSeason;
+            signals.add(new WeightedSignal(
+                    "teamCardsSeason",
+                    matchCardsSeason * YELLOW_CARD_POINTS,
+                    WEIGHT_TEAM_CARDS_SEASON));
         }
 
         if (context.hasRecentForm()) {
             Double homeForm = context.getHomeTeamForm().getCardsAvgHome();
             Double awayForm = context.getAwayTeamForm().getCardsAvgAway();
-            if (homeForm != null) {
-                signals.add(new WeightedSignal("homeCardsForm", homeForm * YELLOW_CARD_POINTS, WEIGHT_HOME_CARDS_FORM));
-            }
-            if (awayForm != null) {
-                signals.add(new WeightedSignal("awayCardsForm", awayForm * YELLOW_CARD_POINTS, WEIGHT_AWAY_CARDS_FORM));
+            if (homeForm != null && awayForm != null) {
+                double matchCardsForm = homeForm + awayForm;
+                signals.add(new WeightedSignal(
+                        "teamCardsForm",
+                        matchCardsForm * YELLOW_CARD_POINTS,
+                        WEIGHT_TEAM_CARDS_FORM));
             }
         }
 
@@ -178,7 +178,6 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
         Double apiCardsCount = null;
         if (context.hasPotentials() && context.getPotentials().getCardsPotential() != null) {
             apiCardsCount = context.getPotentials().getCardsPotential();
-            // P0: cards_potential is expected card COUNT, not a 0–100 score
             signals.add(new WeightedSignal(
                     "apiCardsPotential",
                     apiCardsCount * YELLOW_CARD_POINTS,
@@ -355,6 +354,11 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
         if (awayStats.getCardsAvgAway() != null) {
             factors.put("awayCardsSeasonAvg", awayStats.getCardsAvgAway());
         }
+        if (homeStats.getCardsAvgHome() != null && awayStats.getCardsAvgAway() != null) {
+            double matchCardsSeason = homeStats.getCardsAvgHome() + awayStats.getCardsAvgAway();
+            factors.put("matchCardsSeasonTotal", matchCardsSeason);
+            factors.put("matchCardsSeasonPoints", matchCardsSeason * YELLOW_CARD_POINTS);
+        }
 
         factors.put("formDataAvailable", context.hasRecentForm());
         if (context.hasRecentForm()) {
@@ -363,6 +367,13 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
             }
             if (context.getAwayTeamForm().getCardsAvgAway() != null) {
                 factors.put("awayCardsFormAvg", context.getAwayTeamForm().getCardsAvgAway());
+            }
+            Double homeForm = context.getHomeTeamForm().getCardsAvgHome();
+            Double awayForm = context.getAwayTeamForm().getCardsAvgAway();
+            if (homeForm != null && awayForm != null) {
+                double matchCardsForm = homeForm + awayForm;
+                factors.put("matchCardsFormTotal", matchCardsForm);
+                factors.put("matchCardsFormPoints", matchCardsForm * YELLOW_CARD_POINTS);
             }
         }
 
