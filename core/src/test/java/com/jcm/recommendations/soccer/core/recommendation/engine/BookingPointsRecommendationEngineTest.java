@@ -51,6 +51,19 @@ class BookingPointsRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze sums home and away card avgs into match total before ×10")
+    void analyze_sumsTeamCardsForMatchTotal() {
+        FixtureContext context = createLowCardsContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("matchCardsSeasonTotal")).isEqualTo(1.9);
+        assertThat(result.get().getFactors().get("matchCardsSeasonPoints")).isEqualTo(19.0);
+        assertThat((Double) result.get().getFactors().get("expectedBookingPoints")).isGreaterThan(15.0);
+    }
+
+    @Test
     @DisplayName("analyze returns empty when expected points lack edge vs line")
     void analyze_midRange_returnsEmpty() {
         FixtureContext context = createMidRangeCardsContext();
