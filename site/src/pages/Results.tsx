@@ -693,21 +693,26 @@ function ConfidenceSection({
   summary,
   fixtures,
   eliteKeys,
+  showEliteRank = false,
+  className,
 }: {
   title: string;
   tone: 'strong' | 'moderate';
   summary: ResultsDaySummary;
   fixtures: ResultsFixture[];
   eliteKeys?: Set<string>;
+  showEliteRank?: boolean;
+  className?: string;
 }) {
   return (
-    <section className={styles.confidenceSection}>
+    <section className={`${styles.confidenceSection}${className ? ` ${className}` : ''}`}>
       <SummaryStrip title={title} summary={summary} tone={tone} />
       <FixtureList
         fixtures={fixtures}
         emptyTitle={`No ${title.toLowerCase()} picks`}
         emptyBody={`No ${title.toLowerCase()} picks for this filter.`}
         eliteKeys={eliteKeys}
+        showEliteRank={showEliteRank}
       />
     </section>
   );
@@ -1148,7 +1153,7 @@ export default function Results() {
             </div>
           )}
 
-          {!isLoading && !isError && data?.snapshotDate && strongFixtures.length === 0 && moderateFixtures.length === 0 && (
+          {!isLoading && !isError && data?.snapshotDate && strongFixtures.length === 0 && moderateFixtures.length === 0 && eliteFixtures.length === 0 && (
             <div className={styles.empty}>
               <h2>No picks for this filter</h2>
               <p>
@@ -1160,27 +1165,41 @@ export default function Results() {
             </div>
           )}
 
-          {!isLoading && !isError && data?.snapshotDate && (strongFixtures.length > 0 || moderateFixtures.length > 0) && (
-            <div className={styles.splitSections}>
-              {strongFixtures.length > 0 && strongSummary && (
+          {!isLoading && !isError && data?.snapshotDate && (strongFixtures.length > 0 || moderateFixtures.length > 0 || eliteFixtures.length > 0) && (
+            <>
+              {(strongFixtures.length > 0 || moderateFixtures.length > 0) && (
+                <div className={styles.splitSections}>
+                  {strongFixtures.length > 0 && strongSummary && (
+                    <ConfidenceSection
+                      title="Strong"
+                      tone="strong"
+                      summary={strongSummary}
+                      fixtures={strongFixtures}
+                      eliteKeys={eliteKeys}
+                    />
+                  )}
+                  {moderateFixtures.length > 0 && moderateSummary && (
+                    <ConfidenceSection
+                      title="Moderate"
+                      tone="moderate"
+                      summary={moderateSummary}
+                      fixtures={moderateFixtures}
+                      eliteKeys={eliteKeys}
+                    />
+                  )}
+                </div>
+              )}
+              {eliteFixtures.length > 0 && eliteSummary && (
                 <ConfidenceSection
-                  title="Strong"
+                  title="Elite Picks"
                   tone="strong"
-                  summary={strongSummary}
-                  fixtures={strongFixtures}
-                  eliteKeys={eliteKeys}
+                  summary={eliteSummary}
+                  fixtures={eliteFixtures}
+                  showEliteRank
+                  className={styles.eliteDashboardSection}
                 />
               )}
-              {moderateFixtures.length > 0 && moderateSummary && (
-                <ConfidenceSection
-                  title="Moderate"
-                  tone="moderate"
-                  summary={moderateSummary}
-                  fixtures={moderateFixtures}
-                  eliteKeys={eliteKeys}
-                />
-              )}
-            </div>
+            </>
           )}
         </>
       )}

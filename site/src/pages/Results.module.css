@@ -364,6 +364,10 @@
   min-width: 0;
 }
 
+.eliteDashboardSection {
+  margin-top: 1.5rem;
+}
+
 .sectionEmpty {
   padding: 1.25rem;
   text-align: center;
