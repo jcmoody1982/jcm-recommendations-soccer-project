@@ -24,6 +24,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ResultsQueryService {
 
+    /** Types paused from Results day board and day summaries. */
+    private static final Set<String> EXCLUDED_TYPES = Set.of("CLEAN_SHEET");
+
     private final RecommendationSnapshotRepository snapshotRepository;
     private final CompletedMatchRepository completedMatchRepository;
     private final ResultsProperties resultsProperties;
@@ -85,7 +88,10 @@ public class ResultsQueryService {
         }
 
         List<RecommendationSnapshot> allRows = snapshotRepository
-                .findBySnapshotDateOrderByMatchDateUnixAscIdAsc(snapshotDate);
+                .findBySnapshotDateOrderByMatchDateUnixAscIdAsc(snapshotDate)
+                .stream()
+                .filter(ResultsQueryService::isIncludedType)
+                .toList();
 
         DaySummary summary = summarize(allRows);
         DaySummary strongSummary = summarize(filterByConfidence(allRows, "STRONG"));
@@ -231,6 +237,11 @@ public class ResultsQueryService {
         return rows.stream()
                 .filter(r -> confidence.equalsIgnoreCase(r.getConfidence()))
                 .toList();
+    }
+
+    static boolean isIncludedType(RecommendationSnapshot row) {
+        String type = row.getType();
+        return type == null || !EXCLUDED_TYPES.contains(type);
     }
 
     private PickView toPickView(RecommendationSnapshot row) {

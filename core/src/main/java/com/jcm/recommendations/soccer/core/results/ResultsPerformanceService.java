@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * UC-035: aggregate settled snapshot picks into hit rates by period, confidence, and type.
@@ -24,6 +25,9 @@ import java.util.Map;
 public class ResultsPerformanceService {
 
     public static final int MIN_SAMPLE = 10;
+
+    /** Types paused from boards/metrics (engine still exists for later recalibration). */
+    private static final Set<String> EXCLUDED_TYPES = Set.of("CLEAN_SHEET");
 
     private final RecommendationSnapshotRepository snapshotRepository;
     private final ResultsProperties resultsProperties;
@@ -60,7 +64,9 @@ public class ResultsPerformanceService {
         LocalDate toDate = LocalDate.now(resultsProperties.zoneId());
         LocalDate fromDate = resolveFromDate(period, toDate);
 
-        List<RecommendationSnapshot> rows = loadRows(fromDate, toDate);
+        List<RecommendationSnapshot> rows = loadRows(fromDate, toDate).stream()
+                .filter(ResultsPerformanceService::isIncludedType)
+                .toList();
         BucketStats overall = summarize(rows);
         Map<String, BucketStats> byConfidence = Map.of(
                 "STRONG", summarize(filterConfidence(rows, "STRONG")),
@@ -69,10 +75,16 @@ public class ResultsPerformanceService {
 
         Map<String, List<RecommendationSnapshot>> byType = new LinkedHashMap<>();
         for (RecommendationType type : RecommendationType.values()) {
+            if (EXCLUDED_TYPES.contains(type.name())) {
+                continue;
+            }
             byType.put(type.name(), new ArrayList<>());
         }
         for (RecommendationSnapshot row : rows) {
             String type = row.getType() == null ? "UNKNOWN" : row.getType();
+            if (EXCLUDED_TYPES.contains(type)) {
+                continue;
+            }
             byType.computeIfAbsent(type, key -> new ArrayList<>()).add(row);
         }
 
@@ -100,6 +112,11 @@ public class ResultsPerformanceService {
             return snapshotRepository.findBySnapshotDateLessThanEqual(toDate);
         }
         return snapshotRepository.findBySnapshotDateBetweenInclusive(fromDate, toDate);
+    }
+
+    static boolean isIncludedType(RecommendationSnapshot row) {
+        String type = row.getType();
+        return type == null || !EXCLUDED_TYPES.contains(type);
     }
 
     static String normalizePeriod(String periodRaw) {

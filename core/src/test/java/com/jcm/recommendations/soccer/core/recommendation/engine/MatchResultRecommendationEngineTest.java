@@ -43,15 +43,13 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze returns away win recommendation for dominant away team")
-    void analyze_withDominantAwayTeam_returnsAwayWin() {
+    @DisplayName("analyze skips Away tips while Away side is paused")
+    void analyze_withDominantAwayTeam_returnsEmpty() {
         FixtureContext context = createDominantAwayTeamContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
-        assertThat(result).isPresent();
-        assertThat(result.get().getType()).isEqualTo(RecommendationType.MATCH_RESULT);
-        assertThat(result.get().getMarket()).isEqualTo("Away Team");
+        assertThat(result).isEmpty();
     }
 
     @Test
@@ -685,45 +683,46 @@ class MatchResultRecommendationEngineTest {
     }
 
     private FixtureContext createBalancedContext() {
+        // Mild home edge so the tip clears the Moderate floor (≥55%) while draw residual stays meaningful
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsHome(7)
-                .seasonDrawsHome(6)
-                .seasonLossesHome(7)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(22)
-                .seasonGoalDifference(0)
-                .ppgHome(1.35)
-                .position(10)
+                .seasonWinsHome(11)
+                .seasonDrawsHome(5)
+                .seasonLossesHome(4)
+                .seasonGoalsHome(28)
+                .seasonConcededHome(16)
+                .seasonGoalDifference(12)
+                .ppgHome(1.90)
+                .position(8)
                 .build();
 
         TeamSeasonStats awayStats = TeamSeasonStats.builder()
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsAway(7)
+                .seasonWinsAway(5)
                 .seasonDrawsAway(6)
-                .seasonLossesAway(7)
-                .seasonGoalsAway(21)
-                .seasonConcededAway(21)
-                .seasonGoalDifference(0)
-                .ppgAway(1.35)
-                .position(11)
+                .seasonLossesAway(9)
+                .seasonGoalsAway(18)
+                .seasonConcededAway(26)
+                .seasonGoalDifference(-8)
+                .ppgAway(1.05)
+                .position(14)
                 .build();
 
         TeamRecentForm homeForm = TeamRecentForm.builder()
                 .teamId(1L)
-                .winsHome(2)
-                .drawsHome(2)
+                .winsHome(3)
+                .drawsHome(1)
                 .lossesHome(1)
                 .build();
 
         TeamRecentForm awayForm = TeamRecentForm.builder()
                 .teamId(2L)
-                .winsAway(2)
-                .drawsAway(1)
+                .winsAway(1)
+                .drawsAway(2)
                 .lossesAway(2)
                 .build();
 

@@ -20,8 +20,9 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 /**
  * UC-017: Match Result Recommendations
  *
- * Predicts Home Win / Away Win (1X2 sides only). Draws are deferred to
- * {@link DrawRecommendationEngine} (UC-019).
+ * Predicts Home Win only (1X2 home side). Draws are deferred to
+ * {@link DrawRecommendationEngine} (UC-019). Away tips are paused until
+ * recalibrated after low hit rates on early snapshots.
  *
  * Signals:
  * - Team win/loss percentages (season and form, venue-specific)
@@ -90,10 +91,12 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     private static final double DRAW_MIN_PROBABILITY = 15.0;
     private static final double DRAW_MAX_PROBABILITY = 35.0;
 
-    // Thresholds
-    private static final double THRESHOLD_STRONG = 55.0;
-    private static final double THRESHOLD_MODERATE = 45.0;
+    // Thresholds — raised after ~34% hit rate; Away tips paused until recalibrated
+    private static final double THRESHOLD_STRONG = 62.0;
+    private static final double THRESHOLD_MODERATE = 55.0;
     private static final double VALUE_THRESHOLD = 5.0;
+    /** STRONG also requires outcome odds not longer than this when odds are present. */
+    private static final double STRONG_MAX_ODDS = 2.50;
 
     @Override
     public RecommendationType getType() {
@@ -149,43 +152,33 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         awayWinProb = (awayWinProb / total) * 100;
         drawProb = (drawProb / total) * 100;
 
-        // Defer draws to DrawRecommendationEngine — only recommend Home or Away
-        final String outcomeType;
-        final String recommendedOutcome;
-        final double bestProb;
-        if (homeWinProb >= awayWinProb) {
-            outcomeType = "HOME";
-            recommendedOutcome = context.getHomeTeam().getName();
-            bestProb = homeWinProb;
-        } else {
-            outcomeType = "AWAY";
-            recommendedOutcome = context.getAwayTeam().getName();
-            bestProb = awayWinProb;
+        // Home wins only for now — Away tips paused until recalibrated (low hit rate)
+        if (homeWinProb < awayWinProb) {
+            log.debug("Skipping Away Match Result tip: fixtureId={}, homeProb={}, awayProb={}",
+                    context.getFixture().getId(),
+                    String.format("%.1f", homeWinProb),
+                    String.format("%.1f", awayWinProb));
+            return Optional.empty();
         }
+
+        final String outcomeType = "HOME";
+        final String recommendedOutcome = context.getHomeTeam().getName();
+        final double bestProb = homeWinProb;
 
         double valueVsOdds = 0.0;
         Double odds = null;
         boolean hasOutcomeOdds = false;
 
-        if (outcomeType.equals("HOME")
-                && context.hasOdds()
+        if (context.hasOdds()
                 && context.getOdds().getOddsFt1() != null
                 && context.getOdds().getOddsFt1() > 0) {
             odds = context.getOdds().getOddsFt1();
             double implied = (1.0 / odds) * 100;
             valueVsOdds = bestProb - implied;
             hasOutcomeOdds = true;
-        } else if (outcomeType.equals("AWAY")
-                && context.hasOdds()
-                && context.getOdds().getOddsFt2() != null
-                && context.getOdds().getOddsFt2() > 0) {
-            odds = context.getOdds().getOddsFt2();
-            double implied = (1.0 / odds) * 100;
-            valueVsOdds = bestProb - implied;
-            hasOutcomeOdds = true;
         }
 
-        ConfidenceLevel confidence = determineConfidence(bestProb, valueVsOdds, hasOutcomeOdds);
+        ConfidenceLevel confidence = determineConfidence(bestProb, valueVsOdds, hasOutcomeOdds, odds);
 
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
@@ -516,15 +509,17 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     }
 
     /**
-     * STRONG when probability is high and either odds are missing (model confidence alone)
-     * or the pick shows value vs market. Odds are not used in the probability model itself.
+     * STRONG when probability is high, odds are short enough (≤ {@link #STRONG_MAX_ODDS} when present),
+     * and either odds are missing or the pick shows value vs market.
      */
-    private ConfidenceLevel determineConfidence(double probability, double valueVsOdds, boolean hasOutcomeOdds) {
+    private ConfidenceLevel determineConfidence(
+            double probability, double valueVsOdds, boolean hasOutcomeOdds, Double odds) {
         if (probability >= THRESHOLD_STRONG) {
-            if (!hasOutcomeOdds || valueVsOdds >= VALUE_THRESHOLD) {
+            boolean oddsOkForStrong = !hasOutcomeOdds
+                    || (odds != null && odds <= STRONG_MAX_ODDS && valueVsOdds >= VALUE_THRESHOLD);
+            if (oddsOkForStrong) {
                 return ConfidenceLevel.STRONG;
             }
-            // High model probability but no market edge → Moderate
             return ConfidenceLevel.MODERATE;
         }
         if (probability >= THRESHOLD_MODERATE) {
@@ -546,6 +541,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         factors.put("awayWinProbability", awayWin);
         factors.put("valueVsOdds", valueVsOdds);
         factors.put("drawsDeferredToDrawEngine", true);
+        factors.put("awayTipsPaused", true);
 
         if (context.hasOdds()) {
             factors.put("oddsFt1", context.getOdds().getOddsFt1());
