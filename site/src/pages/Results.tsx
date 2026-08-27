@@ -402,7 +402,16 @@ function summaryFromFixtures(fixtures: ResultsFixture[]): ResultsDaySummary {
   };
 }
 
-function buildOutcomeGradient(summary: ResultsDaySummary): string {
+type OutcomeCounts = {
+  wins: number;
+  losses: number;
+  voids: number;
+  pending: number;
+  unsupported: number;
+  hitRate: number | null;
+};
+
+function buildOutcomeGradient(summary: OutcomeCounts): string {
   const segments = [
     { value: summary.wins, color: 'var(--confidence-strong)' },
     { value: summary.losses, color: '#e07070' },
@@ -425,7 +434,7 @@ function buildOutcomeGradient(summary: ResultsDaySummary): string {
   return `conic-gradient(${stops.join(', ')})`;
 }
 
-function outcomeBreakdownLabel(summary: ResultsDaySummary): string {
+function outcomeBreakdownLabel(summary: OutcomeCounts): string {
   const parts = [
     summary.wins > 0 ? `${summary.wins} win${summary.wins === 1 ? '' : 's'}` : '',
     summary.losses > 0 ? `${summary.losses} loss${summary.losses === 1 ? '' : 'es'}` : '',
@@ -436,14 +445,20 @@ function outcomeBreakdownLabel(summary: ResultsDaySummary): string {
   return parts.length > 0 ? parts.join(' · ') : 'No picks';
 }
 
-function OutcomeDonut({ summary }: { summary: ResultsDaySummary }) {
+function OutcomeDonut({
+  summary,
+  size = 'sm',
+}: {
+  summary: OutcomeCounts;
+  size?: 'sm' | 'md';
+}) {
   const total = summary.wins + summary.losses + summary.voids + summary.pending + summary.unsupported;
   const centerLabel =
     summary.hitRate != null ? `${summary.hitRate.toFixed(0)}%` : total > 0 ? '—' : '0';
 
   return (
     <div
-      className={styles.outcomeDonut}
+      className={`${styles.outcomeDonut} ${size === 'md' ? styles.outcomeDonutMd : ''}`}
       style={{ background: buildOutcomeGradient(summary) }}
       title={outcomeBreakdownLabel(summary)}
       aria-label={`Outcome mix: ${outcomeBreakdownLabel(summary)}`}
@@ -522,7 +537,10 @@ function PerformanceSummary({
   return (
     <section className={`${styles.summaryPanel} ${styles[`summary${tone[0].toUpperCase()}${tone.slice(1)}`]}`}>
       <div className={styles.summaryHeading}>
-        <h2 className={styles.summaryTitle}>{title}</h2>
+        <div className={styles.summaryTitleRow}>
+          <OutcomeDonut summary={bucket} size="md" />
+          <h2 className={styles.summaryTitle}>{title}</h2>
+        </div>
         <span className={styles.summaryHitRate}>{formatBucketHit(bucket)}</span>
       </div>
       <div className={styles.summaryStrip}>
@@ -914,6 +932,73 @@ function withConfidenceDefaults(data: DayResults | undefined): DayResults | unde
   };
 }
 
+function formatBandHit(bucket: PerformanceBucket): string {
+  return `${formatBucketHit(bucket)} (${bucket.sampleSize})`;
+}
+
+function TypePerformanceList({ rows }: { rows: TypePerformance[] }) {
+  return (
+    <div className={styles.typePerfListWrap}>
+      <div className={styles.typePerfHeader} aria-hidden="true">
+        <span>Type</span>
+        <span>n</span>
+        <span>W–L</span>
+        <span>Hit</span>
+        <span>Elite</span>
+        <span>Strong</span>
+        <span>Moderate</span>
+      </div>
+      <ul className={styles.typePerfList}>
+        {orderTypeRows(rows).map((row) => {
+          const eliteBucket = row.byConfidence.ELITE ?? emptyPerformanceBucket();
+          return (
+            <li key={row.type} className={styles.typePerfRow}>
+              <div className={styles.typePerfName}>{formatType(row.type)}</div>
+              <div className={styles.typePerfSample}>{row.overall.sampleSize}</div>
+              <div className={styles.typePerfRecord}>
+                <span className={styles.win}>{row.overall.wins}</span>
+                <span className={styles.typePerfRecordSep}>–</span>
+                <span className={styles.loss}>{row.overall.losses}</span>
+              </div>
+              <div className={styles.typePerfHit}>
+                <span className={`${styles.hitBadge} ${hitBadgeClass(row.overall)}`}>
+                  {formatBucketHit(row.overall)}
+                </span>
+              </div>
+              <div className={styles.typePerfMobileMeta}>
+                <span>{row.overall.sampleSize} graded</span>
+                <span>
+                  <span className={styles.win}>{row.overall.wins}</span>
+                  –
+                  <span className={styles.loss}>{row.overall.losses}</span>
+                </span>
+              </div>
+              <div className={styles.typePerfBands}>
+                <div className={styles.typePerfBand}>
+                  <span className={styles.typePerfBandLabel}>Elite</span>
+                  <span className={styles.typePerfBandValue}>{formatBandHit(eliteBucket)}</span>
+                </div>
+                <div className={styles.typePerfBand}>
+                  <span className={styles.typePerfBandLabel}>Strong</span>
+                  <span className={styles.typePerfBandValue}>
+                    {formatBandHit(row.byConfidence.STRONG)}
+                  </span>
+                </div>
+                <div className={styles.typePerfBand}>
+                  <span className={styles.typePerfBandLabel}>Moderate</span>
+                  <span className={styles.typePerfBandValue}>
+                    {formatBandHit(row.byConfidence.MODERATE)}
+                  </span>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function emptyPerformanceBucket(): PerformanceBucket {
   return {
     wins: 0,
@@ -994,52 +1079,7 @@ function PerformancePanel({
               <p>Performance fills in as daily snapshots settle.</p>
             </div>
           ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.perfTable}>
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Sample</th>
-                    <th>W</th>
-                    <th>L</th>
-                    <th>Hit rate</th>
-                    <th>Elite</th>
-                    <th>Strong</th>
-                    <th>Moderate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orderTypeRows(data.byType).map((row) => {
-                    const eliteBucket = row.byConfidence.ELITE ?? emptyPerformanceBucket();
-                    return (
-                      <tr key={row.type}>
-                        <td>{formatType(row.type)}</td>
-                        <td>{row.overall.sampleSize}</td>
-                        <td className={styles.win}>{row.overall.wins}</td>
-                        <td className={styles.loss}>{row.overall.losses}</td>
-                        <td>
-                          <span className={`${styles.hitBadge} ${hitBadgeClass(row.overall)}`}>
-                            {formatBucketHit(row.overall)}
-                          </span>
-                        </td>
-                        <td>
-                          {formatBucketHit(eliteBucket)}
-                          <span className={styles.sampleHint}> ({eliteBucket.sampleSize})</span>
-                        </td>
-                        <td>
-                          {formatBucketHit(row.byConfidence.STRONG)}
-                          <span className={styles.sampleHint}> ({row.byConfidence.STRONG.sampleSize})</span>
-                        </td>
-                        <td>
-                          {formatBucketHit(row.byConfidence.MODERATE)}
-                          <span className={styles.sampleHint}> ({row.byConfidence.MODERATE.sampleSize})</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <TypePerformanceList rows={data.byType} />
           )}
         </>
       )}

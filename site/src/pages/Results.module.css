@@ -169,10 +169,17 @@
 
 .summaryHeading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.85rem;
+}
+
+.summaryTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
 }
 
 .summaryTitle {
@@ -405,6 +412,11 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 70%, transparent);
 }
 
+.outcomeDonutMd {
+  width: 3.1rem;
+  height: 3.1rem;
+}
+
 .outcomeDonutCenter {
   position: absolute;
   inset: 0.42rem;
@@ -419,6 +431,12 @@
   line-height: 1;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+}
+
+.outcomeDonutMd .outcomeDonutCenter {
+  inset: 0.5rem;
+  font-size: 0.72rem;
+  background: var(--bg-secondary);
 }
 
 .compactSummaryTitle {
@@ -827,6 +845,113 @@
   color: var(--text-primary);
 }
 
+.typePerfListWrap {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.typePerfList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.typePerfHeader,
+.typePerfRow {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.5fr)
+    3.25rem
+    3.75rem
+    3.75rem
+    minmax(0, 1fr)
+    minmax(0, 1fr)
+    minmax(0, 1fr);
+  gap: 0.35rem 0.55rem;
+  align-items: center;
+  padding: 0.4rem 0.65rem;
+}
+
+.typePerfHeader {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.typePerfRow {
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.typePerfRow:last-child {
+  border-bottom: none;
+}
+
+.typePerfRow:hover {
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+}
+
+.typePerfName {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.typePerfSample,
+.typePerfRecord {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.typePerfRecord {
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  font-weight: 600;
+}
+
+.typePerfRecordSep {
+  color: var(--text-muted);
+}
+
+.typePerfHit {
+  justify-self: start;
+}
+
+.typePerfBands {
+  display: contents;
+}
+
+.typePerfBand {
+  min-width: 0;
+}
+
+.typePerfBandLabel {
+  display: none;
+}
+
+.typePerfBandValue {
+  display: block;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.typePerfMobileMeta {
+  display: none;
+}
+
 .tableWrap {
   overflow-x: auto;
   border: 1px solid var(--border-color);
@@ -861,11 +986,11 @@
 
 .hitBadge {
   display: inline-block;
-  min-width: 3.5rem;
+  min-width: 2.75rem;
   text-align: center;
-  padding: 0.2rem 0.45rem;
+  padding: 0.15rem 0.35rem;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
@@ -929,6 +1054,80 @@
 }
 
 @media (max-width: 800px) {
+  .typePerfHeader {
+    display: none;
+  }
+
+  .typePerfRow {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name hit"
+      "meta meta"
+      "bands bands";
+    gap: 0.35rem 0.5rem;
+    padding: 0.65rem 0.75rem;
+    align-items: start;
+  }
+
+  .typePerfName {
+    grid-area: name;
+  }
+
+  .typePerfHit {
+    grid-area: hit;
+    justify-self: end;
+  }
+
+  .typePerfSample,
+  .typePerfRecord {
+    display: none;
+  }
+
+  .typePerfMobileMeta {
+    grid-area: meta;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+
+  .typePerfBands {
+    grid-area: bands;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+
+  .typePerfBand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.4rem 0.45rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    min-width: 0;
+  }
+
+  .typePerfBandLabel {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .typePerfBandValue {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
   .compactPickHeader {
     display: none;
   }
