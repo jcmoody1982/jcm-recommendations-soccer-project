@@ -22,6 +22,7 @@ public class FixtureContextBuilder {
     private final FixtureOddsRepository fixtureOddsRepository;
     private final FixturePotentialsRepository fixturePotentialsRepository;
     private final FixtureHeadToHeadRepository fixtureHeadToHeadRepository;
+    private final TeamSquadProfileRepository teamSquadProfileRepository;
     private final LeagueRepository leagueRepository;
     private final TeamRepository teamRepository;
     private final TeamSeasonStatsRepository teamSeasonStatsRepository;
@@ -35,6 +36,10 @@ public class FixtureContextBuilder {
         FixtureOdds odds = fixtureOddsRepository.findById(fixture.getId()).orElse(null);
         FixturePotentials potentials = fixturePotentialsRepository.findById(fixture.getId()).orElse(null);
         FixtureHeadToHead headToHead = fixtureHeadToHeadRepository.findById(fixture.getId()).orElse(null);
+        TeamSquadProfile homeSquadProfile = fixture.getHomeTeamId() != null
+                ? teamSquadProfileRepository.findById(fixture.getHomeTeamId()).orElse(null) : null;
+        TeamSquadProfile awaySquadProfile = fixture.getAwayTeamId() != null
+                ? teamSquadProfileRepository.findById(fixture.getAwayTeamId()).orElse(null) : null;
         
         League league = leagueRepository.findById(fixture.getSeasonId()).orElse(null);
 
@@ -78,6 +83,8 @@ public class FixtureContextBuilder {
                 .odds(odds)
                 .potentials(potentials)
                 .headToHead(headToHead)
+                .homeSquadProfile(homeSquadProfile)
+                .awaySquadProfile(awaySquadProfile)
                 .league(league)
                 .homeTeam(homeTeam)
                 .awayTeam(awayTeam)
@@ -117,6 +124,7 @@ public class FixtureContextBuilder {
         Map<Long, FixtureOdds> oddsMap = fetchOddsMap(fixtureIds);
         Map<Long, FixturePotentials> potentialsMap = fetchPotentialsMap(fixtureIds);
         Map<Long, FixtureHeadToHead> h2hMap = fetchHeadToHeadMap(fixtureIds);
+        Map<Long, TeamSquadProfile> squadProfileMap = fetchSquadProfileMap(teamIds);
         Map<Long, League> leagueMap = fetchLeagueMap(seasonIds);
         Map<Long, Team> teamMap = fetchTeamMap(teamIds);
         Map<String, TeamSeasonStats> teamStatsMap = fetchTeamStatsMap(teamIds, seasonIds);
@@ -125,8 +133,8 @@ public class FixtureContextBuilder {
         Map<String, List<PlayerSeasonStats>> playersMap = fetchPlayersMap(teamIds, seasonIds);
         
         long fetchTime = System.currentTimeMillis() - startTime;
-        log.debug("Batch data fetched in {}ms: odds={}, potentials={}, h2h={}, leagues={}, teams={}, teamStats={}, teamForms={}, refereeStats={}",
-                fetchTime, oddsMap.size(), potentialsMap.size(), h2hMap.size(), leagueMap.size(),
+        log.debug("Batch data fetched in {}ms: odds={}, potentials={}, h2h={}, squadProfiles={}, leagues={}, teams={}, teamStats={}, teamForms={}, refereeStats={}",
+                fetchTime, oddsMap.size(), potentialsMap.size(), h2hMap.size(), squadProfileMap.size(), leagueMap.size(),
                 teamMap.size(), teamStatsMap.size(), teamFormMap.size(), refereeStatsMap.size());
         
         // Build contexts using pre-fetched data
@@ -135,7 +143,7 @@ public class FixtureContextBuilder {
         
         for (Fixture fixture : fixtures) {
             FixtureContext context = buildContextFromMaps(
-                    fixture, oddsMap, potentialsMap, h2hMap, leagueMap, teamMap,
+                    fixture, oddsMap, potentialsMap, h2hMap, squadProfileMap, leagueMap, teamMap,
                     teamStatsMap, teamFormMap, refereeStatsMap, playersMap);
             
             if (context.hasCompleteData()) {
@@ -158,6 +166,7 @@ public class FixtureContextBuilder {
             Map<Long, FixtureOdds> oddsMap,
             Map<Long, FixturePotentials> potentialsMap,
             Map<Long, FixtureHeadToHead> h2hMap,
+            Map<Long, TeamSquadProfile> squadProfileMap,
             Map<Long, League> leagueMap,
             Map<Long, Team> teamMap,
             Map<String, TeamSeasonStats> teamStatsMap,
@@ -179,6 +188,8 @@ public class FixtureContextBuilder {
                 .odds(oddsMap.get(fixtureId))
                 .potentials(potentialsMap.get(fixtureId))
                 .headToHead(h2hMap.get(fixtureId))
+                .homeSquadProfile(homeTeamId != null ? squadProfileMap.get(homeTeamId) : null)
+                .awaySquadProfile(awayTeamId != null ? squadProfileMap.get(awayTeamId) : null)
                 .league(leagueMap.get(seasonId))
                 .homeTeam(homeTeam)
                 .awayTeam(awayTeam)
@@ -209,6 +220,14 @@ public class FixtureContextBuilder {
     private Map<Long, FixtureHeadToHead> fetchHeadToHeadMap(Set<Long> fixtureIds) {
         return fixtureHeadToHeadRepository.findAllById(fixtureIds).stream()
                 .collect(Collectors.toMap(FixtureHeadToHead::getFixtureId, Function.identity()));
+    }
+
+    private Map<Long, TeamSquadProfile> fetchSquadProfileMap(Set<Long> teamIds) {
+        if (teamIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return teamSquadProfileRepository.findAllById(teamIds).stream()
+                .collect(Collectors.toMap(TeamSquadProfile::getTeamId, Function.identity()));
     }
     
     private Map<Long, League> fetchLeagueMap(Set<Long> seasonIds) {

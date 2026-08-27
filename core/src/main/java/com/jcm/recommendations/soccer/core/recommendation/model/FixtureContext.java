@@ -25,6 +25,9 @@ public class FixtureContext {
     
     private TeamRecentForm homeTeamForm;
     private TeamRecentForm awayTeamForm;
+
+    private TeamSquadProfile homeSquadProfile;
+    private TeamSquadProfile awaySquadProfile;
     
     private RefereeStats refereeStats;
 
@@ -55,6 +58,31 @@ public class FixtureContext {
         return headToHead != null
                 && headToHead.getPreviousMeetings() != null
                 && headToHead.getPreviousMeetings() > 0;
+    }
+
+    /**
+     * Squad value is available for additive engine factors when both sides have verified TM profiles.
+     */
+    public boolean hasSquadValue() {
+        return isUsableSquadProfile(homeSquadProfile) && isUsableSquadProfile(awaySquadProfile);
+    }
+
+    public double squadValueRatioHomeOverAway() {
+        if (!hasSquadValue()) {
+            return 1.0;
+        }
+        long away = awaySquadProfile.getTotalMarketValueEur();
+        if (away <= 0) {
+            return 1.0;
+        }
+        return (double) homeSquadProfile.getTotalMarketValueEur() / away;
+    }
+
+    private static boolean isUsableSquadProfile(TeamSquadProfile profile) {
+        return profile != null
+                && Boolean.TRUE.equals(profile.getEngineUsable())
+                && profile.getTotalMarketValueEur() != null
+                && profile.getTotalMarketValueEur() > 0;
     }
     
     public boolean hasRefereeStats() {

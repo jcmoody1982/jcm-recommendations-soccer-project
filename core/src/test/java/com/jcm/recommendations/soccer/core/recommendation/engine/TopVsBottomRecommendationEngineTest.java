@@ -93,6 +93,38 @@ class TopVsBottomRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze applies additive squad value boost without replacing FS score")
+    void analyze_appliesSquadValueBoost() {
+        FixtureContext baseline = strongHomeMismatch(31L);
+        double baselineQuality = (Double) engine.analyze(baseline).orElseThrow().getFactors().get("qualityScore");
+
+        FixtureContext withSquadValue = mismatchBuilder(31L)
+                .homeTeamStats(homeStatsForMismatch())
+                .awayTeamStats(awayStatsForMismatch())
+                .homeTeamForm(homeFormForMismatch())
+                .awayTeamForm(awayFormForMismatch())
+                .homeSquadProfile(TeamSquadProfile.builder()
+                        .teamId(1L)
+                        .totalMarketValueEur(900_000_000L)
+                        .engineUsable(true)
+                        .build())
+                .awaySquadProfile(TeamSquadProfile.builder()
+                        .teamId(2L)
+                        .totalMarketValueEur(200_000_000L)
+                        .engineUsable(true)
+                        .build())
+                .build();
+
+        Optional<Recommendation> result = engine.analyze(withSquadValue);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("squadValueApplied")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("squadValueBoostApplied")).isEqualTo(4.0);
+        assertThat((Double) result.get().getFactors().get("qualityScore"))
+                .isGreaterThan(baselineQuality);
+    }
+
+    @Test
     @DisplayName("analyze pivots to Over 2.5 when favorite odds are short")
     void analyze_shortOddsPivotsToGoalsLine() {
         FixtureContext context = mismatchBuilder(4L)

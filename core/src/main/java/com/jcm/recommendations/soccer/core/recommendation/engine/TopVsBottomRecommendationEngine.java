@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
+import static com.jcm.recommendations.soccer.core.recommendation.util.SquadValueSupport.*;
 
 /**
  * UC-026: Top vs Bottom — table mismatch picks for home favorites with UC form/GD filters,
@@ -162,7 +163,9 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
             h2hBoost = H2H_FAVORITE_SUPPORT_BOOST;
         }
 
-        return clampScore(ppgScore + gdScore + posScore + formScore + underdogBoost + h2hBoost);
+        double squadValueBoost = qualityBoost(context);
+
+        return clampScore(ppgScore + gdScore + posScore + formScore + underdogBoost + h2hBoost + squadValueBoost);
     }
 
     private boolean passesQualityFilters(TeamSeasonStats homeStats, TeamSeasonStats awayStats,
@@ -217,6 +220,10 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         }
 
         if (suggestsUpsetFromH2h(context)) {
+            count++;
+        }
+
+        if (suggestsUpset(context)) {
             count++;
         }
 
@@ -394,6 +401,8 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
             factors.put("h2hSupportsFavorite", supportsFavoriteInH2h(context));
             factors.put("h2hSuggestsUpset", suggestsUpsetFromH2h(context));
         }
+
+        putFactors(context, factors);
 
         if (suggestsBttsMismatch(context.getHomeTeamStats(), context.getAwayTeamStats())) {
             factors.put("bttsMismatchSuggested", true);

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
+import static com.jcm.recommendations.soccer.core.recommendation.util.SquadValueSupport.*;
 
 @Component
 @RequiredArgsConstructor
@@ -67,7 +68,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        Map<String, Object> factors = buildFactors(bestOpportunity, opportunities);
+        Map<String, Object> factors = buildFactors(context, bestOpportunity, opportunities);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.VALUE_BET)
@@ -287,6 +288,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
             homeWinProb = (homeWinProb * 0.7) + (xgSignal * 0.3);
         }
 
+        homeWinProb += homeProbabilityBoostFraction(context);
         homeWinProb = Math.max(0.05, Math.min(0.90, homeWinProb));
 
         // Home Win only — Away/Draw value paused after poor snapshot hit rates (aligned with Match Result).
@@ -320,9 +322,10 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
         return ConfidenceLevel.WEAK;
     }
 
-    private Map<String, Object> buildFactors(ValueOpportunity best, List<ValueOpportunity> all) {
+    private Map<String, Object> buildFactors(FixtureContext context, ValueOpportunity best, List<ValueOpportunity> all) {
         Map<String, Object> factors = new HashMap<>();
         
+        putFactors(context, factors);
         // Best opportunity details
         factors.put("market", best.market);
         factors.put("ourProbability", best.ourProbability);

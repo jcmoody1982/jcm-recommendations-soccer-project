@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
+import static com.jcm.recommendations.soccer.core.recommendation.util.SquadValueSupport.*;
 
 /**
  * UC-017: Match Result Recommendations
@@ -145,6 +146,9 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         awayWinProb = applyPositionFactor(awayWinProb, context, false);
         homeWinProb = applyMotivationFactor(homeWinProb, context, true);
         awayWinProb = applyMotivationFactor(awayWinProb, context, false);
+
+        // Additive TM squad value — nudges home probability when richer squad supports favorite
+        homeWinProb += homeProbabilityBoost(context);
 
         // Normalize so home + away + draw = 100%
         double total = homeWinProb + awayWinProb + drawProb;
@@ -655,6 +659,16 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         if (valueVsOdds >= VALUE_THRESHOLD) {
             positiveIndicators.add("Value vs market odds");
         }
+
+        if (supportsFavorite(context)) {
+            positiveIndicators.add("Home squad value supports favorite");
+        }
+
+        if (suggestsUpset(context)) {
+            riskFlags.add("Away squad richer on paper");
+        }
+
+        putFactors(context, factors);
 
         factors.put("positiveIndicators", positiveIndicators);
         factors.put("riskFlags", riskFlags);

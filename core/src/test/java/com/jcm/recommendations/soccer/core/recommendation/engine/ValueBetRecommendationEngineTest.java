@@ -258,6 +258,23 @@ class ValueBetRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("match-result value increases when squad value supports home favorite")
+    void analyze_squadValueBoostsHomeWinValue() {
+        stubNoGoalEngines();
+
+        double baselineValue = engine.analyze(createHomeWinValueContext(8, 2.20, false))
+                .orElseThrow()
+                .getScore();
+        Optional<Recommendation> result = engine.analyze(createHomeWinValueContext(8, 2.20, true));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Home Win");
+        assertThat(result.get().getFactors().get("squadValueApplied")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("squadValueBoostApplied")).isEqualTo(4.0);
+        assertThat(result.get().getScore()).isGreaterThan(baselineValue);
+    }
+
+    @Test
     @DisplayName("analyze skips Away Win and Draw value opportunities")
     void analyze_skipsAwayAndDrawValue() {
         FixtureContext context = createDominantAwayContext();
@@ -367,6 +384,56 @@ class ValueBetRecommendationEngineTest {
                 .awayTeamStats(awayStats)
                 .odds(odds)
                 .build();
+    }
+
+    private FixtureContext createHomeWinValueContext(int homeWins, double homeOdds, boolean withSquadValue) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonWinsHome(homeWins)
+                .seasonDrawsHome(1)
+                .seasonLossesHome(10 - homeWins - 1)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(20)
+                .seasonWinsAway(1)
+                .seasonDrawsAway(2)
+                .seasonLossesAway(7)
+                .build();
+
+        FixtureOdds odds = FixtureOdds.builder()
+                .fixtureId(1000L)
+                .oddsFt1(homeOdds)
+                .oddsFtX(3.00)
+                .oddsFt2(3.00)
+                .build();
+
+        FixtureContext.FixtureContextBuilder builder = FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .odds(odds);
+
+        if (withSquadValue) {
+            builder.homeSquadProfile(TeamSquadProfile.builder()
+                            .teamId(1L)
+                            .totalMarketValueEur(900_000_000L)
+                            .engineUsable(true)
+                            .build())
+                    .awaySquadProfile(TeamSquadProfile.builder()
+                            .teamId(2L)
+                            .totalMarketValueEur(200_000_000L)
+                            .engineUsable(true)
+                            .build());
+        }
+
+        return builder.build();
     }
 
     private FixtureContext createBalancedContextWithOdds() {

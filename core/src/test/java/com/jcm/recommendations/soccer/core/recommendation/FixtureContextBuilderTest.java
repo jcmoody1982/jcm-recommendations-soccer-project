@@ -27,6 +27,8 @@ class FixtureContextBuilderTest {
     @Mock
     private FixtureHeadToHeadRepository fixtureHeadToHeadRepository;
     @Mock
+    private TeamSquadProfileRepository teamSquadProfileRepository;
+    @Mock
     private LeagueRepository leagueRepository;
     @Mock
     private TeamRepository teamRepository;
@@ -48,6 +50,7 @@ class FixtureContextBuilderTest {
                 fixtureOddsRepository,
                 fixturePotentialsRepository,
                 fixtureHeadToHeadRepository,
+                teamSquadProfileRepository,
                 leagueRepository,
                 teamRepository,
                 teamSeasonStatsRepository,
@@ -63,8 +66,8 @@ class FixtureContextBuilderTest {
         
         assertThat(result).isEmpty();
         verifyNoInteractions(fixtureOddsRepository, fixturePotentialsRepository, fixtureHeadToHeadRepository,
-                leagueRepository, teamRepository, teamSeasonStatsRepository, teamRecentFormRepository,
-                refereeStatsRepository, playerSeasonStatsRepository);
+                teamSquadProfileRepository, leagueRepository, teamRepository, teamSeasonStatsRepository,
+                teamRecentFormRepository, refereeStatsRepository, playerSeasonStatsRepository);
     }
 
     @Test
@@ -86,6 +89,7 @@ class FixtureContextBuilderTest {
         when(fixtureOddsRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(fixturePotentialsRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(fixtureHeadToHeadRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
+        when(teamSquadProfileRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(leagueRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(teamRepository.findAllById(anyCollection()))
                 .thenReturn(List.of(homeTeam1, awayTeam1, homeTeam2, awayTeam2));
@@ -104,6 +108,7 @@ class FixtureContextBuilderTest {
         verify(fixtureOddsRepository, times(1)).findAllById(anyCollection());
         verify(fixturePotentialsRepository, times(1)).findAllById(anyCollection());
         verify(fixtureHeadToHeadRepository, times(1)).findAllById(anyCollection());
+        verify(teamSquadProfileRepository, times(1)).findAllById(anyCollection());
         verify(leagueRepository, times(1)).findAllById(anyCollection());
         verify(teamRepository, times(1)).findAllById(anyCollection());
         verify(teamSeasonStatsRepository, times(1)).findByTeamIdsAndSeasonIds(anyCollection(), anyCollection());
@@ -138,6 +143,7 @@ class FixtureContextBuilderTest {
         when(fixtureOddsRepository.findAllById(anyCollection())).thenReturn(List.of(odds));
         when(fixturePotentialsRepository.findAllById(anyCollection())).thenReturn(List.of(potentials));
         when(fixtureHeadToHeadRepository.findAllById(anyCollection())).thenReturn(List.of(h2h));
+        when(teamSquadProfileRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(leagueRepository.findAllById(anyCollection())).thenReturn(List.of(league));
         when(teamRepository.findAllById(anyCollection())).thenReturn(List.of(homeTeam, awayTeam));
         when(teamSeasonStatsRepository.findByTeamIdsAndSeasonIds(anyCollection(), anyCollection()))
@@ -182,6 +188,7 @@ class FixtureContextBuilderTest {
         when(fixtureOddsRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(fixturePotentialsRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(fixtureHeadToHeadRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
+        when(teamSquadProfileRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(leagueRepository.findAllById(anyCollection())).thenReturn(Collections.emptyList());
         when(teamRepository.findAllById(anyCollection())).thenReturn(List.of(homeTeam, awayTeam));
         when(teamSeasonStatsRepository.findByTeamIdsAndSeasonIds(anyCollection(), anyCollection()))
@@ -209,6 +216,8 @@ class FixtureContextBuilderTest {
         when(fixtureOddsRepository.findById(1L)).thenReturn(Optional.of(odds));
         when(fixturePotentialsRepository.findById(1L)).thenReturn(Optional.empty());
         when(fixtureHeadToHeadRepository.findById(1L)).thenReturn(Optional.empty());
+        when(teamSquadProfileRepository.findById(10L)).thenReturn(Optional.empty());
+        when(teamSquadProfileRepository.findById(11L)).thenReturn(Optional.empty());
         when(leagueRepository.findById(100L)).thenReturn(Optional.empty());
         when(teamRepository.findById(10L)).thenReturn(Optional.of(homeTeam));
         when(teamRepository.findById(11L)).thenReturn(Optional.of(awayTeam));

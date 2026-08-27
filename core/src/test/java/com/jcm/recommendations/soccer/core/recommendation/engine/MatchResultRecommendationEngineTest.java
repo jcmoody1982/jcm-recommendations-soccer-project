@@ -283,6 +283,42 @@ class MatchResultRecommendationEngineTest {
         assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
     }
 
+    @Test
+    @DisplayName("analyze applies additive squad value boost without replacing FS probability")
+    void analyze_appliesSquadValueBoost() {
+        FixtureContext baseline = createDominantHomeTeamContext();
+        double baselineScore = engine.analyze(baseline).orElseThrow().getScore();
+
+        FixtureContext withSquadValue = dominantHomeBuilder(131L)
+                .odds(FixtureOdds.builder()
+                        .fixtureId(131L)
+                        .oddsFt1(1.45)
+                        .oddsFtX(4.50)
+                        .oddsFt2(7.00)
+                        .build())
+                .homeSquadProfile(TeamSquadProfile.builder()
+                        .teamId(1L)
+                        .totalMarketValueEur(900_000_000L)
+                        .engineUsable(true)
+                        .build())
+                .awaySquadProfile(TeamSquadProfile.builder()
+                        .teamId(2L)
+                        .totalMarketValueEur(200_000_000L)
+                        .engineUsable(true)
+                        .build())
+                .build();
+
+        Optional<Recommendation> result = engine.analyze(withSquadValue);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("squadValueApplied")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("squadValueBoostApplied")).isEqualTo(4.0);
+        assertThat(result.get().getScore()).isGreaterThan(baselineScore);
+        @SuppressWarnings("unchecked")
+        List<String> positiveIndicators = (List<String>) result.get().getFactors().get("positiveIndicators");
+        assertThat(positiveIndicators).contains("Home squad value supports favorite");
+    }
+
     // Helper methods to create test contexts
 
     private FixtureContext createDominantHomeTeamContext() {

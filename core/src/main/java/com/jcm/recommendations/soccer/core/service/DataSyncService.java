@@ -24,6 +24,7 @@ public class DataSyncService {
     private final RefereeService refereeService;
     private final TeamFormService teamFormService;
     private final FixtureH2hService fixtureH2hService;
+    private final TeamSquadProfileService teamSquadProfileService;
 
     public SyncSummary runFullSync() {
         log.info("Starting daily data sync job");
@@ -36,6 +37,7 @@ public class DataSyncService {
         int refereeCount = 0;
         int formCount = 0;
         int h2hCount = 0;
+        int squadProfileCount = 0;
         int failedSeasons = 0;
 
         try {
@@ -116,6 +118,14 @@ public class DataSyncService {
                 log.warn("Failed to sync fixture H2H: {}", e.getMessage());
             }
 
+            try {
+                TeamSquadProfileService.SyncResult squadResult =
+                        teamSquadProfileService.syncSquadProfilesForTeams(upcomingTeamIds);
+                squadProfileCount = squadResult.synced();
+            } catch (Exception e) {
+                log.warn("Failed to sync squad profiles: {}", e.getMessage());
+            }
+
             Duration duration = Duration.between(startTime, Instant.now());
 
             if (failedSeasons > 0) {
@@ -125,8 +135,8 @@ public class DataSyncService {
                 log.info("Daily data sync completed successfully");
             }
 
-            log.info("Sync summary: duration={}s, leagues={}, fixtures={}, teams={}, players={}, referees={}, forms={}, h2h={}",
-                    duration.getSeconds(), leagueCount, fixtureCount, teamCount, playerCount, refereeCount, formCount, h2hCount);
+            log.info("Sync summary: duration={}s, leagues={}, fixtures={}, teams={}, players={}, referees={}, forms={}, h2h={}, squadProfiles={}",
+                    duration.getSeconds(), leagueCount, fixtureCount, teamCount, playerCount, refereeCount, formCount, h2hCount, squadProfileCount);
 
             return new SyncSummary(
                     duration.getSeconds(),
@@ -137,6 +147,7 @@ public class DataSyncService {
                     refereeCount,
                     formCount,
                     h2hCount,
+                    squadProfileCount,
                     failedSeasons == 0
             );
 
@@ -155,6 +166,7 @@ public class DataSyncService {
             int refereesProcessed,
             int formsProcessed,
             int h2hProcessed,
+            int squadProfilesProcessed,
             boolean success
     ) {}
 }
