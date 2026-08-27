@@ -4,23 +4,55 @@ import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
+import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
+/**
+ * UC-026: Top vs Bottom — table mismatch picks for home favorites with UC form/GD filters,
+ * upset detection, and short-odds goals/handicap pivots.
+ */
 @Component
 @Slf4j
 public class TopVsBottomRecommendationEngine implements RecommendationEngine {
 
-    private static final int MIN_POSITION_GAP = 8;
-    private static final int STRONG_POSITION_GAP = 12;
-    private static final int EXTREME_POSITION_GAP = 14;
+    // Option A — tightened publishing floors
+    private static final int MIN_GAP_MODERATE = 10;
+    private static final int MIN_GAP_STRONG = 12;
+    private static final int MIN_GAP_BANKER = 14;
+
+    private static final double QUALITY_MODERATE = 50.0;
+    private static final double QUALITY_STRONG = 65.0;
+    private static final double QUALITY_BANKER = 70.0;
+
+    // UC-026 quality filters (venue-specific)
+    private static final double FAVORITE_MIN_PPG_STRONG = 1.8;
+    private static final double FAVORITE_MIN_PPG_MODERATE = 1.5;
+    private static final double UNDERDOG_MAX_PPG_STRONG = 1.0;
+    private static final double UNDERDOG_MAX_PPG_MODERATE = 1.2;
+
+    private static final int FAVORITE_MIN_GD_STRONG = 10;
+    private static final int UNDERDOG_MAX_GD_STRONG = -5;
+
+    private static final double SHORT_FAVORITE_ODDS = 1.40;
+    private static final double UNDERDOG_POOR_AWAY_WIN_RATE = 20.0;
+    private static final double AWAY_COMPETITIVE_WIN_RATE = 35.0;
+    private static final double AWAY_IMPROVING_FORM_PPG = 1.5;
+
+    private static final int UPSET_WATCH_FACTORS = 2;
+    private static final int UPSET_SKIP_FACTORS = 3;
+
+    private static final double BTTS_UNDERDOG_SCORED_PCT = 50.0;
+    private static final double BTTS_FAVORITE_CONCEDES_PCT = 40.0;
 
     @Override
     public RecommendationType getType() {
@@ -42,124 +74,314 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
 
         int homePos = homeStats.getPosition();
         int awayPos = awayStats.getPosition();
-        int positionGap = Math.abs(homePos - awayPos);
 
-        if (positionGap < MIN_POSITION_GAP) {
+        // Option A — home favorites only
+        if (homePos >= awayPos) {
+            log.debug("Skipping Top vs Bottom — home team is not table favorite: fixtureId={}, homePos={}, awayPos={}",
+                    context.getFixture().getId(), homePos, awayPos);
             return Optional.empty();
         }
 
-        log.debug("Analyzing Top vs Bottom for fixture: fixtureId={}, {} (pos {}) vs {} (pos {}), gap={}",
-                context.getFixture().getId(),
-                context.getHomeTeam().getName(), homePos,
-                context.getAwayTeam().getName(), awayPos,
-                positionGap);
+        int positionGap = awayPos - homePos;
+        if (positionGap < MIN_GAP_MODERATE) {
+            return Optional.empty();
+        }
 
-        boolean homeIsFavorite = homePos < awayPos;
-        String favoriteTeam = homeIsFavorite ? context.getHomeTeam().getName() : context.getAwayTeam().getName();
+        int upsetFactors = countUpsetFactors(context);
+        if (upsetFactors >= UPSET_SKIP_FACTORS) {
+            log.debug("Skipping Top vs Bottom — too many upset factors: fixtureId={}, count={}",
+                    context.getFixture().getId(), upsetFactors);
+            return Optional.empty();
+        }
 
-        double qualityScore = calculateQualityScore(context, homeIsFavorite);
-        ConfidenceLevel confidence = determineConfidence(positionGap, qualityScore, homeIsFavorite);
-
+        double qualityScore = calculateQualityScore(context);
+        ConfidenceLevel confidence = determineConfidence(positionGap, qualityScore, upsetFactors);
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
         }
 
-        String market = favoriteTeam;
-        String flag = determineFlag(positionGap, qualityScore, homeIsFavorite);
+        if (!passesQualityFilters(homeStats, awayStats, confidence)) {
+            return Optional.empty();
+        }
 
-        Map<String, Object> factors = buildFactors(context, positionGap, qualityScore, homeIsFavorite, flag);
+        String homeTeam = context.getHomeTeam().getName();
+        MarketSelection selection = selectPrimaryMarket(context, positionGap, qualityScore, upsetFactors, confidence);
+        String flag = determineFlag(positionGap, qualityScore, upsetFactors, selection);
+
+        List<String> alternativeMarkets = buildAlternativeMarkets(context, selection.market(), homeTeam);
+        Map<String, Object> factors = buildFactors(
+                context, positionGap, qualityScore, upsetFactors, flag, selection, alternativeMarkets);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.TOP_VS_BOTTOM)
                 .confidence(confidence)
                 .score(qualityScore)
-                .market(market)
-                .odds(null)
-                .description(buildDescription(context, favoriteTeam, positionGap, confidence, flag))
+                .market(selection.market())
+                .odds(selection.odds())
+                .description(buildDescription(context, selection.market(), positionGap, confidence, flag))
                 .factors(factors)
                 .build();
 
-        log.info("Top vs Bottom recommendation: fixtureId={}, market={}, gap={}, quality={}, flag={}",
-                context.getFixture().getId(), market, positionGap, 
-                String.format("%.1f", qualityScore), flag);
+        log.info("Top vs Bottom recommendation: fixtureId={}, market={}, gap={}, quality={}, flag={}, upsetFactors={}",
+                context.getFixture().getId(), selection.market(), positionGap,
+                String.format("%.1f", qualityScore), flag, upsetFactors);
 
         return Optional.of(recommendation);
     }
 
-    private double calculateQualityScore(FixtureContext context, boolean homeIsFavorite) {
-        TeamSeasonStats favoriteStats = homeIsFavorite ? context.getHomeTeamStats() : context.getAwayTeamStats();
-        TeamSeasonStats underdogStats = homeIsFavorite ? context.getAwayTeamStats() : context.getHomeTeamStats();
+    private record MarketSelection(String market, Double odds) {}
 
-        double ppgFavorite = homeIsFavorite ? 
-                safeDouble(favoriteStats.getPpgHome()) : safeDouble(favoriteStats.getPpgAway());
-        double ppgUnderdog = homeIsFavorite ? 
-                safeDouble(underdogStats.getPpgAway()) : safeDouble(underdogStats.getPpgHome());
+    private double calculateQualityScore(FixtureContext context) {
+        TeamSeasonStats homeStats = context.getHomeTeamStats();
+        TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double ppgDiff = ppgFavorite - ppgUnderdog;
+        double ppgDiff = safeDouble(homeStats.getPpgHome()) - safeDouble(awayStats.getPpgAway());
+        int gdDiff = safeInt(homeStats.getSeasonGoalDifference()) - safeInt(awayStats.getSeasonGoalDifference());
+        int positionGap = awayStats.getPosition() - homeStats.getPosition();
 
-        int gdFavorite = safeInt(favoriteStats.getSeasonGoalDifference());
-        int gdUnderdog = safeInt(underdogStats.getSeasonGoalDifference());
-        double gdDiff = gdFavorite - gdUnderdog;
+        double ppgScore = Math.min(35.0, Math.max(0, ppgDiff * 18));
+        double gdScore = Math.min(25.0, Math.max(0, gdDiff * 1.2));
+        double posScore = Math.min(25.0, positionGap * 1.8);
 
-        double ppgScore = Math.min(40.0, ppgDiff * 20);
-        double gdScore = Math.min(30.0, Math.max(0, gdDiff * 1.5));
+        double formScore = 0.0;
+        if (context.hasRecentForm()) {
+            double formPpgDiff = safeDouble(context.getHomeTeamForm().getPpgHome())
+                    - safeDouble(context.getAwayTeamForm().getPpgAway());
+            formScore = Math.min(15.0, Math.max(0, formPpgDiff * 10));
+        }
 
-        int posDiff = Math.abs(favoriteStats.getPosition() - underdogStats.getPosition());
-        double posScore = Math.min(30.0, posDiff * 2);
+        double underdogBoost = 0.0;
+        if (calculateWinPercentage(awayStats, false) < UNDERDOG_POOR_AWAY_WIN_RATE) {
+            underdogBoost = 5.0;
+        }
 
-        return ppgScore + gdScore + posScore;
+        return clampScore(ppgScore + gdScore + posScore + formScore + underdogBoost);
     }
 
-    private ConfidenceLevel determineConfidence(int positionGap, double qualityScore, boolean favoriteAtHome) {
-        if (positionGap >= EXTREME_POSITION_GAP && qualityScore >= 70 && favoriteAtHome) {
-            return ConfidenceLevel.STRONG;
+    private boolean passesQualityFilters(TeamSeasonStats homeStats, TeamSeasonStats awayStats,
+            ConfidenceLevel confidence) {
+        boolean strong = confidence == ConfidenceLevel.STRONG;
+        double favoriteMinPpg = strong ? FAVORITE_MIN_PPG_STRONG : FAVORITE_MIN_PPG_MODERATE;
+        double underdogMaxPpg = strong ? UNDERDOG_MAX_PPG_STRONG : UNDERDOG_MAX_PPG_MODERATE;
+
+        if (safeDouble(homeStats.getPpgHome()) < favoriteMinPpg) {
+            return false;
         }
-        if (positionGap >= STRONG_POSITION_GAP && qualityScore >= 50) {
-            return ConfidenceLevel.STRONG;
+        if (safeDouble(awayStats.getPpgAway()) > underdogMaxPpg) {
+            return false;
         }
-        if (positionGap >= MIN_POSITION_GAP && qualityScore >= 30) {
+
+        if (strong) {
+            if (safeInt(homeStats.getSeasonGoalDifference()) < FAVORITE_MIN_GD_STRONG) {
+                return false;
+            }
+            if (safeInt(awayStats.getSeasonGoalDifference()) > UNDERDOG_MAX_GD_STRONG) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int countUpsetFactors(FixtureContext context) {
+        TeamSeasonStats homeStats = context.getHomeTeamStats();
+        TeamSeasonStats awayStats = context.getAwayTeamStats();
+        int count = 0;
+
+        if (context.hasRecentForm()) {
+            TeamRecentForm homeForm = context.getHomeTeamForm();
+            TeamRecentForm awayForm = context.getAwayTeamForm();
+            if (safeDouble(awayForm.getPpgAway()) >= AWAY_IMPROVING_FORM_PPG) {
+                count++;
+            }
+            if (safeInt(homeForm.getLossesHome()) >= 2) {
+                count++;
+            }
+            if (safeInt(awayForm.getWinsAway()) >= 2) {
+                count++;
+            }
+        }
+
+        if (calculateWinPercentage(awayStats, false) >= AWAY_COMPETITIVE_WIN_RATE) {
+            count++;
+        }
+
+        if (calculateVenueScoredPercentage(awayStats, false) >= BTTS_UNDERDOG_SCORED_PCT) {
+            count++;
+        }
+
+        return count;
+    }
+
+    private ConfidenceLevel determineConfidence(int positionGap, double qualityScore, int upsetFactors) {
+        ConfidenceLevel level = ConfidenceLevel.WEAK;
+
+        if (positionGap >= MIN_GAP_BANKER && qualityScore >= QUALITY_BANKER) {
+            level = ConfidenceLevel.STRONG;
+        } else if (positionGap >= MIN_GAP_STRONG && qualityScore >= QUALITY_STRONG) {
+            level = ConfidenceLevel.STRONG;
+        } else if (positionGap >= MIN_GAP_MODERATE && qualityScore >= QUALITY_MODERATE) {
+            level = ConfidenceLevel.MODERATE;
+        }
+
+        if (level == ConfidenceLevel.WEAK) {
+            return ConfidenceLevel.WEAK;
+        }
+
+        // Option A — Strong requires home favorite (always true here); cap when upset watch fires
+        if (upsetFactors >= UPSET_WATCH_FACTORS && level == ConfidenceLevel.STRONG) {
             return ConfidenceLevel.MODERATE;
         }
-        return ConfidenceLevel.WEAK;
+        return level;
     }
 
-    private String determineFlag(int positionGap, double qualityScore, boolean favoriteAtHome) {
-        if (positionGap >= EXTREME_POSITION_GAP && qualityScore >= 70 && favoriteAtHome) {
+    private MarketSelection selectPrimaryMarket(FixtureContext context, int positionGap, double qualityScore,
+            int upsetFactors, ConfidenceLevel confidence) {
+        String homeTeam = context.getHomeTeam().getName();
+        Double homeOdds = context.hasOdds() ? context.getOdds().getOddsFt1() : null;
+
+        if (upsetFactors >= UPSET_WATCH_FACTORS && confidence == ConfidenceLevel.MODERATE) {
+            Double dcOdds = context.hasOdds() ? impliedDoubleChance1X(context) : null;
+            return new MarketSelection("Home/Draw (1X)", dcOdds);
+        }
+
+        if (homeOdds != null && homeOdds < SHORT_FAVORITE_ODDS) {
+            double expectedGoals = calculateVenueGoalsAvg(context.getHomeTeamStats(), true)
+                    + calculateVenueConcededAvg(context.getAwayTeamStats(), false);
+            if (expectedGoals >= 3.2) {
+                return new MarketSelection("Over 3.5 Goals", context.getOdds().getOddsFtOver35());
+            }
+            if (expectedGoals >= 2.6) {
+                return new MarketSelection("Over 2.5 Goals", context.getOdds().getOddsFtOver25());
+            }
+            if (positionGap >= MIN_GAP_STRONG && qualityScore >= QUALITY_STRONG) {
+                return new MarketSelection(homeTeam + " -1.5", null);
+            }
+        }
+
+        return new MarketSelection(homeTeam, homeOdds);
+    }
+
+    private Double impliedDoubleChance1X(FixtureContext context) {
+        Double home = context.getOdds().getOddsFt1();
+        Double draw = context.getOdds().getOddsFtX();
+        if (home == null || draw == null || home <= 0 || draw <= 0) {
+            return null;
+        }
+        double implied = (1.0 / home) + (1.0 / draw);
+        if (implied <= 0) {
+            return null;
+        }
+        return 1.0 / implied;
+    }
+
+    private List<String> buildAlternativeMarkets(FixtureContext context, String primaryMarket, String homeTeam) {
+        List<String> alternatives = new ArrayList<>();
+        TeamSeasonStats homeStats = context.getHomeTeamStats();
+        TeamSeasonStats awayStats = context.getAwayTeamStats();
+
+        if (!primaryMarket.equals(homeTeam)) {
+            alternatives.add(homeTeam);
+        }
+
+        if (context.hasOdds()) {
+            Double homeOdds = context.getOdds().getOddsFt1();
+            if (homeOdds != null && homeOdds < SHORT_FAVORITE_ODDS) {
+                if (!primaryMarket.contains("Over 2.5")) {
+                    alternatives.add("Over 2.5 Goals");
+                }
+                if (!primaryMarket.contains("-1.5")) {
+                    alternatives.add(homeTeam + " -1.5");
+                }
+            }
+        }
+
+        if (suggestsBttsMismatch(homeStats, awayStats) && !primaryMarket.toLowerCase().contains("btts")) {
+            alternatives.add("BTTS Yes");
+        }
+
+        return alternatives;
+    }
+
+    private boolean suggestsBttsMismatch(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        double awayScoredPct = calculateVenueScoredPercentage(awayStats, false);
+        double homeConcededPct = 100.0 - calculateCleanSheetPercentage(homeStats, true);
+        return awayScoredPct >= BTTS_UNDERDOG_SCORED_PCT && homeConcededPct >= BTTS_FAVORITE_CONCEDES_PCT;
+    }
+
+    private String determineFlag(int positionGap, double qualityScore, int upsetFactors, MarketSelection selection) {
+        if (upsetFactors >= UPSET_WATCH_FACTORS) {
+            return "Upset Watch";
+        }
+        if (selection.market().contains("Over")) {
+            return "Goals Expected";
+        }
+        if (selection.market().contains("-1.5")) {
+            return "Handicap";
+        }
+        if (positionGap >= MIN_GAP_BANKER && qualityScore >= QUALITY_BANKER) {
             return "Banker";
         }
-        if (positionGap >= STRONG_POSITION_GAP && qualityScore >= 60) {
+        if (positionGap >= MIN_GAP_STRONG && qualityScore >= 60.0) {
             return "Strong Favorite";
-        }
-        if (!favoriteAtHome && positionGap >= MIN_POSITION_GAP) {
-            return "Away Favorite";
         }
         return "Mismatch";
     }
 
-    private Map<String, Object> buildFactors(FixtureContext context, int positionGap, 
-            double qualityScore, boolean homeIsFavorite, String flag) {
+    private Map<String, Object> buildFactors(FixtureContext context, int positionGap, double qualityScore,
+            int upsetFactors, String flag, MarketSelection selection, List<String> alternativeMarkets) {
         Map<String, Object> factors = new HashMap<>();
-        
+
         factors.put("homePosition", context.getHomeTeamStats().getPosition());
         factors.put("awayPosition", context.getAwayTeamStats().getPosition());
         factors.put("positionGap", positionGap);
         factors.put("qualityScore", qualityScore);
-        factors.put("homeIsFavorite", homeIsFavorite);
+        factors.put("homeIsFavorite", true);
+        factors.put("awayFavoritesPaused", true);
         factors.put("flag", flag);
+        factors.put("upsetFactorCount", upsetFactors);
+        factors.put("primaryMarketType", primaryMarketType(selection.market()));
+        factors.put("alternativeMarkets", alternativeMarkets);
 
         factors.put("homePpg", context.getHomeTeamStats().getPpgOverall());
         factors.put("awayPpg", context.getAwayTeamStats().getPpgOverall());
+        factors.put("homePpgHome", context.getHomeTeamStats().getPpgHome());
+        factors.put("awayPpgAway", context.getAwayTeamStats().getPpgAway());
         factors.put("homeGd", context.getHomeTeamStats().getSeasonGoalDifference());
         factors.put("awayGd", context.getAwayTeamStats().getSeasonGoalDifference());
+        factors.put("awayAwayWinPct", calculateWinPercentage(context.getAwayTeamStats(), false));
+        factors.put("formDataAvailable", context.hasRecentForm());
+
+        if (context.hasRecentForm()) {
+            factors.put("homeFormPpgHome", context.getHomeTeamForm().getPpgHome());
+            factors.put("awayFormPpgAway", context.getAwayTeamForm().getPpgAway());
+        }
+
+        if (suggestsBttsMismatch(context.getHomeTeamStats(), context.getAwayTeamStats())) {
+            factors.put("bttsMismatchSuggested", true);
+        }
 
         return factors;
     }
 
-    private String buildDescription(FixtureContext context, String favoriteTeam, int positionGap,
+    private static String primaryMarketType(String market) {
+        String lower = market.toLowerCase();
+        if (lower.contains("over") && lower.contains("goals")) {
+            return "GOALS_LINE";
+        }
+        if (lower.contains("-1.5")) {
+            return "HANDICAP";
+        }
+        if (lower.contains("1x") || lower.contains("home/draw")) {
+            return "UPSET_DOUBLE_CHANCE";
+        }
+        return "FAVORITE_WIN";
+    }
+
+    private String buildDescription(FixtureContext context, String market, int positionGap,
             ConfidenceLevel confidence, String flag) {
         return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
                 .confidence(confidence)
-                .selection(favoriteTeam)
+                .selection(market)
                 .context(context)
                 .colourNote(String.format("%d position gap on the table, %s — big fish, small pond energy",
                         positionGap, flag))
