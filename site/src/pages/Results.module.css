@@ -447,44 +447,60 @@
   white-space: nowrap;
 }
 
-.compactTableWrap {
-  overflow-x: auto;
+.compactPickListWrap {
+  overflow-x: hidden;
 }
 
-.compactTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8rem;
+.compactPickList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-.compactTable th,
-.compactTable td {
+.compactPickHeader,
+.compactPickRow {
+  display: grid;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
   padding: 0.35rem 0.6rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-  vertical-align: middle;
 }
 
-.compactTable th {
+.compactPickGrid {
+  grid-template-columns: minmax(0, 1.5fr) 2.75rem minmax(0, 1.6fr) minmax(0, 1fr) 4.75rem;
+}
+
+.compactPickGridWithRank {
+  grid-template-columns: 1.75rem minmax(0, 1.5fr) 2.75rem minmax(0, 1.6fr) minmax(0, 1fr) 4.75rem;
+}
+
+.compactPickHeader {
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
   background: var(--bg-secondary);
-  white-space: nowrap;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.compactTable tbody tr:last-child td {
+.compactPickRow {
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem;
+}
+
+.compactPickRow:last-child {
   border-bottom: none;
 }
 
-.compactTable tbody tr:hover {
+.compactPickRow:hover {
   background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
 }
 
+.compactMobileMeta {
+  display: none;
+}
+
 .compactRank {
-  width: 1.75rem;
   font-family: var(--font-display);
   font-weight: 700;
   color: var(--text-primary);
@@ -492,8 +508,7 @@
 }
 
 .compactMatch {
-  min-width: 9rem;
-  max-width: 14rem;
+  min-width: 0;
 }
 
 .compactMatchLink {
@@ -501,9 +516,7 @@
   color: var(--text-primary);
   font-weight: 600;
   text-decoration: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .compactMatchLink:hover {
@@ -514,9 +527,7 @@
   display: block;
   color: var(--text-muted);
   font-size: 0.68rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .compactScore {
@@ -528,13 +539,17 @@
 }
 
 .compactPick {
-  display: flex;
+  min-width: 0;
+}
+
+.compactPickInner {
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.3rem;
-  min-width: 8rem;
   font-weight: 600;
   color: var(--text-primary);
+  line-height: 1.25;
 }
 
 .compactPrice {
@@ -549,11 +564,11 @@
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .compactOutcome {
-  white-space: nowrap;
+  justify-self: end;
 }
 
 .outcomeCompact {
@@ -905,14 +920,89 @@
   display: inline-flex;
 }
 
-@media (max-width: 960px) {
-  .splitSections,
-  .returnsSplit {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 800px) {
+  .compactPickHeader {
+    display: none;
+  }
+
+  .compactPickRow {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "match result"
+      "pick pick"
+      "meta meta";
+    gap: 0.25rem 0.5rem;
+    padding: 0.55rem 0.65rem;
+    align-items: start;
+  }
+
+  .compactPickRowWithRank {
+    grid-template-columns: 1.75rem 1fr auto;
+    grid-template-areas:
+      "rank match result"
+      "rank pick pick"
+      "rank meta meta";
+  }
+
+  .compactRank {
+    grid-area: rank;
+    align-self: start;
+    padding-top: 0.1rem;
+  }
+
+  .compactMatch {
+    grid-area: match;
+  }
+
+  .compactPick {
+    grid-area: pick;
+  }
+
+  .compactOutcome {
+    grid-area: result;
+    justify-self: end;
+  }
+
+  .compactMobileMeta {
+    grid-area: meta;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.65rem;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .compactScore,
+  .compactType {
+    display: none;
+  }
+
+  .compactMobileScore {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .compactMobileType {
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 0.68rem;
+  }
+
+  .compactSummary {
+    gap: 0.4rem 0.55rem;
+  }
+
+  .compactStats {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .outcomeCompact {
+    min-width: 0;
+  }
+
   .summaryStrip {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -925,5 +1015,12 @@
   .pickRow {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 960px) {
+  .splitSections,
+  .returnsSplit {
+    grid-template-columns: 1fr;
   }
 }

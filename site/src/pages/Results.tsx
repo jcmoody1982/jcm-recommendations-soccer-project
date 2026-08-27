@@ -660,6 +660,68 @@ function ReturnsPanel({ fixtures }: { fixtures: ResultsFixture[] }) {
   );
 }
 
+function CompactPickRow({
+  fixture,
+  pick,
+  showEliteRank,
+  eliteKeys,
+}: {
+  fixture: ResultsFixture;
+  pick: ResultsPick;
+  showEliteRank: boolean;
+  eliteKeys?: Set<string>;
+}) {
+  const price = formatPrice(pick.odds);
+  const isElite =
+    showEliteRank
+    || pick.eliteRank != null
+    || Boolean(eliteKeys?.has(`${fixture.fixtureId}:${pick.type}`));
+  const score = fixture.scoreline
+    ? `${fixture.scoreline.home}–${fixture.scoreline.away}`
+    : fixture.matchStatus === 'incomplete'
+      ? '…'
+      : '—';
+  const gridClass = showEliteRank ? styles.compactPickGridWithRank : styles.compactPickGrid;
+
+  return (
+    <li
+      className={`${styles.compactPickRow} ${gridClass}${showEliteRank ? ` ${styles.compactPickRowWithRank}` : ''}`}
+    >
+      {showEliteRank && (
+        <span className={styles.compactRank}>
+          {pick.eliteRank != null ? pick.eliteRank : '—'}
+        </span>
+      )}
+      <div className={styles.compactMatch}>
+        <Link to={`/fixtures/${fixture.fixtureId}`} className={styles.compactMatchLink}>
+          {fixture.homeTeamName} v {fixture.awayTeamName}
+        </Link>
+        {fixture.leagueName && (
+          <span className={styles.compactLeague}>{fixture.leagueName}</span>
+        )}
+      </div>
+      <span className={styles.compactScore}>{score}</span>
+      <div className={styles.compactPick}>
+        <span className={styles.compactPickInner}>
+          {isElite && <EliteBolt variant="badge" size={14} />}
+          <span>{pick.market}</span>
+          {price && <span className={styles.compactPrice}>@{price}</span>}
+        </span>
+      </div>
+      <span className={styles.compactType}>{formatType(pick.type)}</span>
+      <div className={styles.compactOutcome}>
+        <span className={`${styles.outcomeCompact} ${styles[`outcome${pick.outcome}`]}`}>
+          {outcomeLabel(pick.outcome)}
+        </span>
+      </div>
+      <div className={styles.compactMobileMeta}>
+        <span className={styles.compactMobileScore}>{score}</span>
+        <span className={styles.compactMobileType}>{formatType(pick.type)}</span>
+      </div>
+    </li>
+  );
+}
+
 function CompactPickTable({
   fixtures,
   showEliteRank = false,
@@ -675,64 +737,29 @@ function CompactPickTable({
 
   if (rows.length === 0) return null;
 
-  return (
-    <div className={styles.compactTableWrap}>
-      <table className={styles.compactTable}>
-        <thead>
-          <tr>
-            {showEliteRank && <th>#</th>}
-            <th>Match</th>
-            <th>Scr</th>
-            <th>Pick</th>
-            <th>Type</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(({ fixture, pick }) => {
-            const price = formatPrice(pick.odds);
-            const isElite =
-              showEliteRank
-              || pick.eliteRank != null
-              || Boolean(eliteKeys?.has(`${fixture.fixtureId}:${pick.type}`));
-            const score = fixture.scoreline
-              ? `${fixture.scoreline.home}–${fixture.scoreline.away}`
-              : fixture.matchStatus === 'incomplete'
-                ? '…'
-                : '—';
+  const gridClass = showEliteRank ? styles.compactPickGridWithRank : styles.compactPickGrid;
 
-            return (
-              <tr key={pick.id}>
-                {showEliteRank && (
-                  <td className={styles.compactRank}>
-                    {pick.eliteRank != null ? pick.eliteRank : '—'}
-                  </td>
-                )}
-                <td className={styles.compactMatch}>
-                  <Link to={`/fixtures/${fixture.fixtureId}`} className={styles.compactMatchLink}>
-                    {fixture.homeTeamName} v {fixture.awayTeamName}
-                  </Link>
-                  {fixture.leagueName && (
-                    <span className={styles.compactLeague}>{fixture.leagueName}</span>
-                  )}
-                </td>
-                <td className={styles.compactScore}>{score}</td>
-                <td className={styles.compactPick}>
-                  {isElite && <EliteBolt variant="badge" size={14} />}
-                  <span>{pick.market}</span>
-                  {price && <span className={styles.compactPrice}>@{price}</span>}
-                </td>
-                <td className={styles.compactType}>{formatType(pick.type)}</td>
-                <td className={styles.compactOutcome}>
-                  <span className={`${styles.outcomeCompact} ${styles[`outcome${pick.outcome}`]}`}>
-                    {outcomeLabel(pick.outcome)}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+  return (
+    <div className={styles.compactPickListWrap}>
+      <div className={`${styles.compactPickHeader} ${gridClass}`} aria-hidden="true">
+        {showEliteRank && <span>#</span>}
+        <span>Match</span>
+        <span>Scr</span>
+        <span>Pick</span>
+        <span>Type</span>
+        <span>Result</span>
+      </div>
+      <ul className={styles.compactPickList}>
+        {rows.map(({ fixture, pick }) => (
+          <CompactPickRow
+            key={pick.id}
+            fixture={fixture}
+            pick={pick}
+            showEliteRank={showEliteRank}
+            eliteKeys={eliteKeys}
+          />
+        ))}
+      </ul>
     </div>
   );
 }
