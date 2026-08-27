@@ -427,12 +427,13 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, String market, int positionGap,
             ConfidenceLevel confidence, String flag) {
+        String colour = String.format("%d places between them on the table, %s — clear gulf in standing",
+                positionGap, flag);
         return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(market)
                 .context(context)
-                .colourNote(String.format("%d places between them on the table, %s — clear gulf in standing",
-                        positionGap, flag))
+                .colourNote(appendColourNote(colour, context))
                 .build());
     }
 }

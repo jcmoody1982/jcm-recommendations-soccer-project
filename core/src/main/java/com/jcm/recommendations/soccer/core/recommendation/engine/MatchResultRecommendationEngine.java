@@ -708,7 +708,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
                 .context(context)
                 .probabilityPct(probability)
                 .valuePct(hasOutcomeOdds && valueVsOdds > 0 ? valueVsOdds : null)
-                .colourNote(colour.isEmpty() ? null : colour.toString())
+                .colourNote(appendColourNote(colour.isEmpty() ? null : colour.toString(), context))
                 .build());
     }
 }

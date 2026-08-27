@@ -313,6 +313,9 @@ class MatchResultRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("squadValueApplied")).isEqualTo(true);
         assertThat(result.get().getFactors().get("squadValueBoostApplied")).isEqualTo(4.0);
+        assertThat(result.get().getFactors().get("squadValueDifference"))
+                .isEqualTo("Home €900m vs Away €200m (home 4.5×)");
+        assertThat(result.get().getDescription()).contains("Squad value");
         assertThat(result.get().getScore()).isGreaterThan(baselineScore);
         @SuppressWarnings("unchecked")
         List<String> positiveIndicators = (List<String>) result.get().getFactors().get("positiveIndicators");

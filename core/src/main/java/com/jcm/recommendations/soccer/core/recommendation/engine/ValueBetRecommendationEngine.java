@@ -377,7 +377,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
                 .odds(opportunity.odds)
                 .valuePct(opportunity.valuePercentage)
                 .expectedValue(opportunity.expectedValue)
-                .colourNote("The listed price looks soft against the analysis")
+                .colourNote(appendColourNote("The listed price looks soft against the analysis", context))
                 .build());
     }
 

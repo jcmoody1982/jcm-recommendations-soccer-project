@@ -28,10 +28,21 @@ const SKIP_KEYS = new Set([
   'apiCornersPotential',
   'apiCornersO85Potential',
   'apiCornersO105Potential',
+  // Squad value: show the human-readable difference only
+  'squadValueApplied',
+  'homeSquadValueEur',
+  'awaySquadValueEur',
+  'squadValueDifferenceEur',
+  'squadValueRatioHomeOverAway',
+  'squadValueSupportsFavorite',
+  'squadValueSuggestsUpset',
+  'squadValueBoostApplied',
 ]);
 
 /** Friendly labels for specific factor keys (all markets). */
-const GLOBAL_LABELS: Record<string, string> = {};
+const GLOBAL_LABELS: Record<string, string> = {
+  squadValueDifference: 'Squad Value',
+};
 
 /**
  * Preferred Info order for BTTS: all Home attributes, then Away, then shared.
@@ -140,6 +151,19 @@ const PLAYER_PROP_FACTOR_ORDER: readonly string[] = [
   'calculatedScore',
 ];
 
+/** Markets that use TM squad value — keep the difference near the top of Info. */
+const SQUAD_VALUE_FACTOR_ORDER: readonly string[] = [
+  'squadValueDifference',
+  'positiveIndicators',
+  'riskFlags',
+  'positionGap',
+  'qualityScore',
+  'valuePercentage',
+  'expectedValue',
+  'homeWinProbability',
+  'market',
+];
+
 const FACTOR_ORDER_BY_TYPE: Partial<Record<RecommendationType, readonly string[]>> = {
   BTTS: BTTS_FACTOR_ORDER,
   DOUBLE_CHANCE: DOUBLE_CHANCE_FACTOR_ORDER,
@@ -147,6 +171,9 @@ const FACTOR_ORDER_BY_TYPE: Partial<Record<RecommendationType, readonly string[]
   OVER_25_GOALS: TOTAL_GOALS_OVER_FACTOR_ORDER,
   PLAYER_TO_SCORE: PLAYER_PROP_FACTOR_ORDER,
   PLAYER_TO_ASSIST: PLAYER_PROP_FACTOR_ORDER,
+  MATCH_RESULT: SQUAD_VALUE_FACTOR_ORDER,
+  TOP_VS_BOTTOM: SQUAD_VALUE_FACTOR_ORDER,
+  VALUE_BET: SQUAD_VALUE_FACTOR_ORDER,
 };
 
 const MAX_FACTORS = 8;
