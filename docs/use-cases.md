@@ -1079,7 +1079,7 @@ Opponent Overperformance:
   - `opponentXgOverperformance` - opponent scoring below xG
   - `riskFlags` / `positiveIndicators` - summary lists
 
-**Status:** `Implemented`
+**Status:** `Paused` — removed from site boards, Elite, and Results metrics pending recalibration (early hit rate ~21%).
 
 ---
 
@@ -1308,9 +1308,9 @@ Blend of draw likelihood (40%) and attacking intent (60%):
 
 #### UC-017: Match Result Recommendations
 
-**Goal:** Predict Home Win / Away Win outcomes for upcoming fixtures. Draw picks are deferred to UC-019 (`DrawRecommendationEngine`).
+**Goal:** Predict Home Win outcomes for upcoming fixtures. Away tips are paused pending recalibration. Draw picks are deferred to UC-019 (`DrawRecommendationEngine`).
 
-**User Story:** As a user, I want to see predicted match winners for upcoming fixtures.
+**User Story:** As a user, I want to see predicted home winners for upcoming fixtures.
 
 **Data Required:**
 - Team PPG (home/away, season + form)
@@ -1409,18 +1409,20 @@ Other positions: × 1.0
 
 **Recommendation selection (P2):**
 ```
-Only Home or Away may be recommended (higher of the two win probs).
+Only Home may be recommended (Away tips paused until recalibrated).
+If Away win probability is higher than Home → no tip.
 Draw is never emitted by this engine — use UC-019 Draw engine.
 ```
 
 **Thresholds (P0):**
-- **Strong:** Probability ≥ 55% AND (no outcome odds OR value vs odds ≥ 5%)
-- **Moderate:** Probability ≥ 45% (also: probability ≥ 55% with odds but no value edge)
-- **Weak (filtered):** Probability < 45%
+- **Strong:** Probability ≥ 62% AND (no outcome odds OR (odds ≤ 2.50 AND value vs odds ≥ 5%))
+- **Moderate:** Probability ≥ 55% (also: probability ≥ 62% with long odds or no value edge)
+- **Weak (filtered):** Probability < 55%
 
 **Enhanced Factor Tracking:**
 - `homeWinProbability`, `drawProbability`, `awayWinProbability`
 - `drawsDeferredToDrawEngine` (always true)
+- `awayTipsPaused` (always true while Away side is paused)
 - `valueVsOdds`
 - `oddsFt1`, `oddsFtX`, `oddsFt2`
 - `impliedHomeWinPct`, `impliedDrawPct`, `impliedAwayWinPct`

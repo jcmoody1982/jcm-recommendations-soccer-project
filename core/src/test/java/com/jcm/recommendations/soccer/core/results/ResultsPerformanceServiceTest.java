@@ -62,7 +62,8 @@ class ResultsPerformanceServiceTest {
         assertThat(view.byConfidence().get("MODERATE").wins()).isEqualTo(0);
         assertThat(view.byConfidence().get("MODERATE").losses()).isEqualTo(1);
 
-        assertThat(view.byType()).hasSize(RecommendationType.values().length);
+        assertThat(view.byType()).hasSize(RecommendationType.values().length - 1);
+        assertThat(view.byType()).noneMatch(t -> "CLEAN_SHEET".equals(t.type()));
         ResultsPerformanceService.TypePerformance btts = view.byType().stream()
                 .filter(t -> "BTTS".equals(t.type()))
                 .findFirst()

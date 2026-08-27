@@ -6,13 +6,15 @@ import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFac
 import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.util.*;
 
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
-@Component
+/**
+ * UC-014: paused — low hit rate (~21% on early snapshots). Keep class for recalibration;
+ * not registered as a Spring bean so it is excluded from boards, snapshots, and metrics.
+ */
 @Slf4j
 public class CleanSheetRecommendationEngine implements RecommendationEngine {
 
