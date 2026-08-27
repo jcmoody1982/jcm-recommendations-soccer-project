@@ -17,14 +17,12 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 @Slf4j
 public class ValueBetRecommendationEngine implements RecommendationEngine {
 
-    private static final double THRESHOLD_STRONG_VALUE = 15.0;
-    private static final double THRESHOLD_MODERATE_VALUE = 10.0;
-    private static final double THRESHOLD_STRONG_EV = 0.10;
-    private static final double THRESHOLD_MODERATE_EV = 0.05;
+    private static final double THRESHOLD_STRONG_VALUE = 20.0;
+    private static final double THRESHOLD_MODERATE_VALUE = 15.0;
+    private static final double THRESHOLD_STRONG_EV = 0.12;
+    private static final double THRESHOLD_MODERATE_EV = 0.08;
     private static final double MIN_ODDS = 1.50;
-    private static final double MAX_ODDS = 3.0;
-    /** STRONG value also requires price not longer than this. */
-    private static final double STRONG_MAX_ODDS = 2.50;
+    private static final double MAX_ODDS = 2.50;
 
     // Kelly Criterion fraction (conservative)
     private static final double KELLY_FRACTION = 0.25;  // Quarter Kelly for safety
@@ -242,7 +240,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
                     expectedValue,
                     weightedEv,
                     kellyStake,
-                    determineConfidence(valuePercentage, expectedValue, odds),
+                    determineConfidence(valuePercentage, expectedValue, odds, sourceConfidence),
                     sourceConfidence
             ));
         }
@@ -273,59 +271,30 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
     }
 
     private void checkMatchResultValue(FixtureContext context, List<ValueOpportunity> opportunities) {
-        double[] probs = calculateMatchResultProbabilities(context);
-        
-        createValueOpportunity("Home Win", probs[0], context.getOdds().getOddsFt1(), 
-                ConfidenceLevel.MODERATE).ifPresent(opportunities::add);
-        createValueOpportunity("Draw", probs[1], context.getOdds().getOddsFtX(), 
-                ConfidenceLevel.MODERATE).ifPresent(opportunities::add);
-        createValueOpportunity("Away Win", probs[2], context.getOdds().getOddsFt2(), 
-                ConfidenceLevel.MODERATE).ifPresent(opportunities::add);
-    }
+        double homeWinProb = calculateHomeWinProbability(context);
 
-    private double[] calculateMatchResultProbabilities(FixtureContext context) {
-        // More sophisticated probability calculation using multiple factors
-        double homeWinBase = calculateHomeWinProbability(context);
-        double awayWinBase = calculateAwayWinProbability(context);
-        
-        // Incorporate form data if available
         if (context.hasRecentForm()) {
             double homeFormPpg = safeDouble(context.getHomeTeamForm().getPpgHome(), 1.0);
-            double awayFormPpg = safeDouble(context.getAwayTeamForm().getPpgAway(), 1.0);
-            
-            // Blend season and form (60% season, 40% form)
-            double homeFormWinRate = homeFormPpg / 3.0; // Approximate win rate from PPG
-            double awayFormWinRate = awayFormPpg / 3.0;
-            
-            homeWinBase = (homeWinBase * 0.6) + (homeFormWinRate * 0.4);
-            awayWinBase = (awayWinBase * 0.6) + (awayFormWinRate * 0.4);
+            double homeFormWinRate = homeFormPpg / 3.0;
+            homeWinProb = (homeWinProb * 0.6) + (homeFormWinRate * 0.4);
         }
-        
-        // Incorporate xG if available
-        if (context.getHomeTeamStats() != null && context.getAwayTeamStats() != null) {
-            Double homeXg = context.getHomeTeamStats().getXgForAvgHome();
-            Double awayXg = context.getAwayTeamStats().getXgForAvgAway();
-            
-            if (homeXg != null && awayXg != null) {
-                // Teams with higher xG tend to win more
-                double xgRatio = homeXg / (homeXg + awayXg + 0.1); // +0.1 to avoid division by zero
-                homeWinBase = (homeWinBase * 0.7) + (xgRatio * 0.3);
-                awayWinBase = (awayWinBase * 0.7) + ((1 - xgRatio) * 0.3);
-            }
+
+        if (context.getHomeTeamStats() != null && context.getHomeTeamStats().getXgForAvgHome() != null
+                && context.getAwayTeamStats() != null && context.getAwayTeamStats().getXgAgainstAvgHome() != null) {
+            double homeXg = safeDouble(context.getHomeTeamStats().getXgForAvgHome());
+            double awayXga = safeDouble(context.getAwayTeamStats().getXgAgainstAvgHome());
+            double xgSignal = homeXg / (homeXg + awayXga + 0.1);
+            homeWinProb = (homeWinProb * 0.7) + (xgSignal * 0.3);
         }
-        
-        // Normalize probabilities to sum to 1
-        double total = homeWinBase + awayWinBase;
-        double drawProb = Math.max(0.15, Math.min(0.35, 1.0 - total)); // Draw typically 15-35%
-        
-        double scaleFactor = (1.0 - drawProb) / total;
-        double homeWin = homeWinBase * scaleFactor;
-        double awayWin = awayWinBase * scaleFactor;
-        
-        return new double[] { homeWin, drawProb, awayWin };
+
+        homeWinProb = Math.max(0.05, Math.min(0.90, homeWinProb));
+
+        // Home Win only — Away/Draw value paused after poor snapshot hit rates (aligned with Match Result).
+        createValueOpportunity("Home Win", homeWinProb, context.getOdds().getOddsFt1(),
+                ConfidenceLevel.MODERATE).ifPresent(opportunities::add);
     }
 
-private double calculateHomeWinProbability(FixtureContext context) {
+    private double calculateHomeWinProbability(FixtureContext context) {
         if (context.getHomeTeamStats() == null) {
             return 0.33;
         }
@@ -338,39 +307,12 @@ private double calculateHomeWinProbability(FixtureContext context) {
         return homeWins / (double) homeMatches;
     }
 
-    private double calculateAwayWinProbability(FixtureContext context) {
-        if (context.getAwayTeamStats() == null) {
-            return 0.33;
-        }
-        int awayMatches = calculateMatchesAtVenue(context.getAwayTeamStats(), false);
-        if (awayMatches == 0) {
-            return 0.33;
-        }
-        int awayWins = context.getAwayTeamStats().getSeasonWinsAway() != null 
-                ? context.getAwayTeamStats().getSeasonWinsAway() : 0;
-        return awayWins / (double) awayMatches;
-    }
-
-    private int calculateMatchesAtVenue(com.jcm.recommendations.soccer.domain.TeamSeasonStats stats, boolean isHome) {
-        if (isHome) {
-            return safeInt(stats.getSeasonWinsHome()) 
-                    + safeInt(stats.getSeasonDrawsHome()) 
-                    + safeInt(stats.getSeasonLossesHome());
-        } else {
-            return safeInt(stats.getSeasonWinsAway()) 
-                    + safeInt(stats.getSeasonDrawsAway()) 
-                    + safeInt(stats.getSeasonLossesAway());
-        }
-    }
-
-    private int safeInt(Integer value) {
-        return value != null ? value : 0;
-    }
-
-    ConfidenceLevel determineConfidence(double valuePercentage, double expectedValue, double odds) {
+    ConfidenceLevel determineConfidence(double valuePercentage, double expectedValue, double odds,
+            ConfidenceLevel sourceConfidence) {
         if (valuePercentage >= THRESHOLD_STRONG_VALUE
                 && expectedValue >= THRESHOLD_STRONG_EV
-                && odds <= STRONG_MAX_ODDS) {
+                && odds <= MAX_ODDS
+                && sourceConfidence == ConfidenceLevel.STRONG) {
             return ConfidenceLevel.STRONG;
         } else if (valuePercentage >= THRESHOLD_MODERATE_VALUE && expectedValue >= THRESHOLD_MODERATE_EV) {
             return ConfidenceLevel.MODERATE;
@@ -413,12 +355,13 @@ private double calculateHomeWinProbability(FixtureContext context) {
         // Breakdown by market type
         long bttsCount = all.stream().filter(o -> o.market.startsWith("BTTS")).count();
         long goalsCount = all.stream().filter(o -> o.market.contains("Goals")).count();
-        long matchResultCount = all.stream().filter(o -> 
-                o.market.equals("Home Win") || o.market.equals("Draw") || o.market.equals("Away Win")).count();
+        long matchResultCount = all.stream().filter(o -> o.market.equals("Home Win")).count();
         
         factors.put("bttsOpportunities", bttsCount);
         factors.put("goalsOpportunities", goalsCount);
         factors.put("matchResultOpportunities", matchResultCount);
+        factors.put("awayWinValuePaused", true);
+        factors.put("drawValuePaused", true);
 
         return factors;
     }

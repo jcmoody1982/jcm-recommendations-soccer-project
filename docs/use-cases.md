@@ -641,9 +641,9 @@ MODERATE requires edge ≥ 8.
 | Under 1.5 Goals | `oddsFtUnder15` | UC-007 adjusted (-15%) |
 | Under 2.5 Goals | `oddsFtUnder25` | UC-007 Under Goals Engine score |
 | Under 3.5 Goals | `oddsFtUnder35` | UC-007 adjusted (+25%) |
-| Home Win | `oddsFt1` | Enhanced probability calculation |
-| Draw | `oddsFtX` | Enhanced probability calculation |
-| Away Win | `oddsFt2` | Enhanced probability calculation |
+| Home Win | `oddsFt1` | Home-only enhanced probability (Away/Draw value paused) |
+| ~~Draw~~ | ~~`oddsFtX`~~ | Paused |
+| ~~Away Win~~ | ~~`oddsFt2`~~ | Paused |
 
 **Logic:**
 ```
@@ -685,34 +685,21 @@ For each market:
 5. Draw constrained to 15-35% range
 ```
 
-**Thresholds:**
-- **Strong Value:** Value % ≥ 15% AND EV ≥ 0.10 AND odds ≤ 2.50
-- **Moderate Value:** Value % ≥ 10% AND EV ≥ 0.05 (and odds ≤ 3.00)
-- **No Value:** Value % < 10% OR EV < 0.05 OR odds outside range
-- **Odds Range:** 1.50 to 3.00 for all markets including 1X2 (avoids tiny margins and longshots)
+**Thresholds (recalibrated Aug 2026):**
+- **Strong Value:** Value % ≥ 20% AND EV ≥ 0.12 AND odds ≤ 2.50 AND source engine **Strong**
+- **Moderate Value:** Value % ≥ 15% AND EV ≥ 0.08 AND odds ≤ 2.50
+- **No Value:** Below thresholds OR odds outside range
+- **Odds Range:** 1.50 to 2.50 (drops the 2.50–3.00 band with poor snapshot hit rates)
+- **1X2 scope:** Home Win value only; Away Win and Draw paused (aligned with Match Result recalibration)
 
 **Best Opportunity Selection:**
 - All qualifying opportunities ranked by weighted EV
 - Best opportunity returned as primary recommendation
 - All opportunities tracked in factors for transparency
 
-**Output:**
-- Single best value bet recommendation
-- Ranked by weighted expected value
-- Include: market, our probability, implied probability, odds, EV, Kelly stake
-- Factors tracked:
-  - `market` - best market found
-  - `ourProbability` / `impliedProbability` - probability comparison
-  - `odds` - bookmaker odds
-  - `valuePercentage` - value edge found
-  - `expectedValue` / `weightedExpectedValue` - EV calculations
-  - `kellyStake` / `suggestedStakePct` - stake sizing
-  - `sourceConfidence` / `valueConfidence` - confidence levels
-  - `totalOpportunities` - count of all value found
-  - `allOpportunities` - list of all qualifying bets
-  - `bttsOpportunities` / `goalsOpportunities` / `matchResultOpportunities` - breakdown by type
+**Output:** market, probabilities, odds, EV, Kelly stake; factors include `awayWinValuePaused`, `drawValuePaused`, and opportunity breakdowns.
 
-**Status:** `Implemented`
+**Status:** `Implemented` (recalibrated)
 
 ---
 
