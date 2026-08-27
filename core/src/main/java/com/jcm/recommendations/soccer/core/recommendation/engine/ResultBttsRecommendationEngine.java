@@ -60,9 +60,11 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
 
     // Confidence adjustment multipliers
     private static final double MULTIPLIER_FORM_BTTS_BONUS = 1.10;
+    private static final double MULTIPLIER_H2H_BTTS_BONUS = 1.08;
     private static final double MULTIPLIER_BOTH_CONCEDE_BONUS = 1.05;
     private static final double MULTIPLIER_CLEAN_SHEET_PENALTY = 0.90;
     private static final double MULTIPLIER_FAILED_TO_SCORE_PENALTY = 0.95;
+    private static final int H2H_MIN_MEETINGS = 3;
 
     @Override
     public RecommendationType getType() {
@@ -227,9 +229,8 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
     }
 
     /**
-     * Applies the spec's confidence adjustments. The recent-form BTTS bonus stands
-     * in for the specified head-to-head check, since head-to-head history is not
-     * part of the fixture context.
+     * Applies confidence adjustments from form, clean sheets, failed-to-score rates,
+     * and head-to-head sample size when available.
      */
     private ConfidenceAdjustment calculateConfidenceAdjustment(FixtureContext context) {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
@@ -253,6 +254,13 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
                 multiplier *= MULTIPLIER_FORM_BTTS_BONUS;
                 applied.add("Both teams BTTS-heavy in recent form (+10%)");
             }
+        }
+
+        if (context.hasHeadToHead()
+                && context.getHeadToHead().getPreviousMeetings() >= H2H_MIN_MEETINGS) {
+            multiplier *= MULTIPLIER_H2H_BTTS_BONUS;
+            applied.add(String.format("H2H sample of %d meetings (+8%%)",
+                    context.getHeadToHead().getPreviousMeetings()));
         }
 
         if (homeCleanSheetPct < CLEAN_SHEET_BONUS_THRESHOLD && awayCleanSheetPct < CLEAN_SHEET_BONUS_THRESHOLD) {
@@ -421,6 +429,13 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
             factors.put("awayBttsPctForm", safeDouble(context.getAwayTeamForm().getBttsPercentageAway()));
         }
 
+        if (context.hasHeadToHead()) {
+            factors.put("h2hPreviousMeetings", context.getHeadToHead().getPreviousMeetings());
+            factors.put("h2hHomeWins", context.getHeadToHead().getHomeWins());
+            factors.put("h2hAwayWins", context.getHeadToHead().getAwayWins());
+            factors.put("h2hDraws", context.getHeadToHead().getDraws());
+        }
+
         // xG data
         factors.put("xgDataAvailable", hasXgData);
         if (hasXgData) {
@@ -466,6 +481,9 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         }
         if (!context.hasRecentForm()) {
             riskFlags.add("No recent form data - head-to-head proxy unavailable");
+        }
+        if (!context.hasHeadToHead()) {
+            riskFlags.add("No head-to-head history available");
         }
 
         factors.put("positiveIndicators", positiveIndicators);

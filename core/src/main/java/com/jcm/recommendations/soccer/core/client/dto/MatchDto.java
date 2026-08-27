@@ -180,4 +180,24 @@ public class MatchDto {
 
     @JsonProperty("team_b_goal_details")
     private List<GoalDetailDto> teamBGoalDetails;
+
+    private H2hDto h2h;
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class H2hDto {
+        @JsonProperty("previous_meetings")
+        private Integer previousMeetings;
+
+        @JsonProperty("team_a_wins")
+        private Integer teamAWins;
+
+        @JsonProperty("team_b_wins")
+        private Integer teamBWins;
+
+        private Integer draws;
+
+        @JsonProperty("previous_match_ids")
+        private List<Long> previousMatchIds;
+    }
 }

@@ -1,5 +1,6 @@
 package com.jcm.recommendations.soccer.core.client.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -108,6 +109,82 @@ public class TeamStatsDto {
     private Double cardsAvgHome;
     @JsonProperty("cardsAVG_away")
     private Double cardsAvgAway;
+
+    @JsonProperty("scoredAVG_overall")
+    @JsonAlias({"seasonScoredAVG_overall"})
+    private Double scoredAvgOverall;
+    @JsonProperty("scoredAVG_home")
+    @JsonAlias({"seasonScoredAVG_home"})
+    private Double scoredAvgHome;
+    @JsonProperty("scoredAVG_away")
+    @JsonAlias({"seasonScoredAVG_away"})
+    private Double scoredAvgAway;
+
+    @JsonProperty("concededAVG_overall")
+    @JsonAlias({"seasonConcededAVG_overall"})
+    private Double concededAvgOverall;
+    @JsonProperty("concededAVG_home")
+    @JsonAlias({"seasonConcededAVG_home"})
+    private Double concededAvgHome;
+    @JsonProperty("concededAVG_away")
+    @JsonAlias({"seasonConcededAVG_away"})
+    private Double concededAvgAway;
+
+    @JsonProperty("foulsAVG_overall")
+    private Double foulsAvgOverall;
+    @JsonProperty("foulsAVG_home")
+    private Double foulsAvgHome;
+    @JsonProperty("foulsAVG_away")
+    private Double foulsAvgAway;
+
+    @JsonProperty("scoredAVGHT_overall")
+    private Double scoredAvgHtOverall;
+    @JsonProperty("scoredAVGHT_home")
+    private Double scoredAvgHtHome;
+    @JsonProperty("scoredAVGHT_away")
+    private Double scoredAvgHtAway;
+
+    @JsonProperty("concededAVGHT_overall")
+    private Double concededAvgHtOverall;
+    @JsonProperty("concededAVGHT_home")
+    private Double concededAvgHtHome;
+    @JsonProperty("concededAVGHT_away")
+    private Double concededAvgHtAway;
+
+    @JsonProperty("scored_2hg_avg_overall")
+    private Double scoredAvg2hOverall;
+    @JsonProperty("scored_2hg_avg_home")
+    private Double scoredAvg2hHome;
+    @JsonProperty("scored_2hg_avg_away")
+    private Double scoredAvg2hAway;
+
+    @JsonProperty("conceded_2hg_avg_overall")
+    private Double concededAvg2hOverall;
+    @JsonProperty("conceded_2hg_avg_home")
+    private Double concededAvg2hHome;
+    @JsonProperty("conceded_2hg_avg_away")
+    private Double concededAvg2hAway;
+
+    @JsonProperty("btts_fhg_percentage_overall")
+    private Double bttsFhgPercentageOverall;
+    @JsonProperty("btts_fhg_percentage_home")
+    private Double bttsFhgPercentageHome;
+    @JsonProperty("btts_fhg_percentage_away")
+    private Double bttsFhgPercentageAway;
+
+    @JsonProperty("btts_2hg_percentage_overall")
+    private Double btts2hgPercentageOverall;
+    @JsonProperty("btts_2hg_percentage_home")
+    private Double btts2hgPercentageHome;
+    @JsonProperty("btts_2hg_percentage_away")
+    private Double btts2hgPercentageAway;
+
+    @JsonProperty("shotsAVG_overall")
+    private Double shotsAvgOverall;
+    @JsonProperty("shotsAVG_home")
+    private Double shotsAvgHome;
+    @JsonProperty("shotsAVG_away")
+    private Double shotsAvgAway;
 
     // Expected Goals (xG) data
     @JsonProperty("xg_for_avg_overall")

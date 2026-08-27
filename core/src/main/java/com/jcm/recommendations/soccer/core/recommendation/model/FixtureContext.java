@@ -13,6 +13,7 @@ public class FixtureContext {
     private Fixture fixture;
     private FixtureOdds odds;
     private FixturePotentials potentials;
+    private FixtureHeadToHead headToHead;
     
     private League league;
     
@@ -48,6 +49,12 @@ public class FixtureContext {
     
     public boolean hasPotentials() {
         return potentials != null;
+    }
+
+    public boolean hasHeadToHead() {
+        return headToHead != null
+                && headToHead.getPreviousMeetings() != null
+                && headToHead.getPreviousMeetings() > 0;
     }
     
     public boolean hasRefereeStats() {

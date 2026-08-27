@@ -53,6 +53,8 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
 
     private static final double BTTS_UNDERDOG_SCORED_PCT = 50.0;
     private static final double BTTS_FAVORITE_CONCEDES_PCT = 40.0;
+    private static final int H2H_MIN_MEETINGS = 3;
+    private static final double H2H_FAVORITE_SUPPORT_BOOST = 4.0;
 
     @Override
     public RecommendationType getType() {
@@ -155,7 +157,12 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
             underdogBoost = 5.0;
         }
 
-        return clampScore(ppgScore + gdScore + posScore + formScore + underdogBoost);
+        double h2hBoost = 0.0;
+        if (supportsFavoriteInH2h(context)) {
+            h2hBoost = H2H_FAVORITE_SUPPORT_BOOST;
+        }
+
+        return clampScore(ppgScore + gdScore + posScore + formScore + underdogBoost + h2hBoost);
     }
 
     private boolean passesQualityFilters(TeamSeasonStats homeStats, TeamSeasonStats awayStats,
@@ -209,7 +216,31 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
             count++;
         }
 
+        if (suggestsUpsetFromH2h(context)) {
+            count++;
+        }
+
         return count;
+    }
+
+    private boolean supportsFavoriteInH2h(FixtureContext context) {
+        if (!context.hasHeadToHead()
+                || context.getHeadToHead().getPreviousMeetings() < H2H_MIN_MEETINGS) {
+            return false;
+        }
+        int homeWins = safeInt(context.getHeadToHead().getHomeWins());
+        int awayWins = safeInt(context.getHeadToHead().getAwayWins());
+        return homeWins > awayWins;
+    }
+
+    private boolean suggestsUpsetFromH2h(FixtureContext context) {
+        if (!context.hasHeadToHead()
+                || context.getHeadToHead().getPreviousMeetings() < H2H_MIN_MEETINGS) {
+            return false;
+        }
+        int homeWins = safeInt(context.getHeadToHead().getHomeWins());
+        int awayWins = safeInt(context.getHeadToHead().getAwayWins());
+        return awayWins > homeWins;
     }
 
     private ConfidenceLevel determineConfidence(int positionGap, double qualityScore, int upsetFactors) {
@@ -354,6 +385,14 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         if (context.hasRecentForm()) {
             factors.put("homeFormPpgHome", context.getHomeTeamForm().getPpgHome());
             factors.put("awayFormPpgAway", context.getAwayTeamForm().getPpgAway());
+        }
+
+        if (context.hasHeadToHead()) {
+            factors.put("h2hPreviousMeetings", context.getHeadToHead().getPreviousMeetings());
+            factors.put("h2hHomeWins", context.getHeadToHead().getHomeWins());
+            factors.put("h2hAwayWins", context.getHeadToHead().getAwayWins());
+            factors.put("h2hSupportsFavorite", supportsFavoriteInH2h(context));
+            factors.put("h2hSuggestsUpset", suggestsUpsetFromH2h(context));
         }
 
         if (suggestsBttsMismatch(context.getHomeTeamStats(), context.getAwayTeamStats())) {

@@ -158,6 +158,34 @@ class ResultBttsRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze applies H2H sample bonus when previous meetings >= 3")
+    void analyze_appliesH2hSampleBonus() {
+        FixtureContext base = createHomeWinBttsContext();
+        FixtureContext context = FixtureContext.builder()
+                .fixture(base.getFixture())
+                .homeTeam(base.getHomeTeam())
+                .awayTeam(base.getAwayTeam())
+                .homeTeamStats(base.getHomeTeamStats())
+                .awayTeamStats(base.getAwayTeamStats())
+                .headToHead(FixtureHeadToHead.builder()
+                        .fixtureId(base.getFixture().getId())
+                        .previousMeetings(5)
+                        .homeWins(2)
+                        .awayWins(2)
+                        .draws(1)
+                        .build())
+                .build();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("h2hPreviousMeetings")).isEqualTo(5);
+        @SuppressWarnings("unchecked")
+        List<String> applied = (List<String>) result.get().getFactors().get("adjustmentsApplied");
+        assertThat(applied).anyMatch(s -> s.contains("H2H sample"));
+    }
+
+    @Test
     @DisplayName("analyze applies clean sheet penalty")
     void analyze_appliesCleanSheetPenalty() {
         FixtureContext context = createCleanSheetPenaltyContext();

@@ -63,10 +63,10 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeGoalsAvg = firstHalfScoredAvg(homeStats, true);
+        double awayGoalsAvg = firstHalfScoredAvg(awayStats, false);
 
-        double estimated1HGoals = (homeGoalsAvg + awayGoalsAvg) * FIRST_HALF_SHARE;
+        double estimated1HGoals = homeGoalsAvg + awayGoalsAvg;
         double goalsScore = normalizeGoalsToScore(estimated1HGoals);
 
         double apiO05Ht = 50.0;
@@ -92,10 +92,10 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeGoalsAvg = secondHalfScoredAvg(homeStats, true);
+        double awayGoalsAvg = secondHalfScoredAvg(awayStats, false);
 
-        double estimated2HGoals = (homeGoalsAvg + awayGoalsAvg) * SECOND_HALF_SHARE;
+        double estimated2HGoals = homeGoalsAvg + awayGoalsAvg;
         double goalsScore = normalizeGoalsToScore(estimated2HGoals);
 
         double intensityFactor = calculateLateGameIntensity(context);
@@ -203,8 +203,32 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
     }
 
     private double calculateBttsHtScore(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeBttsHt = safePercentage(homeStats.getSeasonBttsPercentageHome()) * 0.5;
-        double awayBttsHt = safePercentage(awayStats.getSeasonBttsPercentageAway()) * 0.5;
+        double homeBttsHt = safePercentage(
+                homeStats.getBttsFhgPercentageHome() != null
+                        ? homeStats.getBttsFhgPercentageHome()
+                        : homeStats.getSeasonBttsPercentageHome()) * 0.5;
+        double awayBttsHt = safePercentage(
+                awayStats.getBttsFhgPercentageAway() != null
+                        ? awayStats.getBttsFhgPercentageAway()
+                        : awayStats.getSeasonBttsPercentageAway()) * 0.5;
         return (homeBttsHt + awayBttsHt) * 0.5;
+    }
+
+    private static double firstHalfScoredAvg(TeamSeasonStats stats, boolean home) {
+        Double halfAvg = home ? stats.getScoredAvgHtHome() : stats.getScoredAvgHtAway();
+        if (halfAvg != null) {
+            return halfAvg;
+        }
+        Integer goals = home ? stats.getSeasonGoalsHome() : stats.getSeasonGoalsAway();
+        return calculateGoalsAvg(goals, stats.getMatchesPlayed(), 1.0) * FIRST_HALF_SHARE;
+    }
+
+    private static double secondHalfScoredAvg(TeamSeasonStats stats, boolean home) {
+        Double halfAvg = home ? stats.getScoredAvg2hHome() : stats.getScoredAvg2hAway();
+        if (halfAvg != null) {
+            return halfAvg;
+        }
+        Integer goals = home ? stats.getSeasonGoalsHome() : stats.getSeasonGoalsAway();
+        return calculateGoalsAvg(goals, stats.getMatchesPlayed(), 1.0) * SECOND_HALF_SHARE;
     }
 }

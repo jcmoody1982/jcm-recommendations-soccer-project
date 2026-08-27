@@ -93,4 +93,36 @@ public class TeamSeasonStats {
     private Double xgAgainstAvgOverall;
     private Double xgAgainstAvgHome;
     private Double xgAgainstAvgAway;
+
+    private Double scoredAvgHtOverall;
+    private Double scoredAvgHtHome;
+    private Double scoredAvgHtAway;
+
+    private Double concededAvgHtOverall;
+    private Double concededAvgHtHome;
+    private Double concededAvgHtAway;
+
+    private Double scoredAvg2hOverall;
+    private Double scoredAvg2hHome;
+    private Double scoredAvg2hAway;
+
+    private Double concededAvg2hOverall;
+    private Double concededAvg2hHome;
+    private Double concededAvg2hAway;
+
+    private Double bttsFhgPercentageOverall;
+    private Double bttsFhgPercentageHome;
+    private Double bttsFhgPercentageAway;
+
+    private Double btts2hgPercentageOverall;
+    private Double btts2hgPercentageHome;
+    private Double btts2hgPercentageAway;
+
+    private Double shotsAvgOverall;
+    private Double shotsAvgHome;
+    private Double shotsAvgAway;
+
+    private Double foulsAvgOverall;
+    private Double foulsAvgHome;
+    private Double foulsAvgAway;
 }

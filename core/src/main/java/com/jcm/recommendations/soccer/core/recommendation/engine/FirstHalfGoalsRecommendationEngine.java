@@ -155,30 +155,25 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
     }
 
     private double calculateExpected1HGoals(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        // Calculate full-time expected goals
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeScoredAvg = halfScoredAvg(homeStats, true, FIRST_HALF_RATIO);
+        double awayScoredAvg = halfScoredAvg(awayStats, false, FIRST_HALF_RATIO);
+        double homeConcededAvg = halfConcededAvg(homeStats, true, FIRST_HALF_RATIO);
+        double awayConcededAvg = halfConcededAvg(awayStats, false, FIRST_HALF_RATIO);
 
         double actualExpected = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
 
-        // If xG data is available, blend for more accuracy
+        // If xG data is available, blend for more accuracy (still apply 1H ratio to xG share)
         Double homeXgFor = homeStats.getXgForAvgHome();
         Double awayXgFor = awayStats.getXgForAvgAway();
         Double homeXgAgainst = homeStats.getXgAgainstAvgHome();
         Double awayXgAgainst = awayStats.getXgAgainstAvgAway();
 
-        double fullTimeExpected;
         if (homeXgFor != null && awayXgFor != null && homeXgAgainst != null && awayXgAgainst != null) {
-            double xgExpected = (homeXgFor + awayXgFor + homeXgAgainst + awayXgAgainst) / 2.0;
-            fullTimeExpected = (actualExpected * 0.6) + (xgExpected * 0.4);
-        } else {
-            fullTimeExpected = actualExpected;
+            double xgExpected = (homeXgFor + awayXgFor + homeXgAgainst + awayXgAgainst) / 2.0 * FIRST_HALF_RATIO;
+            return (actualExpected * 0.6) + (xgExpected * 0.4);
         }
 
-        // Apply first half ratio
-        return fullTimeExpected * FIRST_HALF_RATIO;
+        return actualExpected;
     }
 
     private double calculateScore(FixtureContext context) {
@@ -187,21 +182,13 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
 
         boolean hasXgData = hasXgData(homeStats, awayStats);
 
-        // Calculate 1H goals scored proxy (total × 0.45, normalized to percentage)
-        double home1HScoredProxy = normalize1HGoals(
-                calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0) * FIRST_HALF_RATIO);
-        double away1HScoredProxy = normalize1HGoals(
-                calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0) * FIRST_HALF_RATIO);
-        
-        // Calculate 1H goals conceded proxy
-        double home1HConcededProxy = normalize1HGoals(
-                calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0) * FIRST_HALF_RATIO);
-        double away1HConcededProxy = normalize1HGoals(
-                calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0) * FIRST_HALF_RATIO);
+        double home1HScoredProxy = normalize1HGoals(halfScoredAvg(homeStats, true, FIRST_HALF_RATIO));
+        double away1HScoredProxy = normalize1HGoals(halfScoredAvg(awayStats, false, FIRST_HALF_RATIO));
+        double home1HConcededProxy = normalize1HGoals(halfConcededAvg(homeStats, true, FIRST_HALF_RATIO));
+        double away1HConcededProxy = normalize1HGoals(halfConcededAvg(awayStats, false, FIRST_HALF_RATIO));
 
-        // BTTS HT proxy (use season BTTS % as indicator - if teams often have BTTS, likely 1H goals too)
-        double homeBttsHtProxy = safePercentage(homeStats.getSeasonBttsPercentageHome());
-        double awayBttsHtProxy = safePercentage(awayStats.getSeasonBttsPercentageAway());
+        double homeBttsHtProxy = halfBttsPercentage(homeStats, true);
+        double awayBttsHtProxy = halfBttsPercentage(awayStats, false);
 
         // API potentials for HT goals
         double apiO05Ht = 50.0;
@@ -428,25 +415,27 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         // Expected goals
         factors.put("expected1HGoals", expected1HGoals);
         factors.put("firstHalfRatioUsed", FIRST_HALF_RATIO);
+        factors.put("halfStatsFromApi", hasHalfGoalStats(homeStats, awayStats));
         
         // Full-time expected for reference
-        double ftExpected = calculateExpected1HGoals(homeStats, awayStats) / FIRST_HALF_RATIO;
+        double ftExpected = hasHalfGoalStats(homeStats, awayStats)
+                ? expected1HGoals / FIRST_HALF_RATIO
+                : calculateExpected1HGoals(homeStats, awayStats) / FIRST_HALF_RATIO;
         factors.put("expectedFullTimeGoals", ftExpected);
         
-        // Season goal averages (1H proxy)
-        double home1HScoredProxy = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0) * FIRST_HALF_RATIO;
-        double away1HScoredProxy = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0) * FIRST_HALF_RATIO;
-        double home1HConcededProxy = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0) * FIRST_HALF_RATIO;
-        double away1HConcededProxy = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0) * FIRST_HALF_RATIO;
+        double home1HScoredProxy = halfScoredAvg(homeStats, true, FIRST_HALF_RATIO);
+        double away1HScoredProxy = halfScoredAvg(awayStats, false, FIRST_HALF_RATIO);
+        double home1HConcededProxy = halfConcededAvg(homeStats, true, FIRST_HALF_RATIO);
+        double away1HConcededProxy = halfConcededAvg(awayStats, false, FIRST_HALF_RATIO);
         
         factors.put("home1HScoredProxyAvg", home1HScoredProxy);
         factors.put("away1HScoredProxyAvg", away1HScoredProxy);
         factors.put("home1HConcededProxyAvg", home1HConcededProxy);
         factors.put("away1HConcededProxyAvg", away1HConcededProxy);
         
-        // BTTS HT proxy
-        factors.put("homeBttsSeasonPct", safePercentage(homeStats.getSeasonBttsPercentageHome()));
-        factors.put("awayBttsSeasonPct", safePercentage(awayStats.getSeasonBttsPercentageAway()));
+        // BTTS HT
+        factors.put("homeBttsSeasonPct", halfBttsPercentage(homeStats, true));
+        factors.put("awayBttsSeasonPct", halfBttsPercentage(awayStats, false));
 
         // API potentials
         if (context.hasPotentials()) {
@@ -532,7 +521,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
             }
         }
         
-        // Early conceder analysis
+        // Early conceder analysis (full-time conceded as defensive vulnerability signal)
         double combinedConceded = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0)
                 + calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
         factors.put("combinedConcededAvg", combinedConceded);
@@ -607,5 +596,39 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
                 .expected(expected1HGoals, "expected 1H goals")
                 .colourNote(colour.isEmpty() ? "First-half goals look lively on the team brief" : colour.toString())
                 .build());
+    }
+
+    private static double halfScoredAvg(TeamSeasonStats stats, boolean home, double fallbackRatio) {
+        Double halfAvg = home ? stats.getScoredAvgHtHome() : stats.getScoredAvgHtAway();
+        if (halfAvg != null) {
+            return halfAvg;
+        }
+        Integer goals = home ? stats.getSeasonGoalsHome() : stats.getSeasonGoalsAway();
+        return calculateGoalsAvg(goals, stats.getMatchesPlayed(), 1.0) * fallbackRatio;
+    }
+
+    private static double halfConcededAvg(TeamSeasonStats stats, boolean home, double fallbackRatio) {
+        Double halfAvg = home ? stats.getConcededAvgHtHome() : stats.getConcededAvgHtAway();
+        if (halfAvg != null) {
+            return halfAvg;
+        }
+        Integer conceded = home ? stats.getSeasonConcededHome() : stats.getSeasonConcededAway();
+        return calculateGoalsAvg(conceded, stats.getMatchesPlayed(), 1.0) * fallbackRatio;
+    }
+
+    private static double halfBttsPercentage(TeamSeasonStats stats, boolean home) {
+        Double halfPct = home ? stats.getBttsFhgPercentageHome() : stats.getBttsFhgPercentageAway();
+        if (halfPct != null) {
+            return safePercentage(halfPct);
+        }
+        Double seasonPct = home ? stats.getSeasonBttsPercentageHome() : stats.getSeasonBttsPercentageAway();
+        return safePercentage(seasonPct);
+    }
+
+    private static boolean hasHalfGoalStats(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        return homeStats.getScoredAvgHtHome() != null
+                && awayStats.getScoredAvgHtAway() != null
+                && homeStats.getConcededAvgHtHome() != null
+                && awayStats.getConcededAvgHtAway() != null;
     }
 }

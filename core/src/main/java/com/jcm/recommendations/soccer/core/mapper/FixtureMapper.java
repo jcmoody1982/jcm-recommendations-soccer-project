@@ -2,9 +2,14 @@ package com.jcm.recommendations.soccer.core.mapper;
 
 import com.jcm.recommendations.soccer.core.client.dto.MatchDto;
 import com.jcm.recommendations.soccer.domain.Fixture;
+import com.jcm.recommendations.soccer.domain.FixtureHeadToHead;
 import com.jcm.recommendations.soccer.domain.FixtureOdds;
 import com.jcm.recommendations.soccer.domain.FixturePotentials;
 import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class FixtureMapper {
@@ -83,5 +88,32 @@ public class FixtureMapper {
                 .cardsPotential(dto.getCardsPotential())
                 .offsidesPotential(dto.getOffsidesPotential())
                 .build();
+    }
+
+    public FixtureHeadToHead toFixtureHeadToHead(MatchDto dto, Instant fetchedAt) {
+        if (dto == null || dto.getH2h() == null) {
+            return null;
+        }
+
+        MatchDto.H2hDto h2h = dto.getH2h();
+        return FixtureHeadToHead.builder()
+                .fixtureId(dto.getId())
+                .previousMeetings(h2h.getPreviousMeetings())
+                .homeWins(h2h.getTeamAWins())
+                .awayWins(h2h.getTeamBWins())
+                .draws(h2h.getDraws())
+                .previousMatchIdsJson(toPreviousMatchIdsJson(h2h.getPreviousMatchIds()))
+                .fetchedAt(fetchedAt)
+                .build();
+    }
+
+    private static String toPreviousMatchIdsJson(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return "[]";
+        }
+        return ids.stream()
+                .filter(id -> id != null && id > 0)
+                .map(String::valueOf)
+                .collect(Collectors.joining(",", "[", "]"));
     }
 }

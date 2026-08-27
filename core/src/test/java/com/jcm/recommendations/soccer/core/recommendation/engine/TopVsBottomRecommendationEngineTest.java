@@ -68,6 +68,31 @@ class TopVsBottomRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze records H2H favorite support in factors")
+    void analyze_recordsH2hFavoriteSupport() {
+        FixtureContext context = mismatchBuilder(30L)
+                .homeTeamStats(homeStatsForMismatch())
+                .awayTeamStats(awayStatsForMismatch())
+                .homeTeamForm(homeFormForMismatch())
+                .awayTeamForm(awayFormForMismatch())
+                .headToHead(FixtureHeadToHead.builder()
+                        .fixtureId(30L)
+                        .previousMeetings(6)
+                        .homeWins(4)
+                        .awayWins(1)
+                        .draws(1)
+                        .build())
+                .build();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("h2hSupportsFavorite")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("h2hSuggestsUpset")).isEqualTo(false);
+        assertThat(result.get().getFactors().get("h2hPreviousMeetings")).isEqualTo(6);
+    }
+
+    @Test
     @DisplayName("analyze pivots to Over 2.5 when favorite odds are short")
     void analyze_shortOddsPivotsToGoalsLine() {
         FixtureContext context = mismatchBuilder(4L)

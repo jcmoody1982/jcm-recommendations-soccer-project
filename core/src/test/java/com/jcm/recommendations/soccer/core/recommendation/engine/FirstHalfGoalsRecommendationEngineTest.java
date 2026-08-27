@@ -106,6 +106,27 @@ class FirstHalfGoalsRecommendationEngineTest {
         assertThat(result.get().getFactors()).containsKey("away1HConcededProxyAvg");
         assertThat(result.get().getFactors()).containsKey("firstHalfRatioUsed");
         assertThat(result.get().getFactors().get("firstHalfRatioUsed")).isEqualTo(0.45);
+        assertThat(result.get().getFactors().get("halfStatsFromApi")).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("analyze prefers real HT averages when present")
+    void analyze_prefersRealHtAverages() {
+        FixtureContext base = createHighScoringContext();
+        base.getHomeTeamStats().setScoredAvgHtHome(1.2);
+        base.getHomeTeamStats().setConcededAvgHtHome(0.9);
+        base.getHomeTeamStats().setBttsFhgPercentageHome(48.0);
+        base.getAwayTeamStats().setScoredAvgHtAway(1.0);
+        base.getAwayTeamStats().setConcededAvgHtAway(1.1);
+        base.getAwayTeamStats().setBttsFhgPercentageAway(44.0);
+
+        Optional<Recommendation> result = engine.analyze(base);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors().get("halfStatsFromApi")).isEqualTo(true);
+        assertThat(result.get().getFactors().get("home1HScoredProxyAvg")).isEqualTo(1.2);
+        assertThat(result.get().getFactors().get("away1HScoredProxyAvg")).isEqualTo(1.0);
+        assertThat(result.get().getFactors().get("homeBttsSeasonPct")).isEqualTo(48.0);
     }
 
     @Test
