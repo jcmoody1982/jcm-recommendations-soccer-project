@@ -81,7 +81,7 @@ class CornersRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("apiConfidenceBoostApplied")).isEqualTo(true);
-        assertThat(result.get().getDescription()).contains("API potential boost");
+        assertThat(result.get().getDescription()).contains("Corner potential reading is strong on the analysis");
     }
 
     @Test

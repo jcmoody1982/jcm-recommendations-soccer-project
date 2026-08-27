@@ -69,7 +69,7 @@ public final class RecommendationFactory {
             double scoreOrProbability,
             String scoreLabel,
             FixtureContext context) {
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(marketOrType)
                 .context(context)
@@ -86,7 +86,7 @@ public final class RecommendationFactory {
             double expectedValue,
             String valueLabel,
             FixtureContext context) {
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(market)
                 .context(context)
@@ -103,7 +103,7 @@ public final class RecommendationFactory {
             String teamName,
             double score,
             FixtureContext context) {
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(recommendationType + " for " + teamName)
                 .context(context)

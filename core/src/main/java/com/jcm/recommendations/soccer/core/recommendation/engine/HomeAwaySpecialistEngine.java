@@ -3,7 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
-import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
+import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import lombok.extern.slf4j.Slf4j;
@@ -578,7 +578,7 @@ private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
 
         colour.append(". Recommendation: ").append(candidate.recommendation);
 
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(candidate.confidence)
                 .selection(candidate.classification + ": " + candidate.teamName)
                 .context(context)

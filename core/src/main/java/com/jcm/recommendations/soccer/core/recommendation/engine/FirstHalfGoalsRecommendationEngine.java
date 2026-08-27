@@ -3,7 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
-import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
+import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import lombok.extern.slf4j.Slf4j;
@@ -596,16 +596,16 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
                 if (!colour.isEmpty()) {
                     colour.append(". ");
                 }
-                colour.append(String.format("API rates O0.5HT at %.0f%%", o05Ht));
+                colour.append(String.format("Analysis rates first-half goal potential at %.0f%%", o05Ht));
             }
         }
 
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(market)
                 .context(context)
                 .expected(expected1HGoals, "expected 1H goals")
-                .colourNote(colour.isEmpty() ? "First half goals potential lighting up early" : colour.toString())
+                .colourNote(colour.isEmpty() ? "First-half goals look lively on the team brief" : colour.toString())
                 .build());
     }
 }

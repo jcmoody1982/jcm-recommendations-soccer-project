@@ -3,7 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
-import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
+import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
 import com.jcm.recommendations.soccer.domain.RefereeStats;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
@@ -422,13 +422,13 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, ConfidenceLevel confidence,
             double expectedPoints, MarketPick pick) {
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(pick.market())
                 .context(context)
                 .expected(expectedPoints, "expected booking points")
                 .edge(pick.edge())
-                .colourNote("Cards are cooking — the whistle's got work tonight")
+                .colourNote("A lively disciplinary afternoon looks on the cards")
                 .build());
     }
 

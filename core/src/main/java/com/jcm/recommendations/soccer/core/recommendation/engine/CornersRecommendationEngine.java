@@ -3,7 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
-import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
+import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
 import com.jcm.recommendations.soccer.domain.FixturePotentials;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
@@ -350,7 +350,7 @@ double expectedCorners = calculateExpectedCorners(context);
             double expectedCorners, String market, boolean apiBoostApplied) {
         StringBuilder colour = new StringBuilder();
         if (apiBoostApplied) {
-            colour.append("API potential boost lighting up the board");
+            colour.append("Corner potential reading is strong on the analysis");
         }
 
         if (context.hasRecentForm()) {
@@ -370,7 +370,7 @@ double expectedCorners = calculateExpectedCorners(context);
             }
         }
 
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(market)
                 .context(context)

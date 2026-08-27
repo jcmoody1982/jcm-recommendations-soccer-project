@@ -3,7 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
-import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
+import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
@@ -575,16 +575,16 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
             double value, ConfidenceLevel confidence, Map<String, Object> factors) {
         String colourNote = null;
         if (Boolean.TRUE.equals(factors.get("homeFortress"))) {
-            colourNote = "Home fortress writing the script tonight";
+            colourNote = "Home form has been fortress-like of late";
         } else if (Boolean.TRUE.equals(factors.get("awayPoorTraveler"))) {
-            colourNote = "Away team poor travelers — suitcase full of regret";
+            colourNote = "The away side have travelled poorly this season";
         } else if (Boolean.TRUE.equals(factors.get("awayRoadWarrior"))) {
-            colourNote = "Away road warriors rolling into town";
+            colourNote = "The away team have been strong on the road";
         } else if (Boolean.TRUE.equals(factors.get("homeWeakAtHome"))) {
-            colourNote = "Home team weak at home — the house is leaking";
+            colourNote = "Home form has been fragile in front of their own crowd";
         }
 
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(market)
                 .context(context)

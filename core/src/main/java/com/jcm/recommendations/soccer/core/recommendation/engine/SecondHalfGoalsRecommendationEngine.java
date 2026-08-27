@@ -3,7 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
-import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
+import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import lombok.extern.slf4j.Slf4j;
@@ -559,7 +559,7 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
             colour.append("High-intensity matchup expected after the break");
         }
 
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(confidence)
                 .selection(market)
                 .context(context)

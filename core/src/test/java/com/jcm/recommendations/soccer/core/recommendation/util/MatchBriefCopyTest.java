@@ -8,18 +8,19 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class VegasTipsterCopyTest {
+class MatchBriefCopyTest {
 
     @Test
     @DisplayName("narrate keeps real numbers and fixture names without certainty language")
     void narrateIncludesNumbersAndFixture() {
         FixtureContext context = context(42L, "Home FC", "Away United");
 
-        String text = VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        String text = MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(ConfidenceLevel.STRONG)
                 .selection("Home Win")
                 .context(context)
@@ -36,9 +37,13 @@ class VegasTipsterCopyTest {
         assertThat(text).contains("Home FC");
         assertThat(text).contains("Away United");
         assertThat(text).contains("vs");
-        assertThat(text.toLowerCase()).doesNotContain("lock");
-        assertThat(text.toLowerCase()).doesNotContain("guaranteed");
-        assertThat(text.toLowerCase()).doesNotContain("mortgage");
+        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("lock");
+        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("guaranteed");
+        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("mortgage");
+        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("api");
+        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("the model");
+        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("chips");
+        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("juice");
     }
 
     @Test
@@ -46,22 +51,23 @@ class VegasTipsterCopyTest {
     void narrateExpectedTotals() {
         FixtureContext context = context(7L, "A", "B");
 
-        String text = VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        String text = MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(ConfidenceLevel.MODERATE)
                 .selection("Over 9.5 Corners")
                 .context(context)
                 .expected(10.4, "expected corners")
-                .colourNote("API potential boost")
+                .colourNote("Corner potential reading is strong on the analysis")
                 .build());
 
         assertThat(text).contains("Over 9.5 Corners");
         assertThat(text).contains("Moderate");
         assertThat(text).contains("10.4");
         assertThat(text).contains("expected corners");
-        assertThat(text).contains("API potential boost");
+        assertThat(text).contains("Corner potential reading is strong on the analysis");
         assertThat(text).contains("A");
         assertThat(text).contains("B");
         assertThat(text).contains("vs");
+        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("api");
     }
 
     @Test
@@ -70,7 +76,7 @@ class VegasTipsterCopyTest {
         Set<String> outputs = new HashSet<>();
         String[] selections = {"Home Win", "BTTS Yes", "Over 2.5 Goals", "Draw", "Over 9.5 Corners"};
         for (long fixtureId = 1; fixtureId <= 40; fixtureId++) {
-            String text = VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+            String text = MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                     .confidence(fixtureId % 3 == 0 ? ConfidenceLevel.STRONG
                             : fixtureId % 3 == 1 ? ConfidenceLevel.MODERATE : ConfidenceLevel.WEAK)
                     .selection(selections[(int) (fixtureId % selections.length)])
@@ -79,6 +85,8 @@ class VegasTipsterCopyTest {
                     .valuePct(5.0 + fixtureId / 5.0)
                     .colourNote(fixtureId % 2 == 0 ? "Team in good form" : null)
                     .build());
+            assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("api");
+            assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("the model");
             outputs.add(text);
         }
         assertThat(outputs.size()).isGreaterThan(20);
@@ -88,14 +96,14 @@ class VegasTipsterCopyTest {
     @DisplayName("same brief narrates stably")
     void narrateIsStableForSameBrief() {
         FixtureContext context = context(99L, "Alpha", "Beta");
-        var brief = VegasTipsterCopy.Brief.builder()
+        var brief = MatchBriefCopy.Brief.builder()
                 .confidence(ConfidenceLevel.STRONG)
                 .selection("Draw")
                 .context(context)
                 .probabilityPct(41.2)
                 .build();
 
-        assertThat(VegasTipsterCopy.narrate(brief)).isEqualTo(VegasTipsterCopy.narrate(brief));
+        assertThat(MatchBriefCopy.narrate(brief)).isEqualTo(MatchBriefCopy.narrate(brief));
     }
 
     private static FixtureContext context(long fixtureId, String home, String away) {

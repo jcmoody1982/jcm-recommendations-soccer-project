@@ -3,7 +3,7 @@ package com.jcm.recommendations.soccer.core.recommendation.engine;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
-import com.jcm.recommendations.soccer.core.recommendation.util.VegasTipsterCopy;
+import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -367,14 +367,14 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
     }
 
     private String buildDescription(FixtureContext context, ValueOpportunity opportunity) {
-        return VegasTipsterCopy.narrate(VegasTipsterCopy.Brief.builder()
+        return MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(opportunity.confidence)
                 .selection("Value Bet on " + opportunity.market)
                 .context(context)
                 .odds(opportunity.odds)
                 .valuePct(opportunity.valuePercentage)
                 .expectedValue(opportunity.expectedValue)
-                .colourNote("The board's mispriced this one — grab the juice while it lasts")
+                .colourNote("The listed price looks soft against the analysis")
                 .build());
     }
 

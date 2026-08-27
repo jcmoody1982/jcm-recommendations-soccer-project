@@ -4,235 +4,296 @@ import com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel;
 import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
 
 /**
- * AccaBaccaGlory Info blurb voice: Las Vegas tipster that hams it up.
- * Facts stay honest (selection, confidence, numbers, optional colour notes);
- * wrapping gets theatrical and varies by layout so a list of picks doesn't
- * read like the same sentence on loop. Never invent injuries, motives, or certainty.
+ * AccaBaccaGlory Info blurb voice: warmer British analytical newspaper tone
+ * (Racing Post / broadsheet preview). Facts stay honest (selection, confidence,
+ * numbers, optional colour notes); wrapping varies by layout so a list of picks
+ * does not read like the same sentence on loop.
+ * <p>
+ * Prefer "the analysis" and "the team"; never invent injuries, motives, certainty,
+ * or reference an "API" / "the model" in user-facing copy.
  */
-public final class VegasTipsterCopy {
+public final class MatchBriefCopy {
 
     private enum Layout {
         CLASSIC,
         COLOUR_FIRST,
-        BOARD_READ,
-        STREET_WISE,
+        ANALYSIS_LEAD,
+        FIXTURE_LEAD,
         SHORT_PUNCH,
         CLOSER_LEAD,
         NUMBERS_HOOK,
         ASIDE,
-        WHISPER
+        CAUTION,
+        TEAM_ANGLE,
+        SELECTION_HOOK,
+        BRIEF_NOTE
     }
 
     private static final String[] OPENERS = {
-            "Lights are bright for %s.",
-            "Don't blink — %s is the pick.",
-            "Put the chips on %s.",
-            "Ring the bell for %s.",
-            "Roll it with %s.",
-            "Step right up for %s.",
-            "The neon's pointing at %s.",
-            "Deal me %s.",
-            "Crowd's buzzing about %s.",
-            "Tape this one: %s.",
-            "Mark the card — %s.",
-            "The window likes %s tonight.",
-            "Hot off the printer: %s.",
-            "Somebody cash this vibe — %s.",
-            "Ink's still wet on %s.",
-            "Raise a glass to %s.",
-            "The pit boss whispered %s.",
-            "Fresh chalk on %s.",
-            "All eyes on %s.",
-            "They're talking %s in the lounge.",
-            "Slide over — %s just hit the board.",
-            "Hold the dice for %s.",
-            "Cue the brass section for %s.",
-            "Flashbulb moment: %s."
+            "%s looks the right side of the ledger.",
+            "%s is the selection of interest.",
+            "The case for %s is tidy enough to note.",
+            "%s stands out on this card.",
+            "Interest settles on %s.",
+            "The analysis leans toward %s.",
+            "%s is the pick we are writing up.",
+            "A quiet mark against %s.",
+            "%s is where the sheet is pointing.",
+            "Worth a proper look at %s.",
+            "The preference here is %s.",
+            "%s carries the stronger brief.",
+            "Circle %s for further reading.",
+            "The angle of the day is %s.",
+            "%s has the cleaner narrative.",
+            "We are with %s on the evidence.",
+            "%s fits the shape of the match.",
+            "Put the pencil on %s.",
+            "%s is the line that holds up.",
+            "The team brief supports %s.",
+            "%s looks sound against the field.",
+            "A measured case for %s.",
+            "%s is the standout selection.",
+            "The reading favours %s."
     };
 
     private static final String[] STRONG_LEANS = {
-            "This one's a Strong lean from the board",
-            "Strong lean — the board's nodding along",
-            "We're shouting Strong on this one",
-            "Strong lean stamped on the slip",
-            "The house calls this a Strong lean",
-            "Strong lean with the chest out",
-            "Bold Strong lean — no soft pedaling",
-            "We're planting a Strong flag here",
-            "Strong lean walking in like it owns the room",
+            "Strong grading from the analysis",
+            "Strong conviction on the sheet",
+            "This earns a Strong stamp",
+            "Strong lean without hedging",
+            "The analysis is firmly Strong",
+            "Strong read — the numbers agree",
+            "Strong grading, chest out but calm",
+            "We are planting a Strong flag here",
+            "Strong lean with little ambiguity",
             "Call it Strong and mean it",
-            "Strong lean, lights and all",
-            "This earns the Strong stamp tonight"
+            "Strong conviction on the evidence",
+            "The brief is Strong end to end",
+            "Strong mark — the analysis is clear",
+            "A full Strong grading tonight",
+            "Strong lean from first principles",
+            "The analysis stamps this Strong"
     };
 
     private static final String[] MODERATE_LEANS = {
-            "We're calling a Moderate lean from the board",
-            "Moderate lean — worth a look without the fireworks",
-            "Board says Moderate; keep the powder dry",
-            "A measured Moderate lean tonight",
-            "Moderate lean, no parade needed",
-            "Moderate lean with the volume at half",
-            "Steady Moderate lean from the sheet",
-            "We're in Moderate territory — sensible money",
-            "Moderate lean, cool hand on the rail",
+            "Moderate grading from the analysis",
+            "A measured Moderate lean",
+            "Moderate — interested, not forced",
+            "Moderate lean with the volume half down",
+            "Steady Moderate reading on the sheet",
+            "Moderate territory; keep perspective",
+            "A sensible Moderate lean",
+            "Moderate grading — worth the note",
             "Pencil in a Moderate lean",
-            "Moderate lean without the trumpet solo",
-            "Call it Moderate and keep walking"
+            "Moderate, without the fanfare",
+            "The analysis settles on Moderate",
+            "Moderate lean, cool and tidy",
+            "Call it Moderate and move on",
+            "Moderate conviction on the brief",
+            "A balanced Moderate grading",
+            "Moderate lean from the analysis"
     };
 
     private static final String[] WEAK_LEANS = {
-            "A speculative Weak lean from the board",
-            "Weak lean — entertainment money only",
-            "Speculative Weak lean if you're feeling spicy",
-            "Weak lean on the long-shot ticket",
-            "Call it Weak and treat it like popcorn",
-            "Weak lean, tiny stake energy",
-            "We're whispering Weak on this one",
-            "Weak lean for the curious only",
+            "A speculative Weak lean only",
+            "Weak grading — exploratory rather than core",
+            "Weak lean; notice it, do not build around it",
+            "Weak case on the fringe of the card",
+            "Call it Weak and treat it lightly",
+            "Weak lean for the curious pencil",
+            "A quiet Weak aside from the analysis",
+            "Weak grading — thin on the wash",
+            "Speculative Weak lean at best",
+            "Weak mark; park it as colour, not centrepiece",
+            "The analysis whispers Weak here",
+            "Weak lean without rearranging the card",
             "A dart-throw Weak lean",
-            "Weak lean — don't rearrange the bankroll",
-            "Parking a Weak lean on the fringe",
-            "Weak lean with a wink, not a wave"
+            "Weak conviction — keep it peripheral",
+            "Weak grading from a thin brief",
+            "Only a Weak lean on the evidence"
     };
 
     private static final String[] PROB_PHRASES = {
-            "model's ringing %.1f%%",
-            "our number sits at %.1f%%",
-            "tape has it around %.1f%%",
-            "board math says %.1f%%",
-            "we're marking %.1f%% on the sheet",
-            "probability clocked at %.1f%%",
-            "the abacus lands on %.1f%%",
-            "we're penciling %.1f%%",
-            "hit rate vibes at %.1f%%",
-            "sheet says roughly %.1f%%",
-            "model temperature: %.1f%%",
-            "we're hanging %.1f%% on the hook"
+            "the analysis has it at %.1f%%",
+            "probability sits at %.1f%%",
+            "the sheet reads %.1f%%",
+            "we are marking %.1f%%",
+            "graded around %.1f%%",
+            "the brief clocks %.1f%%",
+            "probability pencilled at %.1f%%",
+            "the reading lands near %.1f%%",
+            "analysis figure: %.1f%%",
+            "roughly %.1f%% on the sheet",
+            "the number comes in at %.1f%%",
+            "hung at %.1f%% by the analysis",
+            "standing at %.1f%%",
+            "the work puts it at %.1f%%",
+            "assessment: %.1f%%",
+            "%.1f%% on the current brief"
     };
 
     private static final String[] EXPECTED_PHRASES = {
-            "we're looking at about %.1f %s",
-            "projection lands near %.1f %s",
+            "projection near %.1f %s",
             "expect something like %.1f %s",
-            "the total's hanging around %.1f %s",
-            "card projects ~%.1f %s",
-            "we're sniffing roughly %.1f %s",
+            "the total hangs around %.1f %s",
+            "the analysis projects ~%.1f %s",
             "forecast parks near %.1f %s",
-            "number crunch points to %.1f %s",
-            "ballpark: %.1f %s",
-            "the line of best fit says %.1f %s",
-            "we're floating ~%.1f %s",
-            "expectancy humming around %.1f %s"
+            "looking at about %.1f %s",
+            "ballpark %.1f %s",
+            "the brief floats ~%.1f %s",
+            "expectancy around %.1f %s",
+            "projected figure: %.1f %s",
+            "the work points to %.1f %s",
+            "roughly %.1f %s on the sheet",
+            "analysis expectancy %.1f %s",
+            "we are around %.1f %s",
+            "the reading suggests %.1f %s",
+            "near %.1f %s by the brief"
     };
 
     private static final String[] VALUE_PHRASES = {
-            "still +%.1f%% of juice on the price",
-            "+%.1f%% value left on the bone",
-            "price still leaking +%.1f%%",
-            "juice check: +%.1f%%",
-            "mispriced to the tune of +%.1f%%",
-            "+%.1f%% hanging off the ticket",
-            "value drip at +%.1f%%",
-            "the price owes you +%.1f%%",
-            "+%.1f%% of daylight vs the market",
-            "still +%.1f%% fat on this number",
-            "overlay roughly +%.1f%%",
-            "market lagging by +%.1f%%"
+            "+%.1f%% still left against the listed price",
+            "an estimated +%.1f%% on the price",
+            "+%.1f%% residual versus the market",
+            "price looks soft by about +%.1f%%",
+            "+%.1f%% of daylight in the price",
+            "the price still offers +%.1f%%",
+            "+%.1f%% hanging on the number",
+            "market lag roughly +%.1f%%",
+            "+%.1f%% of interest versus the board",
+            "listed price trailing by +%.1f%%",
+            "+%.1f%% value on the brief",
+            "about +%.1f%% still in the price",
+            "price edge near +%.1f%%",
+            "+%.1f%% against the chalk",
+            "a +%.1f%% gap versus the market",
+            "+%.1f%% left to work with"
     };
 
     private static final String[] EDGE_PHRASES = {
-            "+%.1f edge in the tank",
-            "+%.1f of edge riding shotgun",
-            "edge meter at +%.1f",
-            "+%.1f edge still breathing",
-            "we're packing +%.1f edge",
-            "+%.1f edge tucked in the cuff",
-            "edge ledger shows +%.1f",
-            "+%.1f of cushion on the model"
+            "+%.1f of edge on the brief",
+            "edge marked at +%.1f",
+            "+%.1f edge in the reading",
+            "the analysis shows +%.1f edge",
+            "+%.1f of cushion on the sheet",
+            "edge ledger at +%.1f",
+            "+%.1f edge still intact",
+            "packing +%.1f of edge",
+            "+%.1f on the edge column",
+            "edge assessed at +%.1f",
+            "+%.1f of analytical edge",
+            "brief edge of +%.1f"
     };
 
     private static final String[] ODDS_PHRASES = {
             "priced at %.2f",
-            "window showing %.2f",
-            "ticket sits at %.2f",
-            "listed %.2f on the board",
-            "market hanging %.2f",
-            "you're getting %.2f",
-            "the number's %.2f",
-            "chalked at %.2f"
+            "listed at %.2f",
+            "the price sits at %.2f",
+            "available at %.2f",
+            "market number %.2f",
+            "chalked at %.2f",
+            "the board shows %.2f",
+            "hanging at %.2f",
+            "ticket at %.2f",
+            "current price %.2f",
+            "quoted %.2f",
+            "standing at %.2f"
     };
 
     private static final String[] EV_PHRASES = {
-            "EV %.3f",
             "expected value %.3f",
-            "EV sitting at %.3f",
-            "EV humming %.3f",
+            "EV at %.3f",
             "long-run EV %.3f",
-            "value engine reads EV %.3f"
+            "EV reading %.3f",
+            "expected value sits at %.3f",
+            "EV on the brief %.3f",
+            "value engine EV %.3f",
+            "EV marked %.3f"
     };
 
     private static final String[] CLOSERS = {
-            "Showtime: %s vs %s.",
-            "Tonight's card: %s vs %s.",
-            "Under the lights: %s vs %s.",
-            "The marquee: %s vs %s.",
-            "Kickoff billing: %s vs %s.",
-            "Main event: %s vs %s.",
-            "On the strip: %s vs %s.",
+            "Fixture: %s vs %s.",
+            "The match-up: %s vs %s.",
+            "%s against %s.",
+            "Billing: %s vs %s.",
+            "Tonight: %s vs %s.",
+            "The fixture reads %s vs %s.",
             "Centre stage: %s vs %s.",
-            "The matchup: %s vs %s.",
-            "Feature bout: %s vs %s.",
-            "Tonight's duel: %s vs %s.",
-            "Bill it as %s vs %s."
+            "On the card: %s vs %s.",
+            "%s host %s.",
+            "The afternoon: %s vs %s.",
+            "Contest: %s vs %s.",
+            "This one is %s vs %s.",
+            "The brief closes on %s vs %s.",
+            "Match: %s vs %s."
     };
 
     private static final String[] COLOUR_BRIDGES = {
             "%s",
-            "Colour on the tape: %s",
-            "Here's the juice: %s",
-            "Read the room — %s",
-            "Side note from the floor: %s",
-            "Floor gossip: %s",
+            "Supporting note: %s",
+            "Context: %s",
+            "Brief aside — %s",
+            "Worth adding: %s",
+            "Colour on the sheet: %s",
             "And the subplot — %s",
             "Between the lines: %s",
-            "Bonus reel: %s",
-            "Why it sings: %s",
-            "The texture: %s",
-            "Whisper from the rail: %s"
+            "Why it holds: %s",
+            "Texture: %s",
+            "On the team side: %s",
+            "From the analysis: %s",
+            "Further reading: %s",
+            "Quiet note: %s"
     };
 
     private static final String[] SELECTION_HOOKS = {
-            "We're sliding the chips toward %s.",
-            "Circle %s in red ink.",
             "The play is %s.",
-            "We're riding %s.",
-            "Ticket stub says %s.",
-            "Park it on %s.",
-            "Our horse is %s.",
-            "Bank the angle on %s.",
-            "We're cashing the vibe on %s.",
-            "Lean the stack into %s."
+            "We are with %s.",
+            "Selection: %s.",
+            "The pencil lands on %s.",
+            "Our reading is %s.",
+            "The team brief points to %s.",
+            "Mark %s on the card.",
+            "The analysis settles on %s.",
+            "Preference: %s.",
+            "Write %s into the notes.",
+            "The cleaner angle is %s.",
+            "Stay with %s."
     };
 
     private static final String[] ASIDE_OPENERS = {
-            "Quick aside from the tipster desk.",
-            "One for the late ticket writers.",
-            "A little theatre before kickoff.",
-            "From the smoke-filled lounge:",
-            "Pass it down the rail —",
-            "For those keeping a lively card:"
+            "A brief from the desk.",
+            "One for the card notes.",
+            "A short preview before kick-off.",
+            "From the analysis sheet:",
+            "For those keeping a lively card:",
+            "A measured aside:",
+            "Quick note from the brief:",
+            "Worth filing under today's angles:"
     };
 
-    private static final String[] WHISPER_OPENERS = {
-            "Lean in.",
-            "Between you and me — hold this close.",
-            "Soft voice, loud number.",
-            "Don't make a scene.",
-            "Quiet tip from the corner.",
-            "Cupped hand from the rail."
+    private static final String[] CAUTION_OPENERS = {
+            "Tempting on paper, thinner in the wash.",
+            "Handle with a cool head.",
+            "Interesting, not irresistible.",
+            "A note of caution first.",
+            "Keep the powder dry.",
+            "Not a headline — a footnote.",
+            "Approach with perspective.",
+            "Quiet interest, nothing more."
     };
 
-    private VegasTipsterCopy() {}
+    private static final String[] TEAM_OPENERS = {
+            "The team picture is instructive.",
+            "On the team evidence:",
+            "Looking at the sides involved:",
+            "The team brief is tidy enough.",
+            "From the team angle:",
+            "The squads tell a story here.",
+            "Team context supports the read.",
+            "On current team form and shape:"
+    };
+
+    private MatchBriefCopy() {}
 
     public record Brief(
             ConfidenceLevel confidence,
@@ -340,9 +401,12 @@ public final class VegasTipsterCopy {
 
         int hash = stableHash(brief);
         Layout layout = pick(Layout.values(), hash, 0);
-        if (!hasColour(brief) && (layout == Layout.COLOUR_FIRST || layout == Layout.STREET_WISE)) {
-            layout = pick(new Layout[]{Layout.CLASSIC, Layout.BOARD_READ, Layout.SHORT_PUNCH,
-                    Layout.CLOSER_LEAD, Layout.NUMBERS_HOOK, Layout.ASIDE, Layout.WHISPER}, hash, 11);
+        if (!hasColour(brief) && (layout == Layout.COLOUR_FIRST || layout == Layout.BRIEF_NOTE)) {
+            layout = pick(new Layout[]{
+                    Layout.CLASSIC, Layout.ANALYSIS_LEAD, Layout.FIXTURE_LEAD,
+                    Layout.SHORT_PUNCH, Layout.CLOSER_LEAD, Layout.NUMBERS_HOOK,
+                    Layout.ASIDE, Layout.CAUTION, Layout.TEAM_ANGLE, Layout.SELECTION_HOOK
+            }, hash, 11);
         }
 
         String selection = brief.selection().trim();
@@ -359,16 +423,17 @@ public final class VegasTipsterCopy {
         String text = switch (layout) {
             case CLASSIC -> joinSentences(opener, leanWithNumbers(lean, numbers), colour, closer);
             case COLOUR_FIRST -> joinSentences(opener, colour, leanWithNumbers(lean, numbers), closer);
-            case BOARD_READ -> joinSentences(
+            case ANALYSIS_LEAD -> joinSentences(
                     leanWithNumbers(lean, numbers),
                     selectionHook,
                     colour,
                     closer
             );
-            case STREET_WISE -> joinSentences(
-                    colour,
-                    leanWithNumbers(lean + " on " + selection, numbers),
-                    closer
+            case FIXTURE_LEAD -> joinSentences(
+                    closer,
+                    opener,
+                    leanWithNumbers(lean, numbers),
+                    colour
             );
             case SHORT_PUNCH -> joinSentences(
                     opener + " " + lean + ".",
@@ -378,7 +443,7 @@ public final class VegasTipsterCopy {
             );
             case CLOSER_LEAD -> joinSentences(
                     closer,
-                    opener,
+                    selectionHook,
                     leanWithNumbers(lean, numbers),
                     colour
             );
@@ -398,10 +463,28 @@ public final class VegasTipsterCopy {
                     colour,
                     closer
             );
-            case WHISPER -> joinSentences(
-                    pick(WHISPER_OPENERS, hash, 14),
+            case CAUTION -> joinSentences(
+                    pick(CAUTION_OPENERS, hash, 14),
                     leanWithNumbers(lean + " — " + selection, numbers),
                     colour,
+                    closer
+            );
+            case TEAM_ANGLE -> joinSentences(
+                    pick(TEAM_OPENERS, hash, 15),
+                    opener,
+                    leanWithNumbers(lean, numbers),
+                    colour,
+                    closer
+            );
+            case SELECTION_HOOK -> joinSentences(
+                    selectionHook,
+                    leanWithNumbers(lean, numbers),
+                    colour,
+                    closer
+            );
+            case BRIEF_NOTE -> joinSentences(
+                    colour,
+                    leanWithNumbers(lean + " on " + selection, numbers),
                     closer
             );
         };
@@ -431,7 +514,7 @@ public final class VegasTipsterCopy {
         if (brief.probabilityPct() != null && Double.isFinite(brief.probabilityPct())) {
             n.append("— ").append(String.format(pick(PROB_PHRASES, hash, 3), brief.probabilityPct()));
         } else if (brief.expectedNumber() != null && Double.isFinite(brief.expectedNumber())) {
-            String unit = brief.expectedUnit() != null ? brief.expectedUnit() : "on the board";
+            String unit = brief.expectedUnit() != null ? brief.expectedUnit() : "on the sheet";
             n.append("— ").append(String.format(pick(EXPECTED_PHRASES, hash, 3), brief.expectedNumber(), unit));
         }
 
