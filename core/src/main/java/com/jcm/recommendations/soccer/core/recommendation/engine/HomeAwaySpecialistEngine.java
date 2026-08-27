@@ -42,10 +42,7 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
     private static final double THRESHOLD_POOR_TRAVELER_GOALS = 0.8;
     private static final double THRESHOLD_STRONG_POOR_TRAVELER_WIN_PCT = 15.0;
 
-    // Away specialist thresholds (rare)
-    private static final double THRESHOLD_STRONG_AWAY_PPG_DIFF = 0.3;
-    private static final double THRESHOLD_AWAY_WIN_DIFF = 10.0;
-    private static final double THRESHOLD_CONSISTENT_AWAY_PPG = 1.5;
+    // Away specialist thresholds — paused (Aug 2026 recalibration)
 
     // Fortress thresholds
     private static final double THRESHOLD_FORTRESS_WIN_PCT = 70.0;
@@ -81,9 +78,8 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
         analyzeHomeTeamAsHomeSpecialist(context).ifPresent(candidates::add);
         analyzeHomeTeamAsFortress(context).ifPresent(candidates::add);
 
-        // Analyze away team
+        // Analyze away team — poor traveler only (away specialist paused)
         analyzeAwayTeamAsPoorTraveler(context).ifPresent(candidates::add);
-        analyzeAwayTeamAsAwaySpecialist(context).ifPresent(candidates::add);
 
         if (candidates.isEmpty()) {
             return Optional.empty();
@@ -100,13 +96,8 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(context, best, candidates);
 
-        // Determine team to back
-        String teamToBack;
-        if (best.isHomeTeam || best.classification.contains("Poor Traveler")) {
-            teamToBack = context.getHomeTeam().getName();
-        } else {
-            teamToBack = context.getAwayTeam().getName();
-        }
+        // Home-only picks after away specialist pause
+        String teamToBack = context.getHomeTeam().getName();
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.HOME_AWAY_SPECIALIST)
@@ -141,15 +132,19 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
         double awayWinPct = calculateWinPercentage(stats, false);
         double winDisparity = homeWinPct - awayWinPct;
 
-        // Goals scored disparity
-        double homeGoalsAvg = calculateGoalsAvg(stats.getSeasonGoalsHome(), stats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(stats.getSeasonGoalsAway(), stats.getMatchesPlayed(), 1.0);
+        if (ppgDiff <= 0 || winDisparity <= 0) {
+            return Optional.empty();
+        }
+
+        // Goals scored disparity (venue-correct denominators)
+        double homeGoalsAvg = calculateVenueGoalsAvg(stats, true);
+        double awayGoalsAvg = calculateVenueGoalsAvg(stats, false);
         double overallGoals = (homeGoalsAvg + awayGoalsAvg) / 2.0;
         double goalsDisparity = overallGoals > 0 ? ((homeGoalsAvg - awayGoalsAvg) / overallGoals) * 100 : 0;
 
         // Goals conceded disparity (lower at home = positive)
-        double homeConcededAvg = calculateGoalsAvg(stats.getSeasonConcededHome(), stats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(stats.getSeasonConcededAway(), stats.getMatchesPlayed(), 1.0);
+        double homeConcededAvg = calculateVenueConcededAvg(stats, true);
+        double awayConcededAvg = calculateVenueConcededAvg(stats, false);
         double overallConceded = (homeConcededAvg + awayConcededAvg) / 2.0;
         double concededDisparity = overallConceded > 0 ? ((awayConcededAvg - homeConcededAvg) / overallConceded) * 100 : 0;
 
@@ -171,31 +166,26 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
             overallDisparity = (ppgDisparity + winDisparity + goalsDisparity + concededDisparity) / 4.0;
         }
 
-        // Check if qualifies as home specialist
-        boolean isStrongHomeSpecialist = ppgDiff >= THRESHOLD_STRONG_HOME_PPG_DIFF 
-                || winDisparity >= THRESHOLD_STRONG_HOME_WIN_DIFF 
-                || goalsDisparity >= THRESHOLD_STRONG_GOALS_DIFF_PCT;
-
-        boolean isModerateHomeSpecialist = ppgDiff >= THRESHOLD_MODERATE_HOME_PPG_DIFF 
-                || winDisparity >= THRESHOLD_MODERATE_HOME_WIN_DIFF 
+        // Check if qualifies as home specialist (any moderate signal + positive home edge)
+        boolean isModerateHomeSpecialist = ppgDiff >= THRESHOLD_MODERATE_HOME_PPG_DIFF
+                || winDisparity >= THRESHOLD_MODERATE_HOME_WIN_DIFF
                 || goalsDisparity >= THRESHOLD_MODERATE_GOALS_DIFF_PCT;
 
-        if (!isModerateHomeSpecialist && overallDisparity < THRESHOLD_MODERATE_DISPARITY) {
+        if (!isModerateHomeSpecialist || overallDisparity < THRESHOLD_MODERATE_DISPARITY) {
             return Optional.empty();
         }
 
         // Check form context
         FormContext formContext = analyzeFormContext(context.getHomeTeamForm(), stats, true);
 
-        ConfidenceLevel confidence;
-        String classification;
-        if (isStrongHomeSpecialist || overallDisparity >= THRESHOLD_STRONG_DISPARITY) {
-            confidence = ConfidenceLevel.STRONG;
-            classification = "Strong Home Specialist";
-        } else {
-            confidence = ConfidenceLevel.MODERATE;
-            classification = "Moderate Home Specialist";
+        ConfidenceLevel confidence = resolveConfidence(overallDisparity, hasXgData, formContext);
+        if (confidence == ConfidenceLevel.WEAK) {
+            return Optional.empty();
         }
+
+        String classification = confidence == ConfidenceLevel.STRONG
+                ? "Strong Home Specialist"
+                : "Moderate Home Specialist";
 
         return Optional.of(new SpecialistCandidate(
                 teamName,
@@ -228,7 +218,7 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
 
         double awayPpg = safeDouble(stats.getPpgAway());
         double awayWinPct = calculateWinPercentage(stats, false);
-        double awayGoalsAvg = calculateGoalsAvg(stats.getSeasonGoalsAway(), stats.getMatchesPlayed(), 1.0);
+        double awayGoalsAvg = calculateVenueGoalsAvg(stats, false);
 
         // Check poor traveler criteria
         boolean isPoorTraveler = awayPpg < THRESHOLD_POOR_TRAVELER_PPG 
@@ -244,9 +234,9 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
 
         double homePpg = safeDouble(stats.getPpgHome());
         double homeWinPct = calculateWinPercentage(stats, true);
-        double homeGoalsAvg = calculateGoalsAvg(stats.getSeasonGoalsHome(), stats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(stats.getSeasonConcededHome(), stats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(stats.getSeasonConcededAway(), stats.getMatchesPlayed(), 1.0);
+        double homeGoalsAvg = calculateVenueGoalsAvg(stats, true);
+        double homeConcededAvg = calculateVenueConcededAvg(stats, true);
+        double awayConcededAvg = calculateVenueConcededAvg(stats, false);
 
         // Calculate disparities
         double overallPpg = (homePpg + awayPpg) / 2.0;
@@ -273,100 +263,26 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
                 (THRESHOLD_POOR_TRAVELER_GOALS - awayGoalsAvg) * 20;
         overallDisparity = Math.min(100, Math.max(0, overallDisparity));
 
-        ConfidenceLevel confidence = isStrongPoorTraveler ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
-        String classification = isStrongPoorTraveler ? "Strong Poor Traveler" : "Moderate Poor Traveler";
+        if (overallDisparity < THRESHOLD_MODERATE_DISPARITY) {
+            return Optional.empty();
+        }
 
         FormContext formContext = analyzeFormContext(context.getAwayTeamForm(), stats, false);
+
+        ConfidenceLevel confidence = resolveConfidence(overallDisparity, hasXgData, formContext);
+        if (confidence == ConfidenceLevel.WEAK) {
+            return Optional.empty();
+        }
+
+        String classification = isStrongPoorTraveler && confidence == ConfidenceLevel.STRONG
+                ? "Strong Poor Traveler"
+                : "Moderate Poor Traveler";
 
         return Optional.of(new SpecialistCandidate(
                 teamName,
                 false,
                 classification,
                 "Back Home Win / Fade Away",
-                overallDisparity,
-                confidence,
-                homePpg,
-                awayPpg,
-                homeWinPct,
-                awayWinPct,
-                ppgDisparity,
-                winDisparity,
-                goalsDisparity,
-                concededDisparity,
-                xgDisparity,
-                hasXgData,
-                homeGoalsAvg,
-                awayGoalsAvg,
-                homeConcededAvg,
-                awayConcededAvg,
-                formContext
-        ));
-    }
-
-    private Optional<SpecialistCandidate> analyzeAwayTeamAsAwaySpecialist(FixtureContext context) {
-        TeamSeasonStats stats = context.getAwayTeamStats();
-        String teamName = context.getAwayTeam().getName();
-
-        double homePpg = safeDouble(stats.getPpgHome());
-        double awayPpg = safeDouble(stats.getPpgAway());
-        double awayWinPct = calculateWinPercentage(stats, false);
-        double homeWinPct = calculateWinPercentage(stats, true);
-
-        // Away specialist is rare - away PPG close to or better than home
-        boolean isStrongAwaySpecialist = awayPpg > homePpg + THRESHOLD_STRONG_AWAY_PPG_DIFF 
-                && awayWinPct > homeWinPct + THRESHOLD_AWAY_WIN_DIFF;
-
-        boolean isModerateAwaySpecialist = awayPpg >= homePpg - 0.2 
-                && awayWinPct >= homeWinPct - 5 
-                && awayPpg >= THRESHOLD_CONSISTENT_AWAY_PPG;
-
-        if (!isModerateAwaySpecialist) {
-            return Optional.empty();
-        }
-
-        double homeGoalsAvg = calculateGoalsAvg(stats.getSeasonGoalsHome(), stats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(stats.getSeasonGoalsAway(), stats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(stats.getSeasonConcededHome(), stats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(stats.getSeasonConcededAway(), stats.getMatchesPlayed(), 1.0);
-
-        // Calculate disparities (inverted for away specialist - positive means better away)
-        double overallPpg = (homePpg + awayPpg) / 2.0;
-        double ppgDisparity = overallPpg > 0 ? ((awayPpg - homePpg) / overallPpg) * 100 : 0;
-        double winDisparity = awayWinPct - homeWinPct;
-        double overallGoals = (homeGoalsAvg + awayGoalsAvg) / 2.0;
-        double goalsDisparity = overallGoals > 0 ? ((awayGoalsAvg - homeGoalsAvg) / overallGoals) * 100 : 0;
-        double overallConceded = (homeConcededAvg + awayConcededAvg) / 2.0;
-        double concededDisparity = overallConceded > 0 ? ((homeConcededAvg - awayConcededAvg) / overallConceded) * 100 : 0;
-
-        // xG disparity
-        double xgDisparity = 0.0;
-        boolean hasXgData = hasXgData(stats);
-        if (hasXgData) {
-            double homeXg = safeDouble(stats.getXgForAvgHome());
-            double awayXg = safeDouble(stats.getXgForAvgAway());
-            double overallXg = (homeXg + awayXg) / 2.0;
-            xgDisparity = overallXg > 0 ? ((awayXg - homeXg) / overallXg) * 100 : 0;
-        }
-
-        // Away specialist disparity (bonus for being rare)
-        double overallDisparity;
-        if (hasXgData) {
-            overallDisparity = (ppgDisparity + winDisparity + goalsDisparity + concededDisparity + xgDisparity) / 5.0 + 20;
-        } else {
-            overallDisparity = (ppgDisparity + winDisparity + goalsDisparity + concededDisparity) / 4.0 + 20;
-        }
-        overallDisparity = Math.min(100, overallDisparity);
-
-        ConfidenceLevel confidence = isStrongAwaySpecialist ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
-        String classification = isStrongAwaySpecialist ? "Strong Away Specialist" : "Consistent Away Performer";
-
-        FormContext formContext = analyzeFormContext(context.getAwayTeamForm(), stats, false);
-
-        return Optional.of(new SpecialistCandidate(
-                teamName,
-                false,
-                classification,
-                "Back Away Win",
                 overallDisparity,
                 confidence,
                 homePpg,
@@ -407,9 +323,9 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
         double homePpg = safeDouble(stats.getPpgHome());
         double awayPpg = safeDouble(stats.getPpgAway());
         double awayWinPct = calculateWinPercentage(stats, false);
-        double homeGoalsAvg = calculateGoalsAvg(stats.getSeasonGoalsHome(), stats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(stats.getSeasonGoalsAway(), stats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(stats.getSeasonConcededAway(), stats.getMatchesPlayed(), 1.0);
+        double homeGoalsAvg = calculateVenueGoalsAvg(stats, true);
+        double awayGoalsAvg = calculateVenueGoalsAvg(stats, false);
+        double awayConcededAvg = calculateVenueConcededAvg(stats, false);
 
         // Calculate disparities
         double overallPpg = (homePpg + awayPpg) / 2.0;
@@ -434,7 +350,16 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
         double overallDisparity = homeWinPct + (100 - homeLossPct * 2) + ((1 - homeConcededAvg) * 50);
         overallDisparity = Math.min(100, overallDisparity / 2.5);
 
+        if (overallDisparity < THRESHOLD_MODERATE_DISPARITY) {
+            return Optional.empty();
+        }
+
         FormContext formContext = analyzeFormContext(context.getHomeTeamForm(), stats, true);
+
+        ConfidenceLevel confidence = resolveConfidence(overallDisparity, hasXgData, formContext);
+        if (confidence == ConfidenceLevel.WEAK) {
+            return Optional.empty();
+        }
 
         return Optional.of(new SpecialistCandidate(
                 teamName,
@@ -442,7 +367,7 @@ public class HomeAwaySpecialistEngine implements RecommendationEngine {
                 "Home Fortress",
                 "Strong Back Home Win",
                 overallDisparity,
-                ConfidenceLevel.STRONG,
+                confidence,
                 homePpg,
                 awayPpg,
                 homeWinPct,
@@ -530,7 +455,20 @@ private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
         return new FormContext(true, ppgDivergence, goalsDivergence, formDiverges, formStatus);
     }
 
-    private Map<String, Object> buildFactors(FixtureContext context, SpecialistCandidate best, 
+    private ConfidenceLevel resolveConfidence(double overallDisparity, boolean hasXgData, FormContext formContext) {
+        if (overallDisparity < THRESHOLD_MODERATE_DISPARITY) {
+            return ConfidenceLevel.WEAK;
+        }
+        boolean decliningForm = formContext.hasFormData()
+                && formContext.formDiverges()
+                && formContext.ppgDivergence() < 0;
+        if (overallDisparity >= THRESHOLD_STRONG_DISPARITY && hasXgData && !decliningForm) {
+            return ConfidenceLevel.STRONG;
+        }
+        return ConfidenceLevel.MODERATE;
+    }
+
+    private Map<String, Object> buildFactors(FixtureContext context, SpecialistCandidate best,
             List<SpecialistCandidate> all) {
         Map<String, Object> factors = new HashMap<>();
         
@@ -619,6 +557,8 @@ private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
 
         factors.put("positiveIndicators", positiveIndicators);
         factors.put("riskFlags", riskFlags);
+        factors.put("awaySpecialistPaused", true);
+        factors.put("homeOnlyPicks", true);
 
         return factors;
     }
