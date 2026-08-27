@@ -1517,10 +1517,17 @@ Last 5 Home/Away Form:
   - Flag if recent form diverges from season pattern
 ```
 
-**Thresholds:**
-- **Strong Specialist:** Disparity Score ≥ 40%
-- **Moderate Specialist:** Disparity Score 25-39%
-- **Balanced:** Disparity Score < 25%
+**Thresholds (recalibrated Aug 2026):**
+- **Strong Specialist:** Disparity score ≥ 40%, xG data available, form not declining
+- **Moderate Specialist:** Disparity score ≥ 25% (capped at Moderate when xG missing or form declining)
+- **No pick:** Disparity &lt; 25%, negative home edge, or failed gates
+
+**Publishing rules:**
+- **Home-only picks** — Home Specialist, Home Fortress, Poor Traveler (back home team); Away Specialist **paused**
+- Home Specialist requires **positive home PPG and win-rate edge** (not OR-only with negative disparity)
+- Goals/conceded averages use **venue match counts**, not overall `matchesPlayed`
+
+**Status:** `Implemented` (recalibrated)
 
 **Form Divergence Detection:**
 ```

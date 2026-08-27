@@ -52,7 +52,7 @@ class HomeAwaySpecialistEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("classification")).isEqualTo("Home Fortress");
-        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
     }
 
     @Test
@@ -69,15 +69,36 @@ class HomeAwaySpecialistEngineTest {
     }
 
     @Test
-    @DisplayName("analyze detects away specialist")
-    void analyze_detectsAwaySpecialist() {
+    @DisplayName("analyze skips away specialist picks")
+    void analyze_skipsAwaySpecialist() {
         FixtureContext context = createAwaySpecialistContext();
+
+        assertThat(engine.analyze(context)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("analyze caps fortress at Moderate without xG validation")
+    void analyze_fortressCapsWithoutXg() {
+        FixtureContext context = createHomeFortressContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getFactors().get("classification").toString()).contains("Away");
-        assertThat(result.get().getMarket()).isEqualTo("Away Team");
+        assertThat(result.get().getFactors().get("classification")).isEqualTo("Home Fortress");
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(result.get().getMarket()).isEqualTo("Home Team");
+    }
+
+    @Test
+    @DisplayName("analyze can reach Strong with xG and high disparity")
+    void analyze_strongWithXgValidation() {
+        FixtureContext context = createContextWithXgData();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(true);
     }
 
     @Test
