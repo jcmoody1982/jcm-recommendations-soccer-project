@@ -402,15 +402,82 @@ function summaryFromFixtures(fixtures: ResultsFixture[]): ResultsDaySummary {
   };
 }
 
+function buildOutcomeGradient(summary: ResultsDaySummary): string {
+  const segments = [
+    { value: summary.wins, color: 'var(--confidence-strong)' },
+    { value: summary.losses, color: '#e07070' },
+    { value: summary.voids, color: 'var(--confidence-moderate)' },
+    { value: summary.pending, color: 'var(--accent-color)' },
+    { value: summary.unsupported, color: 'var(--text-muted)' },
+  ].filter((segment) => segment.value > 0);
+
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  if (total === 0) {
+    return 'conic-gradient(var(--border-color) 0deg 360deg)';
+  }
+
+  let angle = 0;
+  const stops = segments.map((segment) => {
+    const start = angle;
+    angle += (segment.value / total) * 360;
+    return `${segment.color} ${start}deg ${angle}deg`;
+  });
+  return `conic-gradient(${stops.join(', ')})`;
+}
+
+function outcomeBreakdownLabel(summary: ResultsDaySummary): string {
+  const parts = [
+    summary.wins > 0 ? `${summary.wins} win${summary.wins === 1 ? '' : 's'}` : '',
+    summary.losses > 0 ? `${summary.losses} loss${summary.losses === 1 ? '' : 'es'}` : '',
+    summary.voids > 0 ? `${summary.voids} void${summary.voids === 1 ? '' : 's'}` : '',
+    summary.pending > 0 ? `${summary.pending} pending` : '',
+    summary.unsupported > 0 ? `${summary.unsupported} unsupported` : '',
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : 'No picks';
+}
+
+function OutcomeDonut({ summary }: { summary: ResultsDaySummary }) {
+  const total = summary.wins + summary.losses + summary.voids + summary.pending + summary.unsupported;
+  const centerLabel =
+    summary.hitRate != null ? `${summary.hitRate.toFixed(0)}%` : total > 0 ? '—' : '0';
+
+  return (
+    <div
+      className={styles.outcomeDonut}
+      style={{ background: buildOutcomeGradient(summary) }}
+      title={outcomeBreakdownLabel(summary)}
+      aria-label={`Outcome mix: ${outcomeBreakdownLabel(summary)}`}
+      role="img"
+    >
+      <span className={styles.outcomeDonutCenter}>{centerLabel}</span>
+    </div>
+  );
+}
+
 function SummaryStrip({
   title,
   summary,
   tone,
+  compact = false,
 }: {
   title: string;
   summary: ResultsDaySummary;
   tone: 'strong' | 'moderate' | 'all';
+  compact?: boolean;
 }) {
+  if (compact) {
+    return (
+      <div className={`${styles.compactSummary} ${styles[`summary${tone[0].toUpperCase()}${tone.slice(1)}`]}`}>
+        <OutcomeDonut summary={summary} />
+        <h2 className={styles.compactSummaryTitle}>{title}</h2>
+        <span className={styles.compactStats}>
+          {summary.wins}W · {summary.losses}L · {summary.voids}V · {summary.pending}P
+          {summary.unsupported > 0 ? ` · ${summary.unsupported}U` : ''}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <section className={`${styles.summaryPanel} ${styles[`summary${tone[0].toUpperCase()}${tone.slice(1)}`]}`}>
       <div className={styles.summaryHeading}>
@@ -593,6 +660,83 @@ function ReturnsPanel({ fixtures }: { fixtures: ResultsFixture[] }) {
   );
 }
 
+function CompactPickTable({
+  fixtures,
+  showEliteRank = false,
+  eliteKeys,
+}: {
+  fixtures: ResultsFixture[];
+  showEliteRank?: boolean;
+  eliteKeys?: Set<string>;
+}) {
+  const rows = fixtures.flatMap((fixture) =>
+    fixture.picks.map((pick) => ({ fixture, pick })),
+  );
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className={styles.compactTableWrap}>
+      <table className={styles.compactTable}>
+        <thead>
+          <tr>
+            {showEliteRank && <th>#</th>}
+            <th>Match</th>
+            <th>Scr</th>
+            <th>Pick</th>
+            <th>Type</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ fixture, pick }) => {
+            const price = formatPrice(pick.odds);
+            const isElite =
+              showEliteRank
+              || pick.eliteRank != null
+              || Boolean(eliteKeys?.has(`${fixture.fixtureId}:${pick.type}`));
+            const score = fixture.scoreline
+              ? `${fixture.scoreline.home}–${fixture.scoreline.away}`
+              : fixture.matchStatus === 'incomplete'
+                ? '…'
+                : '—';
+
+            return (
+              <tr key={pick.id}>
+                {showEliteRank && (
+                  <td className={styles.compactRank}>
+                    {pick.eliteRank != null ? pick.eliteRank : '—'}
+                  </td>
+                )}
+                <td className={styles.compactMatch}>
+                  <Link to={`/fixtures/${fixture.fixtureId}`} className={styles.compactMatchLink}>
+                    {fixture.homeTeamName} v {fixture.awayTeamName}
+                  </Link>
+                  {fixture.leagueName && (
+                    <span className={styles.compactLeague}>{fixture.leagueName}</span>
+                  )}
+                </td>
+                <td className={styles.compactScore}>{score}</td>
+                <td className={styles.compactPick}>
+                  {isElite && <EliteBolt variant="badge" size={14} />}
+                  <span>{pick.market}</span>
+                  {price && <span className={styles.compactPrice}>@{price}</span>}
+                </td>
+                <td className={styles.compactType}>{formatType(pick.type)}</td>
+                <td className={styles.compactOutcome}>
+                  <span className={`${styles.outcomeCompact} ${styles[`outcome${pick.outcome}`]}`}>
+                    {outcomeLabel(pick.outcome)}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function FixtureList({
   fixtures,
   emptyTitle,
@@ -694,7 +838,7 @@ function ConfidenceSection({
   fixtures,
   eliteKeys,
   showEliteRank = false,
-  className,
+  compact = false,
 }: {
   title: string;
   tone: 'strong' | 'moderate';
@@ -702,18 +846,28 @@ function ConfidenceSection({
   fixtures: ResultsFixture[];
   eliteKeys?: Set<string>;
   showEliteRank?: boolean;
-  className?: string;
+  compact?: boolean;
 }) {
+  if (fixtures.length === 0) return null;
+
   return (
-    <section className={`${styles.confidenceSection}${className ? ` ${className}` : ''}`}>
-      <SummaryStrip title={title} summary={summary} tone={tone} />
-      <FixtureList
-        fixtures={fixtures}
-        emptyTitle={`No ${title.toLowerCase()} picks`}
-        emptyBody={`No ${title.toLowerCase()} picks for this filter.`}
-        eliteKeys={eliteKeys}
-        showEliteRank={showEliteRank}
-      />
+    <section className={compact ? styles.confidenceSectionCompact : styles.confidenceSection}>
+      <SummaryStrip title={title} summary={summary} tone={tone} compact={compact} />
+      {compact ? (
+        <CompactPickTable
+          fixtures={fixtures}
+          eliteKeys={eliteKeys}
+          showEliteRank={showEliteRank}
+        />
+      ) : (
+        <FixtureList
+          fixtures={fixtures}
+          emptyTitle={`No ${title.toLowerCase()} picks`}
+          emptyBody={`No ${title.toLowerCase()} picks for this filter.`}
+          eliteKeys={eliteKeys}
+          showEliteRank={showEliteRank}
+        />
+      )}
     </section>
   );
 }
@@ -948,11 +1102,6 @@ export default function Results() {
     () => (typeFilter === 'ALL' ? data?.moderateSummary : summaryFromFixtures(moderateFixtures)),
     [typeFilter, data?.moderateSummary, moderateFixtures],
   );
-  const allSummary = useMemo(() => {
-    if (!data) return undefined;
-    if (typeFilter === 'ALL') return data.summary;
-    return summaryFromFixtures([...strongFixtures, ...moderateFixtures]);
-  }, [data, typeFilter, strongFixtures, moderateFixtures]);
 
   const eliteFixtures = useMemo(() => {
     const fixtures = data?.eliteFixtures ?? [];
@@ -1132,10 +1281,6 @@ export default function Results() {
 
       {view === 'day' && (
         <>
-          {allSummary && data?.snapshotDate && (
-            <SummaryStrip title="All picks" summary={allSummary} tone="all" />
-          )}
-
           {isLoading && <div className={styles.message}>Loading results…</div>}
 
           {isError && (
@@ -1166,29 +1311,7 @@ export default function Results() {
           )}
 
           {!isLoading && !isError && data?.snapshotDate && (strongFixtures.length > 0 || moderateFixtures.length > 0 || eliteFixtures.length > 0) && (
-            <>
-              {(strongFixtures.length > 0 || moderateFixtures.length > 0) && (
-                <div className={styles.splitSections}>
-                  {strongFixtures.length > 0 && strongSummary && (
-                    <ConfidenceSection
-                      title="Strong"
-                      tone="strong"
-                      summary={strongSummary}
-                      fixtures={strongFixtures}
-                      eliteKeys={eliteKeys}
-                    />
-                  )}
-                  {moderateFixtures.length > 0 && moderateSummary && (
-                    <ConfidenceSection
-                      title="Moderate"
-                      tone="moderate"
-                      summary={moderateSummary}
-                      fixtures={moderateFixtures}
-                      eliteKeys={eliteKeys}
-                    />
-                  )}
-                </div>
-              )}
+            <div className={styles.dashboardSections}>
               {eliteFixtures.length > 0 && eliteSummary && (
                 <ConfidenceSection
                   title="Elite Picks"
@@ -1196,10 +1319,30 @@ export default function Results() {
                   summary={eliteSummary}
                   fixtures={eliteFixtures}
                   showEliteRank
-                  className={styles.eliteDashboardSection}
+                  compact
                 />
               )}
-            </>
+              {strongFixtures.length > 0 && strongSummary && (
+                <ConfidenceSection
+                  title="Strong"
+                  tone="strong"
+                  summary={strongSummary}
+                  fixtures={strongFixtures}
+                  eliteKeys={eliteKeys}
+                  compact
+                />
+              )}
+              {moderateFixtures.length > 0 && moderateSummary && (
+                <ConfidenceSection
+                  title="Moderate"
+                  tone="moderate"
+                  summary={moderateSummary}
+                  fixtures={moderateFixtures}
+                  eliteKeys={eliteKeys}
+                  compact
+                />
+              )}
+            </div>
           )}
         </>
       )}
