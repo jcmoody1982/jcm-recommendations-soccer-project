@@ -50,7 +50,8 @@ public class PickSettlementGrader {
             case CLEAN_SHEET -> gradeCleanSheet(snapshot, match);
             case FIRST_HALF_GOALS -> gradeHalfGoals(snapshot.getMarket(), match, true);
             case SECOND_HALF_GOALS -> gradeHalfGoals(snapshot.getMarket(), match, false);
-            case TOP_VS_BOTTOM, WINNING_FORM_MISMATCH, LOSING_FORM_MISMATCH, HOME_AWAY_SPECIALIST ->
+            case TOP_VS_BOTTOM -> gradeTopVsBottom(snapshot, match);
+            case WINNING_FORM_MISMATCH, LOSING_FORM_MISMATCH, HOME_AWAY_SPECIALIST ->
                     gradeTeamOrDraw(snapshot, match, false);
             case VALUE_BET -> gradeValueBet(snapshot, match);
             case PLAYER_TO_SCORE -> gradePlayerProp(snapshot, match, true);
@@ -169,6 +170,39 @@ public class PickSettlementGrader {
             return home != away ? GradeResult.win() : GradeResult.loss();
         }
         return GradeResult.unsupported("Unparseable double chance: " + market);
+    }
+
+    private GradeResult gradeTopVsBottom(RecommendationSnapshot snapshot, CompletedMatch match) {
+        String market = safe(snapshot.getMarket());
+        String lower = market.toLowerCase(Locale.ROOT);
+        if (lower.contains("goals")) {
+            return gradeOverUnderGoals(market, match, true);
+        }
+        if (lower.contains("1x") || lower.contains("home/draw")) {
+            return gradeDoubleChance(market, match);
+        }
+        if (lower.contains("-1.5")) {
+            return gradeTeamHandicap(snapshot, match, 1.5);
+        }
+        return gradeTeamOrDraw(snapshot, match, false);
+    }
+
+    private GradeResult gradeTeamHandicap(RecommendationSnapshot snapshot, CompletedMatch match, double line) {
+        Optional<Integer[]> ft = ftGoals(match);
+        if (ft.isEmpty()) {
+            return GradeResult.pending("Missing FT goals");
+        }
+        int home = ft.get()[0];
+        int away = ft.get()[1];
+        String team = snapshot.getMarket().replaceAll("(?i)\\s*-1\\.5\\s*$", "").trim();
+        int margin = home - away;
+        if (namesEqual(team, snapshot.getHomeTeamName())) {
+            return margin >= (int) Math.ceil(line) ? GradeResult.win() : GradeResult.loss();
+        }
+        if (namesEqual(team, snapshot.getAwayTeamName())) {
+            return -margin >= (int) Math.ceil(line) ? GradeResult.win() : GradeResult.loss();
+        }
+        return GradeResult.unsupported("Unparseable handicap market: " + snapshot.getMarket());
     }
 
     private GradeResult gradeTeamOrDraw(RecommendationSnapshot snapshot, CompletedMatch match, boolean allowDrawMarket) {

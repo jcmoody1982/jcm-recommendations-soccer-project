@@ -2130,23 +2130,22 @@ Combined Mismatch Score = Gap Score × Quality Score Multiplier
 ```
 
 **Confidence Levels:**
-- **Strong:** Gap ≥ 12 AND favorite at home AND quality indicators align
-- **Moderate:** Gap ≥ 8 AND quality indicators mostly align
-- **Weak:** Gap < 8 OR conflicting indicators (filter out)
+- **Strong:** Gap ≥ 12, home favorite only, quality ≥ 65, PPG/GD filters align, no upset watch cap
+- **Moderate:** Gap ≥ 10, home favorite only, quality ≥ 50, PPG/GD filters mostly align
+- **Weak:** Filter out (includes away favorites, gap &lt; 10, failed quality filters, or ≥ 3 upset factors)
 
-**Output:**
-- Primary market recommendation (Favorite Win, Handicap, or Upset Alert)
-- Position gap and league context
-- Key stats comparison (PPG, GD, form)
-- Risk indicator (High confidence / Upset potential)
-- Alternative market suggestions
+**Publishing rules (Aug 2026 recalibration):**
+- Home table favorites only (away favorites deferred to Match Result recalibration)
+- Moderate gap floor **10** places; Strong gap floor **12** (Banker at **14** + quality ≥ 70)
+- Venue PPG filters: favorite home PPG ≥ 1.5 (Moderate) / 1.8 (Strong); underdog away PPG ≤ 1.2 / 1.0
+- Strong GD filters: favorite season GD ≥ +10; underdog season GD ≤ −5
+- **Upset Watch:** ≥ 2 upset factors caps Strong → Moderate and may pivot primary market to **Home/Draw (1X)**; ≥ 3 upset factors → no pick
+- **Short favorite odds** (&lt; 1.40): pivot primary to **Over 2.5/3.5 Goals** or **Favorite −1.5** when mismatch quality is high
+- **BTTS mismatch** surfaced as an alternative market suggestion in factors when underdog scores away ≥ 50% and favorite concedes home ≥ 40%
 
-**Special Flags:**
-- "Banker" - Very high confidence favorite win
-- "Upset Watch" - Underdog has factors in their favor
-- "Goals Expected" - High-scoring game likely
+**Settlement (UC-033):** Primary market graded on FT scoreline — team win (draw = LOSS), Over/Under goals totals, −1.5 handicap, or Double Chance 1X when pivoted.
 
-**Status:** `Implemented`
+**Status:** `Implemented` (recalibrated)
 
 ---
 

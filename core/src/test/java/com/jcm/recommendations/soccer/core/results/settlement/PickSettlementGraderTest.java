@@ -261,6 +261,23 @@ class PickSettlementGraderTest {
     }
 
     @Test
+    void topVsBottomGradesGoalsHandicapAndDoubleChanceMarkets() {
+        assertThat(grader.grade(snapshot("TOP_VS_BOTTOM", "Over 2.5 Goals"), complete(2, 1)).outcome())
+                .isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(snapshot("TOP_VS_BOTTOM", "Over 2.5 Goals"), complete(1, 0)).outcome())
+                .isEqualTo(PickOutcome.LOSS);
+
+        RecommendationSnapshot handicap = snapshot("TOP_VS_BOTTOM", "Arsenal -1.5");
+        assertThat(grader.grade(handicap, complete(3, 1)).outcome()).isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(handicap, complete(2, 1)).outcome()).isEqualTo(PickOutcome.LOSS);
+
+        assertThat(grader.grade(snapshot("TOP_VS_BOTTOM", "Home/Draw (1X)"), complete(1, 1)).outcome())
+                .isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(snapshot("TOP_VS_BOTTOM", "Home/Draw (1X)"), complete(0, 1)).outcome())
+                .isEqualTo(PickOutcome.LOSS);
+    }
+
+    @Test
     void cleanSheetAway() {
         RecommendationSnapshot snap = snapshot("CLEAN_SHEET", "Chelsea Clean Sheet");
         assertThat(grader.grade(snap, complete(0, 1)).outcome()).isEqualTo(PickOutcome.WIN);
