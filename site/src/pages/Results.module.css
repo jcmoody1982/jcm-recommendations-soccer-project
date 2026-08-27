@@ -360,6 +360,14 @@
   align-items: start;
 }
 
+.performanceBands {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1.25rem;
+}
+
 .dashboardSections {
   display: flex;
   flex-direction: column;
@@ -1020,7 +1028,8 @@
 
 @media (max-width: 960px) {
   .splitSections,
-  .returnsSplit {
+  .returnsSplit,
+  .performanceBands {
     grid-template-columns: 1fr;
   }
 }

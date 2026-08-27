@@ -55,6 +55,7 @@ public class ResultsPerformanceService {
             LocalDate toDate,
             int minSample,
             BucketStats overall,
+            BucketStats elite,
             Map<String, BucketStats> byConfidence,
             List<TypePerformance> byType
     ) {}
@@ -67,7 +68,9 @@ public class ResultsPerformanceService {
         List<RecommendationSnapshot> rows = loadRows(fromDate, toDate).stream()
                 .filter(ResultsPerformanceService::isIncludedType)
                 .toList();
+        List<RecommendationSnapshot> eliteRows = resolveEliteRows(rows);
         BucketStats overall = summarize(rows);
+        BucketStats elite = summarize(eliteRows);
         Map<String, BucketStats> byConfidence = Map.of(
                 "STRONG", summarize(filterConfidence(rows, "STRONG")),
                 "MODERATE", summarize(filterConfidence(rows, "MODERATE"))
@@ -88,6 +91,12 @@ public class ResultsPerformanceService {
             byType.computeIfAbsent(type, key -> new ArrayList<>()).add(row);
         }
 
+        Map<String, List<RecommendationSnapshot>> eliteByType = new LinkedHashMap<>();
+        for (RecommendationSnapshot row : eliteRows) {
+            String type = row.getType() == null ? "UNKNOWN" : row.getType();
+            eliteByType.computeIfAbsent(type, key -> new ArrayList<>()).add(row);
+        }
+
         List<TypePerformance> typeRows = new ArrayList<>();
         for (Map.Entry<String, List<RecommendationSnapshot>> entry : byType.entrySet()) {
             List<RecommendationSnapshot> typePicks = entry.getValue();
@@ -95,6 +104,7 @@ public class ResultsPerformanceService {
                     entry.getKey(),
                     summarize(typePicks),
                     Map.of(
+                            "ELITE", summarize(eliteByType.getOrDefault(entry.getKey(), List.of())),
                             "STRONG", summarize(filterConfidence(typePicks, "STRONG")),
                             "MODERATE", summarize(filterConfidence(typePicks, "MODERATE"))
                     )
@@ -104,7 +114,37 @@ public class ResultsPerformanceService {
                 .comparingInt((TypePerformance t) -> t.overall().sampleSize()).reversed()
                 .thenComparing(TypePerformance::type));
 
-        return new PerformanceView(period, fromDate, toDate, MIN_SAMPLE, overall, byConfidence, typeRows);
+        return new PerformanceView(period, fromDate, toDate, MIN_SAMPLE, overall, elite, byConfidence, typeRows);
+    }
+
+    /**
+     * Prefer persisted eliteRank tags per day; otherwise compute Elite-of-day on read
+     * (same rule as {@link ResultsQueryService}).
+     */
+    static List<RecommendationSnapshot> resolveEliteRows(List<RecommendationSnapshot> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        Map<LocalDate, List<RecommendationSnapshot>> byDate = new LinkedHashMap<>();
+        for (RecommendationSnapshot row : rows) {
+            if (row.getSnapshotDate() == null) {
+                continue;
+            }
+            byDate.computeIfAbsent(row.getSnapshotDate(), key -> new ArrayList<>()).add(row);
+        }
+
+        List<RecommendationSnapshot> elite = new ArrayList<>();
+        for (List<RecommendationSnapshot> dayRows : byDate.values()) {
+            boolean anyTagged = dayRows.stream().anyMatch(r -> r.getEliteRank() != null);
+            if (anyTagged) {
+                dayRows.stream()
+                        .filter(r -> r.getEliteRank() != null)
+                        .forEach(elite::add);
+            } else {
+                elite.addAll(ElitePicksSelector.select(dayRows));
+            }
+        }
+        return elite;
     }
 
     private List<RecommendationSnapshot> loadRows(LocalDate fromDate, LocalDate toDate) {

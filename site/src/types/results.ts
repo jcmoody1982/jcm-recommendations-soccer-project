@@ -65,6 +65,7 @@ export interface TypePerformance {
   type: string;
   overall: PerformanceBucket;
   byConfidence: {
+    ELITE?: PerformanceBucket;
     STRONG: PerformanceBucket;
     MODERATE: PerformanceBucket;
   };
@@ -76,6 +77,7 @@ export interface ResultsPerformance {
   toDate: string;
   minSample: number;
   overall: PerformanceBucket;
+  elite?: PerformanceBucket;
   byConfidence: {
     STRONG: PerformanceBucket;
     MODERATE: PerformanceBucket;

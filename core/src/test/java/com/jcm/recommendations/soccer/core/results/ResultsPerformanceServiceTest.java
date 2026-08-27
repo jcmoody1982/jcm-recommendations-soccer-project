@@ -38,11 +38,11 @@ class ResultsPerformanceServiceTest {
         LocalDate d1 = LocalDate.of(2026, 8, 1);
         LocalDate d2 = LocalDate.of(2026, 8, 2);
         when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
-                snap(1L, d1, "BTTS", "STRONG", PickOutcome.WIN),
-                snap(2L, d1, "BTTS", "MODERATE", PickOutcome.LOSS),
-                snap(3L, d2, "OVER_GOALS", "STRONG", PickOutcome.WIN),
-                snap(4L, d2, "OVER_GOALS", "MODERATE", PickOutcome.VOID),
-                snap(5L, d2, "DRAW", "MODERATE", PickOutcome.PENDING)
+                snap(1L, d1, 100L, "BTTS", "STRONG", PickOutcome.WIN, 1, 90.0, 1.80),
+                snap(2L, d1, 200L, "BTTS", "MODERATE", PickOutcome.LOSS, null, 70.0, 1.90),
+                snap(3L, d2, 300L, "OVER_GOALS", "STRONG", PickOutcome.WIN, 1, 88.0, 1.70),
+                snap(4L, d2, 400L, "OVER_GOALS", "MODERATE", PickOutcome.VOID, null, 65.0, 2.00),
+                snap(5L, d2, 500L, "DRAW", "MODERATE", PickOutcome.PENDING, null, 60.0, 3.20)
         ));
 
         ResultsPerformanceService.PerformanceView view = service.getPerformance("30d");
@@ -56,6 +56,11 @@ class ResultsPerformanceServiceTest {
         assertThat(view.overall().sampleSize()).isEqualTo(3);
         assertThat(view.overall().hitRate()).isEqualTo(2 * 100.0 / 3);
         assertThat(view.overall().enoughData()).isFalse();
+
+        assertThat(view.elite().wins()).isEqualTo(2);
+        assertThat(view.elite().losses()).isEqualTo(0);
+        assertThat(view.elite().sampleSize()).isEqualTo(2);
+        assertThat(view.elite().hitRate()).isEqualTo(100.0);
 
         assertThat(view.byConfidence().get("STRONG").wins()).isEqualTo(2);
         assertThat(view.byConfidence().get("STRONG").losses()).isEqualTo(0);
@@ -71,6 +76,8 @@ class ResultsPerformanceServiceTest {
         assertThat(btts.overall().wins()).isEqualTo(1);
         assertThat(btts.overall().losses()).isEqualTo(1);
         assertThat(btts.overall().hitRate()).isEqualTo(50.0);
+        assertThat(btts.byConfidence().get("ELITE").wins()).isEqualTo(1);
+        assertThat(btts.byConfidence().get("ELITE").sampleSize()).isEqualTo(1);
 
         ResultsPerformanceService.TypePerformance over15 = view.byType().stream()
                 .filter(t -> "OVER_15_GOALS".equals(t.type()))
@@ -85,9 +92,26 @@ class ResultsPerformanceServiceTest {
     }
 
     @Test
+    void computesEliteOnReadWhenRanksMissing() {
+        LocalDate d1 = LocalDate.of(2026, 8, 1);
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "BTTS", "STRONG", PickOutcome.WIN, null, 95.0, 1.70),
+                snap(2L, d1, 200L, "MATCH_RESULT", "STRONG", PickOutcome.LOSS, null, 90.0, 1.80),
+                snap(3L, d1, 300L, "DRAW", "MODERATE", PickOutcome.WIN, null, 80.0, 3.00)
+        ));
+
+        ResultsPerformanceService.PerformanceView view = service.getPerformance("30d");
+
+        assertThat(view.elite().wins()).isEqualTo(1);
+        assertThat(view.elite().losses()).isEqualTo(1);
+        assertThat(view.elite().sampleSize()).isEqualTo(2);
+        assertThat(view.elite().hitRate()).isEqualTo(50.0);
+    }
+
+    @Test
     void allPeriodUsesLessThanEqualQuery() {
         when(snapshotRepository.findBySnapshotDateLessThanEqual(any())).thenReturn(List.of(
-                snap(1L, LocalDate.of(2026, 1, 1), "BTTS", "STRONG", PickOutcome.WIN)
+                snap(1L, LocalDate.of(2026, 1, 1), 100L, "BTTS", "STRONG", PickOutcome.WIN, 1, 90.0, 1.80)
         ));
 
         ResultsPerformanceService.PerformanceView view = service.getPerformance("all");
@@ -96,17 +120,30 @@ class ResultsPerformanceServiceTest {
         assertThat(view.fromDate()).isNull();
         assertThat(view.overall().wins()).isEqualTo(1);
         assertThat(view.overall().sampleSize()).isEqualTo(1);
+        assertThat(view.elite().wins()).isEqualTo(1);
     }
 
     private static RecommendationSnapshot snap(
-            Long id, LocalDate date, String type, String confidence, PickOutcome outcome) {
+            Long id,
+            LocalDate date,
+            Long fixtureId,
+            String type,
+            String confidence,
+            PickOutcome outcome,
+            Integer eliteRank,
+            Double score,
+            Double odds) {
         return RecommendationSnapshot.builder()
                 .id(id)
                 .snapshotDate(date)
-                .fixtureId(id)
+                .fixtureId(fixtureId)
                 .type(type)
                 .confidence(confidence)
                 .outcome(outcome)
+                .eliteRank(eliteRank)
+                .score(score)
+                .odds(odds)
+                .matchDateUnix(date.toEpochDay() * 86_400L)
                 .build();
     }
 }

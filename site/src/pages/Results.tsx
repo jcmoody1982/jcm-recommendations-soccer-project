@@ -914,6 +914,19 @@ function withConfidenceDefaults(data: DayResults | undefined): DayResults | unde
   };
 }
 
+function emptyPerformanceBucket(): PerformanceBucket {
+  return {
+    wins: 0,
+    losses: 0,
+    voids: 0,
+    pending: 0,
+    unsupported: 0,
+    hitRate: null,
+    sampleSize: 0,
+    enoughData: false,
+  };
+}
+
 function PerformancePanel({
   data,
   period,
@@ -968,7 +981,8 @@ function PerformancePanel({
             {data.fromDate ? `: ${data.fromDate} → ${data.toDate}` : ` through ${data.toDate}`}.
             {' '}Voids excluded from hit rate. Minimum sample {data.minSample}.
           </p>
-          <div className={styles.splitSections}>
+          <div className={styles.performanceBands}>
+            <PerformanceSummary title="Elite" bucket={data.elite ?? emptyPerformanceBucket()} tone="strong" />
             <PerformanceSummary title="Strong" bucket={data.byConfidence.STRONG} tone="strong" />
             <PerformanceSummary title="Moderate" bucket={data.byConfidence.MODERATE} tone="moderate" />
           </div>
@@ -989,32 +1003,40 @@ function PerformancePanel({
                     <th>W</th>
                     <th>L</th>
                     <th>Hit rate</th>
+                    <th>Elite</th>
                     <th>Strong</th>
                     <th>Moderate</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orderTypeRows(data.byType).map((row) => (
-                    <tr key={row.type}>
-                      <td>{formatType(row.type)}</td>
-                      <td>{row.overall.sampleSize}</td>
-                      <td className={styles.win}>{row.overall.wins}</td>
-                      <td className={styles.loss}>{row.overall.losses}</td>
-                      <td>
-                        <span className={`${styles.hitBadge} ${hitBadgeClass(row.overall)}`}>
-                          {formatBucketHit(row.overall)}
-                        </span>
-                      </td>
-                      <td>
-                        {formatBucketHit(row.byConfidence.STRONG)}
-                        <span className={styles.sampleHint}> ({row.byConfidence.STRONG.sampleSize})</span>
-                      </td>
-                      <td>
-                        {formatBucketHit(row.byConfidence.MODERATE)}
-                        <span className={styles.sampleHint}> ({row.byConfidence.MODERATE.sampleSize})</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {orderTypeRows(data.byType).map((row) => {
+                    const eliteBucket = row.byConfidence.ELITE ?? emptyPerformanceBucket();
+                    return (
+                      <tr key={row.type}>
+                        <td>{formatType(row.type)}</td>
+                        <td>{row.overall.sampleSize}</td>
+                        <td className={styles.win}>{row.overall.wins}</td>
+                        <td className={styles.loss}>{row.overall.losses}</td>
+                        <td>
+                          <span className={`${styles.hitBadge} ${hitBadgeClass(row.overall)}`}>
+                            {formatBucketHit(row.overall)}
+                          </span>
+                        </td>
+                        <td>
+                          {formatBucketHit(eliteBucket)}
+                          <span className={styles.sampleHint}> ({eliteBucket.sampleSize})</span>
+                        </td>
+                        <td>
+                          {formatBucketHit(row.byConfidence.STRONG)}
+                          <span className={styles.sampleHint}> ({row.byConfidence.STRONG.sampleSize})</span>
+                        </td>
+                        <td>
+                          {formatBucketHit(row.byConfidence.MODERATE)}
+                          <span className={styles.sampleHint}> ({row.byConfidence.MODERATE.sampleSize})</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
