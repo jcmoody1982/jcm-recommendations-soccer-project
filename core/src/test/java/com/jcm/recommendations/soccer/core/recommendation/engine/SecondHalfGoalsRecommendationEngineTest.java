@@ -163,6 +163,17 @@ class SecondHalfGoalsRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze score never exceeds 100% even with stacked multipliers")
+    void analyze_score_neverExceeds100() {
+        FixtureContext context = createVeryHighScoringContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getScore()).isLessThanOrEqualTo(100.0);
+    }
+
+    @Test
     @DisplayName("analyze tracks positive indicators and risk flags")
     void analyze_tracksIndicatorsAndFlags() {
         FixtureContext context = createHighScoringContext();

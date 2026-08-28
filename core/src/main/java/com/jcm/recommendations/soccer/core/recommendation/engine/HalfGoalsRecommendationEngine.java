@@ -100,7 +100,7 @@ public class HalfGoalsRecommendationEngine implements RecommendationEngine {
 
         double intensityFactor = calculateLateGameIntensity(context);
 
-        return goalsScore * intensityFactor;
+        return clampScore(goalsScore * intensityFactor);
     }
 
     private double calculateLateGameIntensity(FixtureContext context) {
