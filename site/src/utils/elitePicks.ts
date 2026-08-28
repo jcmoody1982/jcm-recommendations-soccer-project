@@ -30,6 +30,19 @@ export function isEliteEligibleType(type: string): boolean {
   return ELITE_TYPE_SET.has(type);
 }
 
+/** Temporary: Over 0.5 half-goals crowd Elite until scoring is tuned. Over 1.5 remains eligible. */
+export function isExcludedFromElitePicks(market: string | null | undefined): boolean {
+  return market != null && market.toLowerCase().includes('over 0.5');
+}
+
+export function isEliteEligible(rec: Recommendation): boolean {
+  return (
+    rec.confidence?.toUpperCase() === 'STRONG'
+    && isEliteEligibleType(rec.type)
+    && !isExcludedFromElitePicks(rec.market)
+  );
+}
+
 function compareEliteRank(a: Recommendation, b: Recommendation): number {
   const scoreDiff = (b.score || 0) - (a.score || 0);
   if (scoreDiff !== 0) return scoreDiff;
@@ -49,11 +62,7 @@ export function selectElitePicks(
   recommendations: Recommendation[],
   limit: number = ELITE_PICKS_LIMIT
 ): Recommendation[] {
-  const pool = recommendations.filter(
-    (rec) =>
-      rec.confidence?.toUpperCase() === 'STRONG'
-      && isEliteEligibleType(rec.type)
-  );
+  const pool = recommendations.filter(isEliteEligible);
 
   pool.sort(compareEliteRank);
 

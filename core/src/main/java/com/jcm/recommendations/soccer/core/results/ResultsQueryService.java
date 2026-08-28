@@ -135,6 +135,7 @@ public class ResultsQueryService {
         if (anyTagged) {
             return allRows.stream()
                     .filter(r -> r.getEliteRank() != null)
+                    .filter(r -> !ElitePicksSelector.isExcludedFromElitePicks(r.getMarket()))
                     .sorted(Comparator.comparingInt(RecommendationSnapshot::getEliteRank))
                     .toList();
         }

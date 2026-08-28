@@ -139,6 +139,7 @@ public class ResultsPerformanceService {
             if (anyTagged) {
                 dayRows.stream()
                         .filter(r -> r.getEliteRank() != null)
+                        .filter(r -> !ElitePicksSelector.isExcludedFromElitePicks(r.getMarket()))
                         .forEach(elite::add);
             } else {
                 elite.addAll(ElitePicksSelector.select(dayRows));

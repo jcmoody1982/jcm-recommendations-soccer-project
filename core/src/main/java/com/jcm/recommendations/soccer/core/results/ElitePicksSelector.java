@@ -42,6 +42,21 @@ public final class ElitePicksSelector {
     }
 
     /**
+     * Temporary: Over 0.5 half-goals score too high and crowd out other Elite picks.
+     * Over 1.5 half-goals remain eligible.
+     */
+    public static boolean isExcludedFromElitePicks(String market) {
+        return market != null && market.toLowerCase(Locale.ROOT).contains("over 0.5");
+    }
+
+    public static boolean isEliteEligible(RecommendationSnapshot row) {
+        return row != null
+                && "STRONG".equalsIgnoreCase(row.getConfidence())
+                && isEliteEligibleType(row.getType())
+                && !isExcludedFromElitePicks(row.getMarket());
+    }
+
+    /**
      * Returns Elite picks in rank order (best first). Does not mutate input rows.
      */
     public static List<RecommendationSnapshot> select(List<RecommendationSnapshot> daySnaps) {
@@ -54,8 +69,7 @@ public final class ElitePicksSelector {
         }
 
         List<RecommendationSnapshot> pool = daySnaps.stream()
-                .filter(r -> "STRONG".equalsIgnoreCase(r.getConfidence()))
-                .filter(r -> isEliteEligibleType(r.getType()))
+                .filter(ElitePicksSelector::isEliteEligible)
                 .sorted(eliteComparator())
                 .toList();
 

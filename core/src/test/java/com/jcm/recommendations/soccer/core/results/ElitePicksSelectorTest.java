@@ -60,6 +60,23 @@ class ElitePicksSelectorTest {
     }
 
     @Test
+    void excludesOverHalfGoalsMarketsUntilScoringIsFixed() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        List<RecommendationSnapshot> day = List.of(
+                snapWithMarket(1L, date, 100L, "SECOND_HALF_GOALS", "Over 0.5 2H Goals", "STRONG", 100.0, 1.5, 1000L),
+                snapWithMarket(2L, date, 200L, "FIRST_HALF_GOALS", "Over 0.5 HT Goals", "STRONG", 100.0, 1.5, 2000L),
+                snapWithMarket(3L, date, 300L, "SECOND_HALF_GOALS", "Over 1.5 2H Goals", "STRONG", 85.0, 2.0, 3000L),
+                snapWithMarket(4L, date, 400L, "BTTS", "BTTS Yes", "STRONG", 80.0, 1.8, 4000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite).extracting(RecommendationSnapshot::getFixtureId)
+                .containsExactly(300L, 400L);
+        assertThat(elite).noneMatch(r -> ElitePicksSelector.isExcludedFromElitePicks(r.getMarket()));
+    }
+
+    @Test
     void capsBttsAtThreeAndFillsWithOtherMarkets() {
         LocalDate date = LocalDate.of(2026, 8, 15);
         List<RecommendationSnapshot> day = List.of(
@@ -85,12 +102,18 @@ class ElitePicksSelectorTest {
     private static RecommendationSnapshot snap(
             Long id, LocalDate date, Long fixtureId, String type, String confidence,
             double score, double odds, long kickoff) {
+        return snapWithMarket(id, date, fixtureId, type, type, confidence, score, odds, kickoff);
+    }
+
+    private static RecommendationSnapshot snapWithMarket(
+            Long id, LocalDate date, Long fixtureId, String type, String market, String confidence,
+            double score, double odds, long kickoff) {
         return RecommendationSnapshot.builder()
                 .id(id)
                 .snapshotDate(date)
                 .fixtureId(fixtureId)
                 .type(type)
-                .market(type)
+                .market(market)
                 .confidence(confidence)
                 .score(score)
                 .odds(odds)
