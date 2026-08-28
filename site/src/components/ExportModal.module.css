@@ -185,6 +185,15 @@
 .exportDate {
   font-size: 0.7rem;
   color: #888;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.35rem;
+}
+
+.exportLeagueName {
+  color: #666;
+  font-weight: 600;
 }
 
 .exportDateEarly {
@@ -221,9 +230,25 @@
 
 .exportPickSelection {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.4rem;
   padding-left: 0.25rem;
+}
+
+.exportMarketBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.exportMarketType {
+  font-size: 0.65rem;
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .exportConfidence {
@@ -233,7 +258,8 @@
 .exportMarket {
   font-size: 0.8rem;
   color: #4338ca;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .exportOdds {

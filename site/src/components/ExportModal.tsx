@@ -6,6 +6,10 @@ import {
   EARLY_KICKOFF_WARNING,
   isEarlyKickoffUk,
 } from '../utils/kickoff';
+import {
+  formatExportPickLabels,
+  formatExportSelectionLine,
+} from '../utils/exportPickLabels';
 import { EarlyKickoffBadge } from './EarlyKickoffWarning';
 import styles from './ExportModal.module.css';
 
@@ -43,15 +47,16 @@ function generateTextExport(recommendations: Recommendation[]): string {
   const lines = ['🎯 AccaBaccaGlory Picks', ''];
   
   recommendations.forEach((rec) => {
+    const labels = formatExportPickLabels(rec);
     const early = isEarlyKickoffUk(rec.matchDateUnix);
-    lines.push(`📅 ${formatDate(rec.matchDateUnix)}${early ? ' ⚠️ EARLY KO' : ''}`);
+    const leagueSuffix = labels.leagueLabel ? ` · ${labels.leagueLabel}` : '';
+    lines.push(`📅 ${formatDate(rec.matchDateUnix)}${leagueSuffix}${early ? ' ⚠️ EARLY KO' : ''}`);
     if (early) {
       lines.push(`⚠️ ${EARLY_KICKOFF_WARNING}`);
     }
-    lines.push(`⚽ ${rec.homeTeamName} vs ${rec.awayTeamName}`);
-    const oddsStr = rec.odds ? ` @ ${rec.odds.toFixed(2)}` : '';
+    lines.push(`⚽ ${labels.fixtureLabel}`);
     const confStr = rec.confidence === 'STRONG' ? '🔥' : '⚡';
-    lines.push(`${confStr} ${rec.market}${oddsStr}`);
+    lines.push(`${confStr} ${formatExportSelectionLine(rec, labels)}`);
     lines.push('');
   });
   
@@ -167,6 +172,7 @@ export function ExportModal({ isOpen, onClose, recommendations }: ExportModalPro
                 
                 <div className={styles.exportPicks}>
                   {recommendations.map((rec, index) => {
+                    const labels = formatExportPickLabels(rec);
                     const isEarlyKickoff = isEarlyKickoffUk(rec.matchDateUnix);
                     return (
                       <div
@@ -185,11 +191,12 @@ export function ExportModal({ isOpen, onClose, recommendations }: ExportModalPro
                               title={isEarlyKickoff ? EARLY_KICKOFF_WARNING : undefined}
                             >
                               <span>{formatDate(rec.matchDateUnix)}</span>
+                              {labels.leagueLabel && (
+                                <span className={styles.exportLeagueName}>{labels.leagueLabel}</span>
+                              )}
                               {isEarlyKickoff && <EarlyKickoffBadge />}
                             </span>
-                            <span className={styles.exportFixture}>
-                              {rec.homeTeamName} vs {rec.awayTeamName}
-                            </span>
+                            <span className={styles.exportFixture}>{labels.fixtureLabel}</span>
                             {isEarlyKickoff && (
                               <span className={styles.exportEarlyNote}>{EARLY_KICKOFF_STRIP}</span>
                             )}
@@ -199,7 +206,10 @@ export function ExportModal({ isOpen, onClose, recommendations }: ExportModalPro
                           <span className={styles.exportConfidence}>
                             {rec.confidence === 'STRONG' ? '🔥' : '⚡'}
                           </span>
-                          <span className={styles.exportMarket}>{rec.market}</span>
+                          <div className={styles.exportMarketBlock}>
+                            <span className={styles.exportMarketType}>{labels.marketTypeLabel}</span>
+                            <span className={styles.exportMarket}>{labels.selectionLabel}</span>
+                          </div>
                           {rec.odds && (
                             <span className={styles.exportOdds}>@ {rec.odds.toFixed(2)}</span>
                           )}
