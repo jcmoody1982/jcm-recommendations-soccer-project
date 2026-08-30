@@ -222,14 +222,34 @@ _Use cases for generating insights, recommendations, and predictions based on co
 
 *Base weights (preferred; renormalized when signals are missing):*
 ```
-BTTS Score = weighted average of available signals:
+BTTS Score = weighted average of available signals (all rates shrunk, see below):
   - Home team BTTS % (season, home)     × 0.15
   - Away team BTTS % (season, away)     × 0.15
-  - Home team BTTS % (form, blended)    × 0.20
-  - Away team BTTS % (form, blended)    × 0.20
-  - Home team venue FTS inverse         × 0.10
-  - Away team venue FTS inverse         × 0.10
+  - Home team BTTS % (form, shrunk)     × 0.20
+  - Away team BTTS % (form, shrunk)     × 0.20
+  - P(both teams score), multiplicative × 0.20
   - API btts_potential                  × 0.10
+```
+
+**Sample-size shrinkage (P3):**
+```
+Every observed rate is pulled toward a league prior by 6 pseudo-matches:
+  shrunk = (observed × n + prior × 6) / (n + 6)
+
+  prior = 50%  for BTTS rates
+  prior = 74%  for "this team scores at least once" rates
+
+Effect: a 5-from-5 run reads as "likely", not as a literal 100%.
+```
+
+**Both-teams-score signal (P3):**
+```
+BTTS is a conjunction, so the two one-sided scoring rates are combined
+multiplicatively rather than averaged as two independent signals:
+
+  P(both) = shrunk P(home scores) × shrunk P(away scores)
+
+Averaging two ~100% one-sided rates previously overstated a two-sided event.
 ```
 
 **Missing data (P2):**
@@ -242,9 +262,8 @@ Remaining signal weights are renormalized to sum to 1.0.
 ```
 Venue form sample = wins + draws + losses at venue.
   - sample < 3: omit form signal (weights renormalize)
-  - sample 3–4: blend form % toward season % by sample/5
-  - sample ≥ 5: use form % fully
-  - If form % is present but W/D/L counts are missing: treat as full sample
+  - sample ≥ 3: shrink form % toward season % (or the 50% prior) by sample size
+  - If form % is present but W/D/L counts are missing: assume sample of 3
 ```
 
 **Venue match counts (P0):**
@@ -290,10 +309,20 @@ When xG for available for both sides:
 appliedBoost = min(8.0, goalsBoost + leakyBoost + xgBoost)
 ```
 
-**Thresholds:**
-- **Strong:** BTTS Score ≥ 80%
-- **Moderate:** BTTS Score 65-79%
-- **Weak:** BTTS Score < 65% (filtered out)
+**Realistic ceiling (P3):**
+```
+Scores above 75% are compressed asymptotically toward a 85% ceiling:
+  score = 75 + 10 × (1 − e^−((raw − 75) / 10))
+
+Ranking is preserved and the ceiling is never reached, so BTTS is never
+presented as a certainty. Previously the total was clamped at 100, which
+masked overflow instead of preventing it.
+```
+
+**Thresholds** (rebased onto the shrunk, ceiling-capped scale):
+- **Strong:** BTTS Score ≥ 72%
+- **Moderate:** BTTS Score 62-71%
+- **Weak:** BTTS Score < 62% (filtered out)
 
 **Output:**
 - Ranked list of fixtures by BTTS score
@@ -311,6 +340,8 @@ appliedBoost = min(8.0, goalsBoost + leakyBoost + xgBoost)
   - `xgBoostApplied` / `xgBoostAmount`
   - `baseScore`, `appliedBoost`, `boostCapped`, `maxCombinedBoost`
   - `calculatedScore`
+  - `bothTeamsScoreEstimate`, `shrinkageApplied`
+  - `realisticCeiling`, `ceilingApplied`
 
 **Status:** `Implemented`
 

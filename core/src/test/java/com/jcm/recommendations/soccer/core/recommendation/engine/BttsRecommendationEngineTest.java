@@ -171,16 +171,52 @@ class BttsRecommendationEngineTest {
     }
 
     @Test
-    void analyze_thinFormSample_blendsTowardSeason() {
+    void analyze_thinFormSample_shrinksTowardSeason() {
         FixtureContext context = createContextWithThinFormSample(70.0, 70.0, 100.0, 100.0);
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("homeFormSampleSize")).isEqualTo(3);
-        // Blended: 70*(2/5) + 100*(3/5) = 28 + 60 = 88
+        // Shrunk toward season: (100*3 + 70*6) / (3 + 6) = 720 / 9 = 80
         assertThat((Double) result.get().getFactors().get("homeBttsFormPct"))
-                .isCloseTo(88.0, within(0.01));
+                .isCloseTo(80.0, within(0.01));
+    }
+
+    @Test
+    void analyze_perfectRecords_staysBelowRealisticCeiling() {
+        FixtureContext context = createContextWithPerfectBttsRecords();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        // Every input says 100%; the score must still read as a probability, not a certainty.
+        assertThat(result.get().getScore()).isLessThan(85.0);
+        assertThat(result.get().getFactors().get("ceilingApplied")).isEqualTo(true);
+    }
+
+    @Test
+    void analyze_fiveFromFiveForm_doesNotReadAsCertainty() {
+        FixtureContext context = createContextWithFormData(90.0, 90.0, 100.0, 100.0);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat((Double) result.get().getFactors().get("homeBttsFormPct")).isLessThan(100.0);
+        assertThat((Double) result.get().getFactors().get("awayBttsFormPct")).isLessThan(100.0);
+    }
+
+    @Test
+    void analyze_bothTeamsScoreEstimate_isBelowEitherSideAlone() {
+        FixtureContext context = createContextWithBttsStats(80.0, 80.0);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        double bothScore = (Double) result.get().getFactors().get("bothTeamsScoreEstimate");
+        double homeScoredPct = (Double) result.get().getFactors().get("homeVenueScoredPct");
+        double awayScoredPct = (Double) result.get().getFactors().get("awayVenueScoredPct");
+        assertThat(bothScore).isLessThan(Math.min(homeScoredPct, awayScoredPct));
     }
 
     @Test
@@ -529,6 +565,48 @@ class BttsRecommendationEngineTest {
                 .homeTeamForm(homeForm)
                 .awayTeamForm(awayForm)
                 .potentials(createPotentials(70.0))
+                .build();
+    }
+
+    /** Every available signal maxed out: 100% season BTTS, 100% form, always scores. */
+    private FixtureContext createContextWithPerfectBttsRecords() {
+        TeamRecentForm homeForm = TeamRecentForm.builder()
+                .teamId(1L)
+                .winsHome(3).drawsHome(1).lossesHome(1)
+                .bttsPercentageHome(100.0)
+                .build();
+
+        TeamRecentForm awayForm = TeamRecentForm.builder()
+                .teamId(2L)
+                .winsAway(3).drawsAway(1).lossesAway(1)
+                .bttsPercentageAway(100.0)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(baseHomeStats(100.0)
+                        .seasonFailedToScoreOverall(0)
+                        .seasonFailedToScoreHome(0)
+                        .seasonFailedToScoreAway(0)
+                        .seasonGoalsHome(25)
+                        .seasonConcededHome(18)
+                        .xgForAvgHome(2.4)
+                        .xgAgainstAvgHome(1.8)
+                        .build())
+                .awayTeamStats(baseAwayStats(100.0)
+                        .seasonFailedToScoreOverall(0)
+                        .seasonFailedToScoreHome(0)
+                        .seasonFailedToScoreAway(0)
+                        .seasonGoalsAway(22)
+                        .seasonConcededAway(17)
+                        .xgForAvgAway(2.2)
+                        .xgAgainstAvgAway(1.9)
+                        .build())
+                .homeTeamForm(homeForm)
+                .awayTeamForm(awayForm)
+                .potentials(createPotentials(100.0))
                 .build();
     }
 
