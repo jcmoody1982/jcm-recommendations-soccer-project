@@ -2992,16 +2992,23 @@ Engines publish different `score` meanings. Elite v1 constrains the pool to prob
 | 1 | Confidence gate | **Strong only** |
 | 2 | Score comparability | **%-style types only (v1)** |
 | 3 | Fixture dedupe | **1 per fixture** |
-| 3b | Per-type cap | **BTTS max 3** |
+| 3b | Per-type cap | **Max 3 of any one market type** |
 | 4 | Page filters | **Horizon only** |
 | 5 | Corners / specialist / form later | Defer (percentile / separate board) |
 | 6 | Hit-rate weighting (UC-035) | **No for v1** |
 | 7 | Section position | **Bottom** |
 | 8 | Implementation | **Client-side v1** |
 
+**Why the per-type cap applies to every market:** Elite ranks by probability, which structurally
+favours short-priced markets. Over 1.5 clears in roughly three quarters of all fixtures, so on
+probability alone it outranks almost everything and fills the board on its own. BTTS was capped
+for exactly this reason and Over 0.5 half-goals were excluded outright for the same one. A single
+cap across every type retires those special cases instead of adding a new exception each time a
+market runs hot.
+
 **Acceptance Criteria:**
 - [ ] Elite Picks section appears at the bottom of Recommendations
-- [ ] Shows at most 10 Strong %-style picks, ≤1 per fixture, ≤3 BTTS
+- [ ] Shows at most 10 Strong %-style picks, ≤1 per fixture, ≤3 of any one market type
 - [ ] Uses horizon window only; ignores other page filters
 - [ ] Empty window → section hidden
 - [ ] Early Kick-Off warnings still apply on Elite rows
@@ -3409,7 +3416,7 @@ GET /api/results/performance?period=7d|30d|90d|all
 **Depends on:** UC-031 (daily snapshot), UC-033 (settlement), UC-034 (Results host), UC-036 (Elite ranking rules).
 
 **Scope nuance (locked):**
-Live Recommendations Elite (UC-036) ranks across the **horizon** (3d/7d). Results Elite is **elite-of-the-day**: apply the same UC-036 population rules to that day’s snapshotted Strong %-style picks (fixtures kicking off that London calendar day). Cap remains top **10**, ≤1 per fixture, ≤3 BTTS.
+Live Recommendations Elite (UC-036) ranks across the **horizon** (3d/7d). Results Elite is **elite-of-the-day**: apply the same UC-036 population rules to that day’s snapshotted Strong %-style picks (fixtures kicking off that London calendar day). Cap remains top **10**, ≤1 per fixture, ≤3 of any one market type.
 
 **Population (same rules as UC-036, day-scoped):**
 1. Pool = snapshotted picks for `snapshotDate` with **STRONG** confidence

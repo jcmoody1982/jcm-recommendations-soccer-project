@@ -77,6 +77,28 @@ class ElitePicksSelectorTest {
     }
 
     @Test
+    void capsAnySingleMarketAtThreeSoItCannotFillTheBoard() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        // Over 1.5 clears in roughly three quarters of fixtures, so on probability alone it
+        // outranks everything else and used to take every slot.
+        List<RecommendationSnapshot> day = List.of(
+                snap(1L, date, 100L, "OVER_15_GOALS", "STRONG", 93.0, 1.22, 1000L),
+                snap(2L, date, 200L, "OVER_15_GOALS", "STRONG", 92.0, 1.20, 2000L),
+                snap(3L, date, 300L, "OVER_15_GOALS", "STRONG", 91.0, 1.24, 3000L),
+                snap(4L, date, 400L, "OVER_15_GOALS", "STRONG", 90.0, 1.21, 4000L),
+                snap(5L, date, 500L, "OVER_15_GOALS", "STRONG", 89.0, 1.23, 5000L),
+                snap(6L, date, 600L, "MATCH_RESULT", "STRONG", 74.0, 1.90, 6000L),
+                snap(7L, date, 700L, "DRAW", "STRONG", 71.0, 3.40, 7000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite.stream().filter(r -> "OVER_15_GOALS".equals(r.getType())).count()).isEqualTo(3);
+        assertThat(elite).extracting(RecommendationSnapshot::getType)
+                .containsExactly("OVER_15_GOALS", "OVER_15_GOALS", "OVER_15_GOALS", "MATCH_RESULT", "DRAW");
+    }
+
+    @Test
     void capsBttsAtThreeAndFillsWithOtherMarkets() {
         LocalDate date = LocalDate.of(2026, 8, 15);
         List<RecommendationSnapshot> day = List.of(

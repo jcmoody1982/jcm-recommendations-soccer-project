@@ -19,10 +19,14 @@ export const ELITE_ELIGIBLE_TYPES: readonly RecommendationType[] = [
 
 export const ELITE_PICKS_LIMIT = 10;
 
-/** Soft caps so one market cannot dominate the Elite board. */
-export const ELITE_TYPE_CAPS: Partial<Record<RecommendationType, number>> = {
-  BTTS: 3,
-};
+/**
+ * Most slots any single market may take. Elite ranks by probability, which structurally favours
+ * short-priced markets: Over 1.5 clears in roughly three quarters of fixtures, so on probability
+ * alone it outranks almost everything and fills the board on its own. BTTS was capped for exactly
+ * this reason; one cap across every type retires the special case rather than adding a new
+ * exception each time a market runs hot.
+ */
+export const ELITE_MAX_PER_TYPE = 3;
 
 const ELITE_TYPE_SET = new Set<string>(ELITE_ELIGIBLE_TYPES);
 
@@ -56,7 +60,7 @@ function compareEliteRank(a: Recommendation, b: Recommendation): number {
 
 /**
  * Rank Strong %-style picks into Elite Picks (UC-036).
- * At most one selection per fixture; default cap 10; BTTS capped at 3.
+ * At most one selection per fixture; default cap 10; at most 3 of any one market type.
  */
 export function selectElitePicks(
   recommendations: Recommendation[],
@@ -73,9 +77,8 @@ export function selectElitePicks(
   for (const rec of pool) {
     if (seenFixtures.has(rec.fixtureId)) continue;
 
-    const typeCap = ELITE_TYPE_CAPS[rec.type];
     const typeCount = typeCounts.get(rec.type) ?? 0;
-    if (typeCap != null && typeCount >= typeCap) continue;
+    if (typeCount >= ELITE_MAX_PER_TYPE) continue;
 
     seenFixtures.add(rec.fixtureId);
     typeCounts.set(rec.type, typeCount + 1);

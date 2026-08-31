@@ -4,20 +4,30 @@ import com.jcm.recommendations.soccer.domain.RecommendationSnapshot;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * UC-036 / UC-037: rank Strong %-style snapshot picks into Elite
- * (top 10, ≤1 per fixture, ≤3 BTTS).
+ * (top 10, ≤1 per fixture, ≤3 per market type).
  * Mirrors {@code site/src/utils/elitePicks.ts}.
  */
 public final class ElitePicksSelector {
 
     public static final int ELITE_PICKS_LIMIT = 10;
-    public static final int ELITE_BTTS_CAP = 3;
+
+    /**
+     * Most slots any single market may take. Elite ranks by probability, which structurally
+     * favours short-priced markets: Over 1.5 clears in roughly three quarters of fixtures, so on
+     * probability alone it outranks almost everything and fills the board on its own. BTTS was
+     * capped for exactly this reason; applying one cap to every type retires the special case
+     * rather than adding a new exception each time a market runs hot.
+     */
+    public static final int ELITE_MAX_PER_TYPE = 3;
 
     private static final Set<String> ELIGIBLE_TYPES = Set.of(
             "MATCH_RESULT",
@@ -74,21 +84,20 @@ public final class ElitePicksSelector {
                 .toList();
 
         Set<Long> seenFixtures = new HashSet<>();
-        int bttsCount = 0;
+        Map<String, Integer> typeCounts = new HashMap<>();
         List<RecommendationSnapshot> elite = new ArrayList<>();
         for (RecommendationSnapshot row : pool) {
             Long fixtureId = row.getFixtureId();
             if (fixtureId == null || seenFixtures.contains(fixtureId)) {
                 continue;
             }
-            boolean isBtts = "BTTS".equalsIgnoreCase(row.getType());
-            if (isBtts && bttsCount >= ELITE_BTTS_CAP) {
+            String type = row.getType() == null ? "" : row.getType().toUpperCase(Locale.ROOT);
+            int typeCount = typeCounts.getOrDefault(type, 0);
+            if (typeCount >= ELITE_MAX_PER_TYPE) {
                 continue;
             }
             seenFixtures.add(fixtureId);
-            if (isBtts) {
-                bttsCount++;
-            }
+            typeCounts.put(type, typeCount + 1);
             elite.add(row);
             if (elite.size() >= limit) {
                 break;
