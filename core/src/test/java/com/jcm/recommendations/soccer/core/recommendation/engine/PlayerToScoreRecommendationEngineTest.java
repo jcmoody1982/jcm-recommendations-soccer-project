@@ -1,5 +1,6 @@
 package com.jcm.recommendations.soccer.core.recommendation.engine;
 
+import com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel;
 import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
@@ -17,6 +18,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PlayerToScoreRecommendationEngineTest {
+
+    /** Goals conceded over 10 matches that lands the opponent on the league-average rate. */
+    private static final int NEUTRAL_DEFENCE_CONCEDED = 14;
 
     private PlayerToScoreRecommendationEngine engine;
 
@@ -43,7 +47,46 @@ class PlayerToScoreRecommendationEngineTest {
         assertThat(result.get().getMarket()).isEqualTo("Mohamed Salah to score");
         assertThat(result.get().getOdds()).isNull();
         assertThat(result.get().getFactors()).containsEntry("playerId", 10L);
-        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(72.0);
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+    }
+
+    @Test
+    @DisplayName("analyze publishes a probability the market can actually produce")
+    void analyze_eliteScorer_staysWithinRealisticRange() {
+        Optional<Recommendation> result = engine.analyze(contextWithOpponentConceded(
+                scorer(10L, "Elite Striker", 0.55, 20, 1600, null),
+                NEUTRAL_DEFENCE_CONCEDED));
+
+        assertThat(result).isPresent();
+        // A 0.55-per-90 striker over a full match is a ~42% chance to score. The old weighted
+        // index published 58 as its *floor*, so guard the whole band, not just the 100 clamp.
+        assertThat(result.get().getScore()).isLessThan(50.0);
+        assertThat(result.get().getScore()).isGreaterThan(25.0);
+    }
+
+    @Test
+    @DisplayName("analyze prefers the proven scorer over an equal-rate small sample")
+    void analyze_thinSample_isShrunkTowardPrior() {
+        Optional<Recommendation> result = engine.analyze(contextWithPlayers(
+                scorer(10L, "Proven Starter", 0.60, 20, 1600, null),
+                scorer(11L, "Hot Streak Sub", 0.60, 6, 400, null)));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Proven Starter to score");
+    }
+
+    @Test
+    @DisplayName("analyze scores a part-time player below a full-match player on the same rate")
+    void analyze_expectedMinutes_lowerTheScore() {
+        PlayerSeasonStats fullMatch = scorer(10L, "Ninety Minute Man", 0.70, 20, 1600, null);
+        fullMatch.setMinPerMatch(90);
+        PlayerSeasonStats partial = scorer(10L, "Hour Player", 0.70, 20, 1600, null);
+        partial.setMinPerMatch(55);
+
+        double fullScore = scoreFor(fullMatch);
+        double partialScore = scoreFor(partial);
+
+        assertThat(partialScore).isLessThan(fullScore);
     }
 
     @Test
@@ -60,21 +103,54 @@ class PlayerToScoreRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze returns empty when player lists are missing")
-    void analyze_withoutPlayers_returnsEmpty() {
-        Optional<Recommendation> result = engine.analyze(baseContextBuilder().build());
+    @DisplayName("analyze drops a marginal scorer below the moderate threshold")
+    void analyze_marginalScorer_isNotPublished() {
+        Optional<Recommendation> result = engine.analyze(contextWithOpponentConceded(
+                scorer(10L, "Occasional Scorer", 0.26, 8, 500, null),
+                NEUTRAL_DEFENCE_CONCEDED));
 
         assertThat(result).isEmpty();
     }
 
+    @Test
+    @DisplayName("analyze returns empty when player lists are missing")
+    void analyze_withoutPlayers_returnsEmpty() {
+        Optional<Recommendation> result = engine.analyze(baseContextBuilder(NEUTRAL_DEFENCE_CONCEDED).build());
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("probabilityOfAtLeastOne follows the Poisson complement")
+    void probabilityOfAtLeastOne_matchesPoisson() {
+        assertThat(PlayerPropRecommendationEngine.probabilityOfAtLeastOne(0.0)).isZero();
+        assertThat(PlayerPropRecommendationEngine.probabilityOfAtLeastOne(0.55))
+                .isCloseTo(42.3, org.assertj.core.data.Offset.offset(0.1));
+        assertThat(PlayerPropRecommendationEngine.probabilityOfAtLeastOne(10.0)).isLessThan(100.0);
+    }
+
+    private double scoreFor(PlayerSeasonStats player) {
+        Optional<Recommendation> result = engine.analyze(
+                contextWithOpponentConceded(player, NEUTRAL_DEFENCE_CONCEDED));
+        assertThat(result).isPresent();
+        return result.get().getScore();
+    }
+
     private FixtureContext contextWithPlayers(PlayerSeasonStats homePlayer, PlayerSeasonStats awayPlayer) {
-        return baseContextBuilder()
+        return baseContextBuilder(18)
                 .homePlayers(List.of(homePlayer))
                 .awayPlayers(List.of(awayPlayer))
                 .build();
     }
 
-    private FixtureContext.FixtureContextBuilder baseContextBuilder() {
+    private FixtureContext contextWithOpponentConceded(PlayerSeasonStats homePlayer, int concededAway) {
+        return baseContextBuilder(concededAway)
+                .homePlayers(List.of(homePlayer))
+                .awayPlayers(List.of())
+                .build();
+    }
+
+    private FixtureContext.FixtureContextBuilder baseContextBuilder(int awayConcededAway) {
         return FixtureContext.builder()
                 .fixture(Fixture.builder()
                         .id(1000L)
@@ -100,7 +176,7 @@ class PlayerToScoreRecommendationEngineTest {
                         .seasonId(100L)
                         .matchesPlayed(10)
                         .seasonConcededHome(16)
-                        .seasonConcededAway(18)
+                        .seasonConcededAway(awayConcededAway)
                         .build());
     }
 

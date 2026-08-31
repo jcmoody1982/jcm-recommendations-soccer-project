@@ -18,32 +18,64 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.calculateGoalsAvg;
-import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.clampScore;
-import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.normalizeGoals;
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.safeInt;
 
 /**
- * Shared fixture-level player prop engine. Line-specific rates and labels come from
+ * Shared fixture-level player prop engine. Line-specific rates, priors and thresholds come from
  * {@link PropSpec} (UC-040 to score, UC-041 to assist).
+ *
+ * <p>The published score is the modelled probability that the player records at least one event
+ * in this fixture, from a Poisson draw on their expected event count:
+ * {@code P(>=1) = 1 - exp(-lambda)}. Lambda is the player's shrunk per-90 rate scaled by the
+ * minutes they are expected to play and by how leaky the opponent is.
+ *
+ * <p>This replaces an earlier weighted index that combined rate, minutes and opponent strength on
+ * a 0-100 scale. That index answered "how good is this player?" rather than "will he do it in this
+ * match?", so it published scores far above what the market can produce: at the elite per-90 rates
+ * below, a full ninety minutes is only a 42% chance of a goal and a 33% chance of an assist, yet
+ * the old moderate threshold alone was 58. Every pick it published overstated its own ceiling.
  */
 @Slf4j
 public abstract class PlayerPropRecommendationEngine implements RecommendationEngine {
 
-    private static final double WEIGHT_RATE = 0.55;
-    private static final double WEIGHT_MINUTES = 0.20;
-    private static final double WEIGHT_OPPONENT = 0.25;
-    private static final double THRESHOLD_STRONG = 72.0;
-    private static final double THRESHOLD_MODERATE = 58.0;
     private static final int MIN_APPEARANCES = 5;
     private static final int MIN_MINUTES = 270;
     private static final int MIN_MINUTES_PER_MATCH = 45;
-    private static final double MINUTES_FOR_FULL_RELIABILITY = 1200.0;
 
+    /**
+     * Pseudo-minutes of prior evidence blended into every per-90 rate. Five matches' worth, so a
+     * player with 300 minutes is held close to the baseline while a season regular is trusted.
+     */
+    private static final int SHRINKAGE_PSEUDO_MINUTES = 450;
+
+    /** Typical goals conceded per match, used to turn opponent leakiness into a multiplier. */
+    private static final double LEAGUE_AVG_CONCEDED = 1.35;
+    private static final double OPPONENT_FACTOR_MIN = 0.75;
+    private static final double OPPONENT_FACTOR_MAX = 1.35;
+
+    /** Assumed minutes when a player has no recorded per-match average. */
+    private static final double DEFAULT_EXPECTED_MINUTES = 70.0;
+    private static final double FULL_MATCH_MINUTES = 90.0;
+
+    /** A club's primary scorer takes a larger share of the team's chances than a squad player. */
+    private static final double RANK_ONE_MULTIPLIER = 1.10;
+    private static final double RANK_TWO_MULTIPLIER = 1.05;
+
+    /**
+     * @param minPer90 rate a player must clear to be considered at all
+     * @param elitePer90 rate treated as the top of the realistic range for this market
+     * @param priorPer90 baseline rate that thin samples are shrunk toward
+     * @param thresholdStrong published probability at or above which the pick is STRONG
+     * @param thresholdModerate published probability at or above which the pick is MODERATE
+     */
     protected record PropSpec(
             RecommendationType type,
             String marketVerb,
             double minPer90,
-            double elitePer90
+            double elitePer90,
+            double priorPer90,
+            double thresholdStrong,
+            double thresholdModerate
     ) {}
 
     protected abstract PropSpec spec();
@@ -81,7 +113,7 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
             return Optional.empty();
         }
 
-        ConfidenceLevel confidence = determineConfidence(best.score);
+        ConfidenceLevel confidence = determineConfidence(best.score, spec);
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
         }
@@ -121,21 +153,23 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         TeamSeasonStats opponentStats = isHome ? context.getAwayTeamStats() : context.getHomeTeamStats();
         String teamName = isHome ? context.getHomeTeam().getName() : context.getAwayTeam().getName();
         double opponentConcededAvg = opponentConcededAvg(opponentStats, isHome);
+        double opponentFactor = opponentFactor(opponentConcededAvg);
 
         for (PlayerSeasonStats player : players) {
             if (!passesFilter(player, spec, isHome)) {
                 continue;
             }
             double rate = per90(player, isHome);
-            double rateScore = Math.min(100.0, (rate / spec.elitePer90()) * 100.0);
-            double minutesScore = Math.min(100.0, safeInt(player.getMinutesPlayedOverall()) / MINUTES_FOR_FULL_RELIABILITY * 100.0);
-            double opponentScore = normalizeGoals(opponentConcededAvg);
-            double score = clampScore(
-                    (rateScore * WEIGHT_RATE)
-                            + (minutesScore * WEIGHT_MINUTES)
-                            + (opponentScore * WEIGHT_OPPONENT)
-                            + rankBoost(player));
-            candidates.add(new Candidate(player, isHome, teamName, rate, opponentConcededAvg, score));
+            double shrunkRate = shrinkPer90(rate, safeInt(player.getMinutesPlayedOverall()), spec.priorPer90());
+            double expectedMinutes = expectedMinutes(player);
+            double expectedEvents = shrunkRate
+                    * (expectedMinutes / FULL_MATCH_MINUTES)
+                    * opponentFactor
+                    * rankMultiplier(player);
+            double score = probabilityOfAtLeastOne(expectedEvents);
+            candidates.add(new Candidate(
+                    player, isHome, teamName, rate, shrunkRate, expectedMinutes,
+                    opponentConcededAvg, expectedEvents, score));
         }
     }
 
@@ -157,6 +191,62 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         return per90(player, isHome) >= spec.minPer90();
     }
 
+    /**
+     * Poisson probability of at least one event given an expected count. Naturally bounded below
+     * 100 without a clamp, so candidates stay rank-ordered right at the top of the range.
+     */
+    static double probabilityOfAtLeastOne(double expectedEvents) {
+        if (expectedEvents <= 0) {
+            return 0.0;
+        }
+        return 100.0 * (1.0 - Math.exp(-expectedEvents));
+    }
+
+    /**
+     * Empirical Bayes shrinkage on a per-90 rate. Without this a player with 300 minutes and three
+     * goals reads as 0.90 per 90 and beats a proven starter, which is how the old scoring kept
+     * selecting small-sample outliers.
+     */
+    static double shrinkPer90(double observedPer90, int minutesPlayed, double priorPer90) {
+        if (minutesPlayed <= 0) {
+            return priorPer90;
+        }
+        double weight = minutesPlayed / (double) (minutesPlayed + SHRINKAGE_PSEUDO_MINUTES);
+        return (weight * observedPer90) + ((1.0 - weight) * priorPer90);
+    }
+
+    /** Minutes the player is expected to be on the pitch, from their season per-match average. */
+    static double expectedMinutes(PlayerSeasonStats player) {
+        int perMatch = safeInt(player.getMinPerMatch());
+        if (perMatch <= 0) {
+            return DEFAULT_EXPECTED_MINUTES;
+        }
+        return Math.min(FULL_MATCH_MINUTES, perMatch);
+    }
+
+    /** Opponent leakiness as a multiplier around 1.0, so it scales lambda rather than rescaling it. */
+    static double opponentFactor(double opponentConcededAvg) {
+        if (opponentConcededAvg <= 0) {
+            return 1.0;
+        }
+        double factor = opponentConcededAvg / LEAGUE_AVG_CONCEDED;
+        return Math.min(OPPONENT_FACTOR_MAX, Math.max(OPPONENT_FACTOR_MIN, factor));
+    }
+
+    static double rankMultiplier(PlayerSeasonStats player) {
+        Integer rank = player.getRankInClubTopScorer();
+        if (rank == null) {
+            return 1.0;
+        }
+        if (rank == 1) {
+            return RANK_ONE_MULTIPLIER;
+        }
+        if (rank == 2) {
+            return RANK_TWO_MULTIPLIER;
+        }
+        return 1.0;
+    }
+
     private static double opponentConcededAvg(TeamSeasonStats opponent, boolean playerIsHome) {
         if (opponent == null) {
             return 1.0;
@@ -167,25 +257,11 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         return calculateGoalsAvg(opponent.getSeasonConcededHome(), opponent.getMatchesPlayed(), 1.0);
     }
 
-    private static double rankBoost(PlayerSeasonStats player) {
-        Integer rank = player.getRankInClubTopScorer();
-        if (rank == null) {
-            return 0.0;
-        }
-        if (rank == 1) {
-            return 8.0;
-        }
-        if (rank == 2) {
-            return 4.0;
-        }
-        return 0.0;
-    }
-
-    private static ConfidenceLevel determineConfidence(double score) {
-        if (score >= THRESHOLD_STRONG) {
+    private static ConfidenceLevel determineConfidence(double score, PropSpec spec) {
+        if (score >= spec.thresholdStrong()) {
             return ConfidenceLevel.STRONG;
         }
-        if (score >= THRESHOLD_MODERATE) {
+        if (score >= spec.thresholdModerate()) {
             return ConfidenceLevel.MODERATE;
         }
         return ConfidenceLevel.WEAK;
@@ -198,6 +274,9 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         factors.put("teamName", best.teamName);
         factors.put("isHome", best.isHome);
         factors.put("per90", best.per90);
+        factors.put("shrunkPer90", best.shrunkPer90);
+        factors.put("expectedMinutes", best.expectedMinutes);
+        factors.put("expectedEvents", best.expectedEvents);
         factors.put("appearances", safeInt(best.player.getAppearancesOverall()));
         factors.put("minutes", safeInt(best.player.getMinutesPlayedOverall()));
         factors.put("opponentConcededAvg", best.opponentConcededAvg);
@@ -236,7 +315,10 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
             boolean isHome,
             String teamName,
             double per90,
+            double shrunkPer90,
+            double expectedMinutes,
             double opponentConcededAvg,
+            double expectedEvents,
             double score
     ) {}
 }

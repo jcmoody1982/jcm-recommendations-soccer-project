@@ -12,11 +12,18 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 @Component
 public class PlayerToAssistRecommendationEngine extends PlayerPropRecommendationEngine {
 
+    /**
+     * Assists are rarer than goals, so both the prior and the thresholds sit below the to-score
+     * pair: an elite 0.40 assists-per-90 creator playing a full match is a 33% chance to assist.
+     */
     private static final PropSpec SPEC = new PropSpec(
             RecommendationType.PLAYER_TO_ASSIST,
             "to assist",
             0.20,
-            0.40
+            0.40,
+            0.12,
+            22.0,
+            16.0
     );
 
     @Override
