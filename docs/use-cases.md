@@ -1116,81 +1116,80 @@ Opponent Overperformance:
 
 **Implementation:** `FirstHalfGoalsRecommendationEngine.java`
 
-**Logic (with xG data available):**
+**Logic:**
+
+The published score is the probability of the line actually being recommended. Because Over 0.5 HT
+and Over 1.5 HT are different events, they are scored on their own scales rather than sharing one
+index.
+
+Step 1 — expected first-half goals from season and xG data:
 ```
-First Half Goals Score = weighted average of:
-  - API o05HT_potential                           × 0.15
-  - API o15HT_potential                           × 0.10
-  - Home team 1H goals scored proxy (×0.45)       × 0.12
-  - Away team 1H goals scored proxy (×0.45)       × 0.12
-  - Home team 1H goals conceded proxy (×0.45)     × 0.08
-  - Away team 1H goals conceded proxy (×0.45)     × 0.08
-  - BTTS season % (home team)                     × 0.05
-  - BTTS season % (away team)                     × 0.05
-  - Home team xG avg (× 0.45 for 1H proxy)        × 0.10
-  - Away team xG avg (× 0.45 for 1H proxy)        × 0.10
-  - Combined xGA factor                           × 0.05
+Stats estimate = (home 1H scored + away 1H scored
+                  + home 1H conceded + away 1H conceded) / 2
+
+Half-time averages are used directly where the provider supplies them; otherwise
+full-time figures are split by the 0.45 first-half ratio.
+
+With xG available:  estimate = (stats × 0.6) + (xG total × 0.45 × 0.4)
 ```
 
-**Dynamic Weights (when xG NOT available):**
+Step 2 — blend in the provider's own first-half read:
 ```
-Redistributed weights (total = 1.0):
-  - API o05HT_potential                           × 0.20
-  - API o15HT_potential                           × 0.15
-  - Home team 1H goals scored proxy               × 0.15
-  - Away team 1H goals scored proxy               × 0.15
-  - Home team 1H goals conceded proxy             × 0.10
-  - Away team 1H goals conceded proxy             × 0.10
-  - BTTS season % (home team)                     × 0.075
-  - BTTS season % (away team)                     × 0.075
+Provider estimate = -ln(1 - o05HT_potential / 100)     bounded to [0.40, 2.60]
+
+Expected 1H goals = (stats estimate × 0.65) + (provider estimate × 0.35)
+```
+Inverting the potential recovers the expectation implied by it. This replaces the old fast-starter
+multiplier, whose `o05HT / max(50, o25)` ratio sat above its own 0.825 trigger for nearly every
+fixture and so acted as a near-constant ×1.20 rather than a signal.
+
+Step 3 — bounded adjustment for information not already in the expectation:
+```
+xG regression:
+  - Both teams underperforming xG (actual < xG × 0.85): × 1.10
+  - Both teams overperforming xG (actual > xG × 1.15):  × 0.90
+
+Recent form (O1.5 across last 10 team-matches):
+  - ≥ 8 with O1.5 = hot   × 1.10
+  - ≤ 4 with O1.5 = cold  × 0.90
+
+Combined adjustment clamped to [0.85, 1.20]
+```
+The xG level and the conceded averages are inputs to the expectation itself, so the old
+combined-xG-rating and early-conceder multipliers were removed rather than reapplied. They remain
+as reported match colour.
+
+Step 4 — market selection, then probability of that market:
+```
+Over 1.5 HT chosen when expected 1H goals ≥ 1.5 AND o15HT_potential ≥ 50
+Otherwise Over 0.5 HT
+
+Score = P(≥ goals needed) × 0.65 + o05/o15HT_potential × 0.35
+
+where P(≥1) = 1 - e^-λ
+      P(≥2) = 1 - e^-λ(1 + λ)
 ```
 
-**xG-Based Assessment (multipliers applied sequentially):**
-```
-Combined xG Rating:
-  - Home xG + Away xG > 3.0 = High-scoring potential (× 1.20)
-  - 2.5-3.0 = Above average (× 1.10)
-  - 2.0-2.5 = Average (× 1.0)
-  - <2.0 = Low-scoring potential (× 0.85)
+**Thresholds (per line, since the lines sit on different scales):**
 
-xG Regression Adjustment:
-  - Both teams underperforming xG (actual < xG × 0.85): (× 1.10)
-  - Both teams overperforming xG (actual > xG × 1.15): (× 0.90)
-```
+| Line | Strong | Moderate | Realistic ceiling |
+|---|---|---|---|
+| Over 0.5 HT | ≥ 78% | ≥ 70% | ~86% |
+| Over 1.5 HT | ≥ 52% | ≥ 44% | ~60% |
 
-**Fast Starter Detection (via API potentials):**
-```
-Implied Ratio = O05HT_potential / max(50, O25_potential)
-  - Ratio > 0.825 = Fast starters detected (× 1.20)
-  - Ratio < 0.45 = Slow starters detected (× 0.85)
-```
-
-**Early Conceder Assessment:**
-```
-Combined Conceded Avg (home + away):
-  - > 2.5 per game = Both teams vulnerable defensively (× 1.15)
-  - < 1.5 per game = Strong combined defense (× 0.90)
-```
-
-**Recent Form Adjustment (using O1.5 as proxy):**
-```
-Total O1.5 in form (out of 10 matches):
-  - ≥ 8 matches with O1.5 = Hot form (× 1.10)
-  - ≤ 4 matches with O1.5 = Cold form (× 0.90)
-```
-
-**Thresholds:**
-- **Strong:** Score ≥ 75%
-- **Moderate:** Score 60-74%
-- **Weak (filtered):** Score < 60%
 - **Minimum filter:** Expected 1H goals ≥ 0.8
 
-**Market Selection:**
-- **Over 1.5 HT:** Expected 1H goals ≥ 1.3 AND score ≥ 75% AND O15HT potential ≥ 55%
-- **Over 0.5 HT:** Default market
+**Why the thresholds differ:** a first half averages about 1.2 goals, so P(2+) sits in the 30-60%
+band while P(1+) sits in the 70-86% band. Scoring Over 1.5 HT against the Over 0.5 HT scale was
+what previously let a coin-flip market publish at 100%: five multiplicative boosts compounding to
+as much as ×2.00 pushed a mid-40s composite index past the clamp, and the resulting number was then
+labelled Over 1.5 HT. A fixture with 1.53 expected first-half goals published at 86.7% against a
+true P(2+) of 45.3%.
 
 **Enhanced Factor Tracking:**
-- `expected1HGoals`, `expectedFullTimeGoals`, `firstHalfRatioUsed` (0.45)
+- `expected1HGoals`, `statsExpected1HGoals`, `baseExpected1HGoals`, `expectedGoalsAdjustment`
+- `providerExpected1HGoals`, `expectedFullTimeGoals`, `firstHalfRatioUsed` (0.45)
+- `line`, `goalsNeeded`, `poissonProbability`, `apiPotentialForLine`
 - `home1HScoredProxyAvg`, `away1HScoredProxyAvg`
 - `home1HConcededProxyAvg`, `away1HConcededProxyAvg`
 - `homeBttsSeasonPct`, `awayBttsSeasonPct`
@@ -1198,7 +1197,7 @@ Total O1.5 in form (out of 10 matches):
 - `xgDataAvailable`, `homeXgForAvgHome`, `awayXgForAvgAway`
 - `combinedXg`, `home1HXgProxy`, `away1HXgProxy`
 - `xgRating`, `homeXgPerformance`, `awayXgPerformance`, `xgRegressionOutlook`
-- `fastStarterImpliedRatio`, `fastStarterStatus`
+- `frontLoadedRatio`, `fastStarterStatus`
 - `combinedConcededAvg`, `earlyConcedeStatus`
 - `homeO15RecentForm`, `awayO15RecentForm`, `totalO15InForm`, `recentFormStatus`
 - `positiveIndicators`, `riskFlags`
@@ -1222,92 +1221,77 @@ Total O1.5 in form (out of 10 matches):
 
 **Implementation:** `SecondHalfGoalsRecommendationEngine.java`
 
-**Logic (with xG data available):**
-```
-Second Half Goals Score = weighted average of:
-  - Home team 2H goals scored proxy (×0.55)       × 0.12
-  - Away team 2H goals scored proxy (×0.55)       × 0.12
-  - Home team 2H goals conceded proxy (×0.55)     × 0.08
-  - Away team 2H goals conceded proxy (×0.55)     × 0.08
-  - Home team xG avg (× 0.55 for 2H proxy)        × 0.10
-  - Away team xG avg (× 0.55 for 2H proxy)        × 0.10
-  - Combined xGA factor                           × 0.05
-  - Late game intensity factor (cards)            × 0.10
-  - Fitness/stamina indicator (goal difference)   × 0.10
-  - Match situation factor (draw % + attacking)   × 0.15
-```
+**Logic:**
 
-**Dynamic Weights (when xG NOT available):**
-```
-Redistributed weights (total = 1.0):
-  - Home team 2H goals scored proxy               × 0.18
-  - Away team 2H goals scored proxy               × 0.18
-  - Home team 2H goals conceded proxy             × 0.12
-  - Away team 2H goals conceded proxy             × 0.12
-  - Late game intensity factor                    × 0.15
-  - Fitness/stamina indicator                     × 0.10
-  - Match situation factor                        × 0.15
-```
+Mirrors UC-015: the published score is the probability of the line actually being recommended, so
+Over 0.5 2H and Over 1.5 2H are scored on their own scales.
 
-**xG-Based Assessment:**
+Step 1 — expected second-half goals:
 ```
-Combined xG Rating:
-  - Home xG + Away xG > 3.0 = High-scoring potential (× 1.20)
-  - 2.5-3.0 = Above average (× 1.10)
-  - 2.0-2.5 = Average (× 1.0)
-  - <2.0 = Low-scoring potential (× 0.85)
-```
+Stats estimate = (home 2H scored + away 2H scored
+                  + home 2H conceded + away 2H conceded) / 2
 
-**Late Goals Tendency (Strong Finisher Profile):**
-```
-Based on combined goals avg + clean sheet %:
-  - Combined goals ≥ 3.0 AND avg CS% < 30% = Strong finisher (× 1.25)
-  - Combined goals ≥ 2.5 = Balanced (× 1.05)
-  - Combined goals < 2.0 = Front-loaded (× 0.90)
-```
+Second-half averages are used directly where the provider supplies them; otherwise
+full-time figures are split by the 0.55 second-half ratio.
 
-**Late Conceder Profile:**
+With xG available:  estimate = (stats × 0.6) + (xG total × 0.55 × 0.4)
 ```
-Based on combined conceded avg + clean sheet %:
-  - Combined conceded ≥ 2.5 AND avg CS% < 25% = Vulnerable late (× 1.20)
-  - Combined conceded < 1.5 AND avg CS% > 40% = Strong late defense (× 0.90)
-```
+Unlike the first half, the provider publishes no second-half potentials, so there is no independent
+read to blend in or to corroborate the line with.
 
-**Late Game Intensity Factor:**
+Step 2 — bounded adjustment for information not already in the expectation:
 ```
-Combined Cards Average:
-  - ≥ 4.0 cards per game = High intensity matchup (× 1.10)
-  - < 2.5 cards per game = Low intensity (× 0.95)
+Goal spread (clean sheets, only when the data exists):
+  - Avg CS% < 25% = goals spread across more matches  × 1.10
+  - Avg CS% > 40% = goals concentrated                × 0.90
 
-Intensity Score = min(100, (combinedCards / 6.0) × 100)
-```
+Late game intensity (combined cards average):
+  - ≥ 4.0 cards per game = high intensity  × 1.10
+  - < 2.5 cards per game = low intensity   × 0.95
 
-**Fitness/Stamina Indicator:**
+Combined adjustment clamped to [0.85, 1.20]
 ```
-Based on goal difference per game:
-  - Positive GD = better fitness/ability to push late
-  - Score = 50 + (avgGoalDiff × 25), clamped 0-100
-```
+The scored and conceded averages and the xG level are inputs to the expectation itself, so the old
+combined-xG-rating, strong-finisher and late-conceder multipliers were removed rather than
+reapplied — they restated goal volume that the expectation already carried. All three remain as
+reported match colour. The fitness (goal difference) and match-situation (draw %) terms were
+dropped: a dominant side raising the "second half goals" score was an artefact, not a signal.
 
-**Match Situation Factor:**
-```
-Blend of draw likelihood (40%) and attacking intent (60%):
-  - High draw % + high goals avg = competitive 2H expected
-  - Combined goals indicator = min(100, (homeGoals + awayGoals) × 30)
-```
+The clean-sheet term only fires where the counts exist. An absent count reads as zero clean sheets,
+which is the strongest possible reading of the signal, so missing data would otherwise have earned
+a boost.
 
-**Thresholds:**
-- **Strong:** Score ≥ 75%
-- **Moderate:** Score 60-74%
-- **Weak (filtered):** Score < 60%
+Step 3 — market selection, then probability of that market:
+```
+Over 1.5 2H chosen when expected 2H goals ≥ 1.8
+Otherwise Over 0.5 2H
+
+Score = P(≥ goals needed)
+
+where P(≥1) = 1 - e^-λ
+      P(≥2) = 1 - e^-λ(1 + λ)
+```
+The Over 1.5 bar is higher than the first half's 1.5 because no provider potential is available to
+corroborate the line; the expectation has to carry the decision alone.
+
+**Thresholds (per line, since the lines sit on different scales):**
+
+| Line | Strong | Moderate | Realistic ceiling |
+|---|---|---|---|
+| Over 0.5 2H | ≥ 80% | ≥ 72% | ~86% |
+| Over 1.5 2H | ≥ 54% | ≥ 46% | ~60% |
+
 - **Minimum filter:** Expected 2H goals ≥ 0.9
 
-**Market Selection:**
-- **Over 1.5 2H:** Expected 2H goals ≥ 1.5 AND score ≥ 75%
-- **Over 0.5 2H:** Default market
+**Why the thresholds differ:** a second half averages about 1.45 goals, so P(2+) sits in the 33-60%
+band while P(1+) sits in the 68-86% band. Previously four multiplicative boosts compounding to as
+much as ×1.98 pushed the composite index past the clamp, and the result was labelled Over 1.5 2H
+regardless of it being a two-goal event.
 
 **Enhanced Factor Tracking:**
-- `expected2HGoals`, `expectedFullTimeGoals`, `secondHalfRatioUsed` (0.55)
+- `expected2HGoals`, `baseExpected2HGoals`, `expectedGoalsAdjustment`
+- `expectedFullTimeGoals`, `secondHalfRatioUsed` (0.55)
+- `line`, `goalsNeeded`, `poissonProbability`
 - `home2HScoredProxyAvg`, `away2HScoredProxyAvg`
 - `home2HConcededProxyAvg`, `away2HConcededProxyAvg`
 - `homeCardsAvg`, `awayCardsAvg`, `combinedCardsAvg`, `lateGameIntensityScore`

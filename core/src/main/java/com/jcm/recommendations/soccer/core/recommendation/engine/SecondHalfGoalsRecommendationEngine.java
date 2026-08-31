@@ -5,7 +5,6 @@ import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
-import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -19,10 +18,13 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 
 /**
  * UC-016: Second Half Goals Recommendations
- * 
+ *
  * Predicts likelihood of goals in the second half (Over 0.5 2H, Over 1.5 2H).
- * Uses xG data (×0.55 proxy for 2H share), late game intensity indicators,
- * fitness/stamina analysis, and match situation factors.
+ *
+ * Season goals and xG (×0.55 proxy for the 2H share) feed a single expected-second-half-goals
+ * figure, which a Poisson tail turns into the probability of the line being marketed. The score
+ * published is therefore the probability of that specific line, so Over 1.5 2H is scored as
+ * P(2+ second-half goals) rather than sharing a scale with Over 0.5 2H.
  */
 @Component
 @Slf4j
@@ -31,60 +33,77 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
     // Second half share of total goals (slightly higher than 1H)
     private static final double SECOND_HALF_RATIO = 0.55;
 
-    // Base weights when all data IS available (total = 1.0)
-    private static final double WEIGHT_HOME_2H_SCORED = 0.12;
-    private static final double WEIGHT_AWAY_2H_SCORED = 0.12;
-    private static final double WEIGHT_HOME_2H_CONCEDED = 0.08;
-    private static final double WEIGHT_AWAY_2H_CONCEDED = 0.08;
-    private static final double WEIGHT_HOME_XG_2H = 0.10;
-    private static final double WEIGHT_AWAY_XG_2H = 0.10;
-    private static final double WEIGHT_XGA_COMBINED = 0.05;
-    private static final double WEIGHT_LATE_INTENSITY = 0.10;    // Cards as proxy for intensity
-    private static final double WEIGHT_FITNESS = 0.10;           // Based on late goals pattern
-    private static final double WEIGHT_MATCH_SITUATION = 0.15;   // Based on win/draw likelihood
+    /**
+     * The two lines this engine can market. The published score is the probability of the line
+     * actually being recommended, so each line carries its own thresholds: a second half averages
+     * about 1.45 goals, putting Over 0.5 in the 68-86% band and Over 1.5 in the 33-60% band. There
+     * is no single scale on which both lines can be read.
+     */
+    private enum Line {
+        OVER_05(1, "Over 0.5 2H Goals", 80.0, 72.0),
+        OVER_15(2, "Over 1.5 2H Goals", 54.0, 46.0);
 
-    // Weights when xG data is NOT available (redistribute 0.25 to other factors)
-    private static final double WEIGHT_HOME_2H_SCORED_NO_XG = 0.18;
-    private static final double WEIGHT_AWAY_2H_SCORED_NO_XG = 0.18;
-    private static final double WEIGHT_HOME_2H_CONCEDED_NO_XG = 0.12;
-    private static final double WEIGHT_AWAY_2H_CONCEDED_NO_XG = 0.12;
-    private static final double WEIGHT_LATE_INTENSITY_NO_XG = 0.15;
-    private static final double WEIGHT_FITNESS_NO_XG = 0.10;
-    private static final double WEIGHT_MATCH_SITUATION_NO_XG = 0.15;
+        private final int goalsNeeded;
+        private final String market;
+        private final double thresholdStrong;
+        private final double thresholdModerate;
 
-    // xG-based combined rating thresholds and multipliers
+        Line(int goalsNeeded, String market, double thresholdStrong, double thresholdModerate) {
+            this.goalsNeeded = goalsNeeded;
+            this.market = market;
+            this.thresholdStrong = thresholdStrong;
+            this.thresholdModerate = thresholdModerate;
+        }
+    }
+
+    /**
+     * Bounds on the combined expected-goals adjustment, so the signals below corroborate each
+     * other rather than compound.
+     */
+    private static final double ADJUST_MIN = 0.85;
+    private static final double ADJUST_MAX = 1.20;
+
+    /**
+     * Over 1.5 2H needs a clear volume outlier. The provider publishes no second-half potentials,
+     * so unlike the first-half engine there is no independent read to corroborate the line and the
+     * expectation has to carry the decision alone.
+     */
+    private static final double OVER_15_MIN_EXPECTED_GOALS = 1.8;
+
+    // xG-based combined rating bands (reported as match colour)
     private static final double XG_HIGH_THRESHOLD = 3.0;
-    private static final double XG_HIGH_MULTIPLIER = 1.20;
     private static final double XG_ABOVE_AVG_THRESHOLD = 2.5;
-    private static final double XG_ABOVE_AVG_MULTIPLIER = 1.10;
     private static final double XG_LOW_THRESHOLD = 2.0;
-    private static final double XG_LOW_MULTIPLIER = 0.85;
 
-    // Late scorer/finisher thresholds
-    private static final double STRONG_FINISHER_THRESHOLD = 0.60;
-    private static final double STRONG_FINISHER_MULTIPLIER = 1.25;
-    private static final double BALANCED_FINISHER_THRESHOLD = 0.50;
-    private static final double BALANCED_FINISHER_MULTIPLIER = 1.05;
-    private static final double FRONT_LOADED_MULTIPLIER = 0.90;
-
-    // Late conceder thresholds
-    private static final double LATE_CONCEDER_THRESHOLD = 0.60;
-    private static final double LATE_CONCEDER_MULTIPLIER = 1.20;
-    private static final double STRONG_LATE_DEFENSE_THRESHOLD = 0.45;
-    private static final double STRONG_LATE_DEFENSE_MULTIPLIER = 0.90;
+    // Goal spread: clean sheets say how goals are distributed, which the averages alone do not
+    private static final double GOALS_SPREAD_CS_THRESHOLD = 25.0;
+    private static final double GOALS_SPREAD_FACTOR = 1.10;
+    private static final double GOALS_CONCENTRATED_CS_THRESHOLD = 40.0;
+    private static final double GOALS_CONCENTRATED_FACTOR = 0.90;
 
     // Late game intensity thresholds (based on cards per game)
     private static final double HIGH_INTENSITY_CARDS_THRESHOLD = 4.0;
-    private static final double HIGH_INTENSITY_MULTIPLIER = 1.10;
+    private static final double HIGH_INTENSITY_FACTOR = 1.10;
     private static final double LOW_INTENSITY_CARDS_THRESHOLD = 2.5;
-    private static final double LOW_INTENSITY_MULTIPLIER = 0.95;
+    private static final double LOW_INTENSITY_FACTOR = 0.95;
 
-    // Thresholds for recommendations
-    private static final double THRESHOLD_STRONG = 75.0;
-    private static final double THRESHOLD_MODERATE = 60.0;
-    
+    // Profile bands reported as match colour
+    private static final double STRONG_FINISHER_GOALS = 3.0;
+    private static final double BALANCED_FINISHER_GOALS = 2.5;
+    private static final double FRONT_LOADED_GOALS = 2.0;
+    private static final double VULNERABLE_LATE_GOALS = 2.5;
+    private static final double SOLID_LATE_GOALS = 1.5;
+
     // Filter: minimum expected 2H goals to generate a recommendation
     private static final double FILTER_MIN_2H_GOALS = 0.9;
+
+    /** The chain from raw stats through to the published probability, kept together for reporting. */
+    private record Estimate(
+            double baseExpected2HGoals,
+            double adjustment,
+            double expected2HGoals,
+            Line line,
+            double score) {}
 
     @Override
     public RecommendationType getType() {
@@ -106,46 +125,44 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
         // Calculate expected 2H goals (use ratio of full-time expected)
-        double expectedGoals2H = calculateExpected2HGoals(homeStats, awayStats);
-        
-        if (expectedGoals2H < FILTER_MIN_2H_GOALS) {
+        double baseExpectedGoals2H = calculateExpected2HGoals(homeStats, awayStats);
+
+        if (baseExpectedGoals2H < FILTER_MIN_2H_GOALS) {
             log.debug("Fixture failed Second Half Goals filter: fixtureId={}, expected2HGoals={}", 
-                    context.getFixture().getId(), expectedGoals2H);
+                    context.getFixture().getId(), baseExpectedGoals2H);
             return Optional.empty();
         }
 
-        double score = calculateScore(context);
-        
-        // Apply multipliers
-        score = applyXgRatingMultiplier(score, homeStats, awayStats);
-        score = applyLateGoalsTendencyMultiplier(score, homeStats, awayStats);
-        score = applyLateConcedeMultiplier(score, homeStats, awayStats);
-        score = applyLateIntensityMultiplier(score, homeStats, awayStats);
-        
-        score = clampScore(score);
-        
-        ConfidenceLevel confidence = determineConfidence(score);
+        // The signals below describe how many goals to expect, so they adjust the expectation
+        // rather than the published probability. Poisson then bounds how far they can move it.
+        double adjustment = calculateExpectedGoalsAdjustment(homeStats, awayStats);
+        double expectedGoals2H = baseExpectedGoals2H * adjustment;
+
+        Line line = selectLine(expectedGoals2H);
+        double score = clampScore(poissonAtLeast(expectedGoals2H, line.goalsNeeded));
+
+        ConfidenceLevel confidence = determineConfidence(score, line);
 
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
         }
 
-        String market = determineMarket(expectedGoals2H, score);
-        Map<String, Object> factors = buildFactors(context, score, expectedGoals2H, homeStats, awayStats);
+        Estimate estimate = new Estimate(baseExpectedGoals2H, adjustment, expectedGoals2H, line, score);
+        Map<String, Object> factors = buildFactors(context, estimate, homeStats, awayStats);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.SECOND_HALF_GOALS)
                 .confidence(confidence)
                 .score(score)
-                .market(market)
+                .market(line.market)
                 .odds(null)  // No 2H-specific odds in our data model
-                .description(buildDescription(context, confidence, expectedGoals2H, market))
+                .description(buildDescription(context, confidence, expectedGoals2H, line.market))
                 .factors(factors)
                 .build();
 
         log.info("Second Half Goals recommendation generated: fixtureId={}, expected2HGoals={}, score={}, confidence={}, market={}", 
                 context.getFixture().getId(), String.format("%.2f", expectedGoals2H), 
-                String.format("%.1f", score), confidence, market);
+                String.format("%.1f", score), confidence, line.market);
 
         return Optional.of(recommendation);
     }
@@ -171,61 +188,73 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         return actualExpected;
     }
 
-    private double calculateScore(FixtureContext context) {
-        TeamSeasonStats homeStats = context.getHomeTeamStats();
-        TeamSeasonStats awayStats = context.getAwayTeamStats();
+    private Line selectLine(double expectedGoals2H) {
+        return expectedGoals2H >= OVER_15_MIN_EXPECTED_GOALS ? Line.OVER_15 : Line.OVER_05;
+    }
 
-        boolean hasXgData = hasXgData(homeStats, awayStats);
+    /**
+     * Combined multiplier on expected second-half goals. The scored and conceded averages and the
+     * xG level are inputs to the expectation itself, so only signals holding information beyond
+     * goal volume appear here: how goals are spread across matches, and match intensity.
+     */
+    private double calculateExpectedGoalsAdjustment(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        double adjustment = goalSpreadFactor(homeStats, awayStats) * intensityFactor(homeStats, awayStats);
 
-        double home2HScoredProxy = normalize2HGoals(halfScoredAvg(homeStats, true, SECOND_HALF_RATIO));
-        double away2HScoredProxy = normalize2HGoals(halfScoredAvg(awayStats, false, SECOND_HALF_RATIO));
-        double home2HConcededProxy = normalize2HGoals(halfConcededAvg(homeStats, true, SECOND_HALF_RATIO));
-        double away2HConcededProxy = normalize2HGoals(halfConcededAvg(awayStats, false, SECOND_HALF_RATIO));
+        return Math.max(ADJUST_MIN, Math.min(ADJUST_MAX, adjustment));
+    }
 
-        // Late game intensity - use cards as proxy
-        double lateIntensity = calculateLateGameIntensity(homeStats, awayStats);
-        
-        // Fitness indicator - teams that score late typically have good fitness
-        double fitnessIndicator = calculateFitnessIndicator(homeStats, awayStats);
-        
-        // Match situation factor - close games tend to have more 2H goals
-        double matchSituation = calculateMatchSituationFactor(homeStats, awayStats);
-
-        double score;
-
-        if (hasXgData) {
-            // xG 2H proxy
-            double homeXg2H = normalize2HGoals(safeDouble(homeStats.getXgForAvgHome()) * SECOND_HALF_RATIO);
-            double awayXg2H = normalize2HGoals(safeDouble(awayStats.getXgForAvgAway()) * SECOND_HALF_RATIO);
-            double combinedXga2H = normalize2HGoals(
-                    (safeDouble(homeStats.getXgAgainstAvgHome()) + safeDouble(awayStats.getXgAgainstAvgAway())) 
-                    * SECOND_HALF_RATIO / 2.0);
-
-            score = (home2HScoredProxy * WEIGHT_HOME_2H_SCORED)
-                    + (away2HScoredProxy * WEIGHT_AWAY_2H_SCORED)
-                    + (home2HConcededProxy * WEIGHT_HOME_2H_CONCEDED)
-                    + (away2HConcededProxy * WEIGHT_AWAY_2H_CONCEDED)
-                    + (homeXg2H * WEIGHT_HOME_XG_2H)
-                    + (awayXg2H * WEIGHT_AWAY_XG_2H)
-                    + (combinedXga2H * WEIGHT_XGA_COMBINED)
-                    + (lateIntensity * WEIGHT_LATE_INTENSITY)
-                    + (fitnessIndicator * WEIGHT_FITNESS)
-                    + (matchSituation * WEIGHT_MATCH_SITUATION);
-        } else {
-            // No xG - redistribute weights
-            log.debug("No xG data available, using redistributed weights for fixture: {}", 
-                    context.getFixture().getId());
-
-            score = (home2HScoredProxy * WEIGHT_HOME_2H_SCORED_NO_XG)
-                    + (away2HScoredProxy * WEIGHT_AWAY_2H_SCORED_NO_XG)
-                    + (home2HConcededProxy * WEIGHT_HOME_2H_CONCEDED_NO_XG)
-                    + (away2HConcededProxy * WEIGHT_AWAY_2H_CONCEDED_NO_XG)
-                    + (lateIntensity * WEIGHT_LATE_INTENSITY_NO_XG)
-                    + (fitnessIndicator * WEIGHT_FITNESS_NO_XG)
-                    + (matchSituation * WEIGHT_MATCH_SITUATION_NO_XG);
+    /**
+     * Two sides can share a conceded average while keeping very different numbers of clean sheets.
+     * Where clean sheets are rare the goals are spread across more matches, so any given half is
+     * likelier to contain one.
+     */
+    private double goalSpreadFactor(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        // An absent clean sheet count reads as zero clean sheets, which is the strongest possible
+        // reading of this signal. Treat missing data as no information instead.
+        if (!hasCleanSheetData(homeStats, true) || !hasCleanSheetData(awayStats, false)) {
+            return 1.0;
         }
 
-        return score;
+        double avgCsPct = averageCleanSheetPct(homeStats, awayStats);
+
+        if (avgCsPct < GOALS_SPREAD_CS_THRESHOLD) {
+            log.debug("Goals spread widely (few clean sheets): avgCS%={}", avgCsPct);
+            return GOALS_SPREAD_FACTOR;
+        }
+        if (avgCsPct > GOALS_CONCENTRATED_CS_THRESHOLD) {
+            log.debug("Goals concentrated (frequent clean sheets): avgCS%={}", avgCsPct);
+            return GOALS_CONCENTRATED_FACTOR;
+        }
+
+        return 1.0;
+    }
+
+    private double intensityFactor(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        double combinedCards = combinedCardsAvg(homeStats, awayStats);
+
+        if (combinedCards >= HIGH_INTENSITY_CARDS_THRESHOLD) {
+            log.debug("High intensity matchup (cards): combinedCards={}", combinedCards);
+            return HIGH_INTENSITY_FACTOR;
+        }
+        if (combinedCards < LOW_INTENSITY_CARDS_THRESHOLD) {
+            log.debug("Low intensity matchup (cards): combinedCards={}", combinedCards);
+            return LOW_INTENSITY_FACTOR;
+        }
+
+        return 1.0;
+    }
+
+    private static boolean hasCleanSheetData(TeamSeasonStats stats, boolean home) {
+        return (home ? stats.getSeasonCleanSheetsHome() : stats.getSeasonCleanSheetsAway()) != null;
+    }
+
+    private static double averageCleanSheetPct(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        return (calculateCleanSheetPercentage(homeStats, true)
+                + calculateCleanSheetPercentage(awayStats, false)) / 2.0;
+    }
+
+    private static double combinedCardsAvg(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        return safeDouble(homeStats.getCardsAvgHome(), 2.0) + safeDouble(awayStats.getCardsAvgAway(), 2.0);
     }
 
     private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
@@ -275,130 +304,36 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         return (avgDrawPct * 0.4) + (combinedGoalsIndicator * 0.6);
     }
 
-    private double applyXgRatingMultiplier(double score, TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        if (!hasXgData(homeStats, awayStats)) {
-            return score;
-        }
-
-        double combinedXg = safeDouble(homeStats.getXgForAvgHome()) + safeDouble(awayStats.getXgForAvgAway());
-
-        if (combinedXg > XG_HIGH_THRESHOLD) {
-            log.debug("Applying high xG rating multiplier: combinedXg={}", combinedXg);
-            return score * XG_HIGH_MULTIPLIER;
-        } else if (combinedXg >= XG_ABOVE_AVG_THRESHOLD) {
-            log.debug("Applying above-average xG rating multiplier: combinedXg={}", combinedXg);
-            return score * XG_ABOVE_AVG_MULTIPLIER;
-        } else if (combinedXg < XG_LOW_THRESHOLD) {
-            log.debug("Applying low xG rating multiplier: combinedXg={}", combinedXg);
-            return score * XG_LOW_MULTIPLIER;
-        }
-
-        return score;
-    }
-
-    private double applyLateGoalsTendencyMultiplier(double score, TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        // Without explicit 2H data, we infer late scoring tendency from attacking metrics
-        // Teams with high goals and low clean sheets tend to score/concede late
-        
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        double combinedGoals = homeGoalsAvg + awayGoalsAvg;
-        
-        // Calculate "late scorer profile" based on attacking + low clean sheets
-        double homeCsPct = calculateCleanSheetPercentage(homeStats, true);
-        double awayCsPct = calculateCleanSheetPercentage(awayStats, false);
-        double avgCsPct = (homeCsPct + awayCsPct) / 2.0;
-        
-        // High-scoring teams with low clean sheet % = strong finishers
-        if (combinedGoals >= 3.0 && avgCsPct < 30.0) {
-            log.debug("Strong finisher profile detected: combinedGoals={}, avgCS%={}", combinedGoals, avgCsPct);
-            return score * STRONG_FINISHER_MULTIPLIER;
-        } else if (combinedGoals >= 2.5) {
-            log.debug("Balanced finisher profile: combinedGoals={}", combinedGoals);
-            return score * BALANCED_FINISHER_MULTIPLIER;
-        } else if (combinedGoals < 2.0) {
-            log.debug("Front-loaded profile (low combined goals): combinedGoals={}", combinedGoals);
-            return score * FRONT_LOADED_MULTIPLIER;
-        }
-        
-        return score;
-    }
-
-    private double applyLateConcedeMultiplier(double score, TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        // Teams with high conceded average and low clean sheets = vulnerable late
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
-        double combinedConceded = homeConcededAvg + awayConcededAvg;
-        
-        double homeCsPct = calculateCleanSheetPercentage(homeStats, true);
-        double awayCsPct = calculateCleanSheetPercentage(awayStats, false);
-        double avgCsPct = (homeCsPct + awayCsPct) / 2.0;
-        
-        // High conceded + low clean sheets = late concede tendency
-        if (combinedConceded >= 2.5 && avgCsPct < 25.0) {
-            log.debug("Late conceder profile: combinedConceded={}, avgCS%={}", combinedConceded, avgCsPct);
-            return score * LATE_CONCEDER_MULTIPLIER;
-        } else if (combinedConceded < 1.5 && avgCsPct > 40.0) {
-            log.debug("Strong late defense profile: combinedConceded={}, avgCS%={}", combinedConceded, avgCsPct);
-            return score * STRONG_LATE_DEFENSE_MULTIPLIER;
-        }
-        
-        return score;
-    }
-
-    private double applyLateIntensityMultiplier(double score, TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeCards = safeDouble(homeStats.getCardsAvgHome(), 2.0);
-        double awayCards = safeDouble(awayStats.getCardsAvgAway(), 2.0);
-        double combinedCards = homeCards + awayCards;
-        
-        if (combinedCards >= HIGH_INTENSITY_CARDS_THRESHOLD) {
-            log.debug("High intensity matchup (cards): combinedCards={}", combinedCards);
-            return score * HIGH_INTENSITY_MULTIPLIER;
-        } else if (combinedCards < LOW_INTENSITY_CARDS_THRESHOLD) {
-            log.debug("Low intensity matchup (cards): combinedCards={}", combinedCards);
-            return score * LOW_INTENSITY_MULTIPLIER;
-        }
-        
-        return score;
-    }
-
-    private double normalize2HGoals(double goals2HAvg) {
-        // Normalize 2H goals (typically 0.6-1.8 range) to percentage scale
-        // Max expected 2H goals per team is around 1.7, so multiply by 45
-        return Math.min(100.0, goals2HAvg * 45.0);
-    }
-
-    private ConfidenceLevel determineConfidence(double score) {
-        if (score >= THRESHOLD_STRONG) {
+    private ConfidenceLevel determineConfidence(double score, Line line) {
+        if (score >= line.thresholdStrong) {
             return ConfidenceLevel.STRONG;
-        } else if (score >= THRESHOLD_MODERATE) {
+        } else if (score >= line.thresholdModerate) {
             return ConfidenceLevel.MODERATE;
         }
         return ConfidenceLevel.WEAK;
     }
 
-    private String determineMarket(double expected2HGoals, double score) {
-        // Over 1.5 2H if expected 2H goals >= 1.5 AND score is strong
-        if (expected2HGoals >= 1.5 && score >= THRESHOLD_STRONG) {
-            return "Over 1.5 2H Goals";
-        }
-        
-        // Over 0.5 2H is the default market
-        return "Over 0.5 2H Goals";
-    }
-
-    private Map<String, Object> buildFactors(FixtureContext context, double score, 
-            double expected2HGoals, TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+    private Map<String, Object> buildFactors(FixtureContext context, Estimate estimate,
+            TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
         Map<String, Object> factors = new HashMap<>();
-        
+
+        double expected2HGoals = estimate.expected2HGoals();
+        Line line = estimate.line();
+
         // Expected goals
         factors.put("expected2HGoals", expected2HGoals);
+        factors.put("baseExpected2HGoals", estimate.baseExpected2HGoals());
+        factors.put("expectedGoalsAdjustment", estimate.adjustment());
         factors.put("secondHalfRatioUsed", SECOND_HALF_RATIO);
         factors.put("halfStatsFromApi", hasHalfGoalStats(homeStats, awayStats));
-        
+
+        // How the published probability was arrived at
+        factors.put("line", line.market);
+        factors.put("goalsNeeded", line.goalsNeeded);
+        factors.put("poissonProbability", poissonAtLeast(expected2HGoals, line.goalsNeeded));
+
         // Full-time expected for reference
-        double ftExpected = expected2HGoals / SECOND_HALF_RATIO;
-        factors.put("expectedFullTimeGoals", ftExpected);
+        factors.put("expectedFullTimeGoals", expected2HGoals / SECOND_HALF_RATIO);
         
         double home2HScoredProxy = halfScoredAvg(homeStats, true, SECOND_HALF_RATIO);
         double away2HScoredProxy = halfScoredAvg(awayStats, false, SECOND_HALF_RATIO);
@@ -480,12 +415,12 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         factors.put("combinedGoalsAvg", combinedGoals);
         factors.put("avgCleanSheetPct", avgCsPct);
         
-        if (combinedGoals >= 3.0 && avgCsPct < 30.0) {
+        if (combinedGoals >= STRONG_FINISHER_GOALS && avgCsPct < GOALS_SPREAD_CS_THRESHOLD) {
             factors.put("finisherProfile", "Strong finisher");
             positiveIndicators.add("Strong late scoring profile");
-        } else if (combinedGoals >= 2.5) {
+        } else if (combinedGoals >= BALANCED_FINISHER_GOALS) {
             factors.put("finisherProfile", "Balanced");
-        } else if (combinedGoals < 2.0) {
+        } else if (combinedGoals < FRONT_LOADED_GOALS) {
             factors.put("finisherProfile", "Front-loaded");
             riskFlags.add("Teams tend to score early");
         }
@@ -496,10 +431,10 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         double combinedConceded = homeConcededAvg + awayConcededAvg;
         factors.put("combinedConcededAvg", combinedConceded);
         
-        if (combinedConceded >= 2.5 && avgCsPct < 25.0) {
+        if (combinedConceded >= VULNERABLE_LATE_GOALS && avgCsPct < GOALS_SPREAD_CS_THRESHOLD) {
             factors.put("lateConcedeProfile", "Vulnerable late");
             positiveIndicators.add("Both teams vulnerable late");
-        } else if (combinedConceded < 1.5 && avgCsPct > 40.0) {
+        } else if (combinedConceded < SOLID_LATE_GOALS && avgCsPct > GOALS_CONCENTRATED_CS_THRESHOLD) {
             factors.put("lateConcedeProfile", "Strong late defense");
             riskFlags.add("Both teams solid defensively late");
         }
@@ -518,7 +453,7 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         
         factors.put("positiveIndicators", positiveIndicators);
         factors.put("riskFlags", riskFlags);
-        factors.put("calculatedScore", score);
+        factors.put("calculatedScore", estimate.score());
         
         return factors;
     }

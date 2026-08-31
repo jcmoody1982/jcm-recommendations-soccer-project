@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Optional;
 
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.poissonAtLeast;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class SecondHalfGoalsRecommendationEngineTest {
 
@@ -156,10 +158,8 @@ class SecondHalfGoalsRecommendationEngineTest {
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        // With very high expected goals and score, should recommend O1.5 2H
-        if (result.get().getScore() >= 75.0) {
-            assertThat(result.get().getMarket()).isIn("Over 1.5 2H Goals", "Over 0.5 2H Goals");
-        }
+        assertThat(result.get().getMarket()).isEqualTo("Over 1.5 2H Goals");
+        assertThat(result.get().getFactors().get("goalsNeeded")).isEqualTo(2);
     }
 
     @Test
@@ -171,6 +171,75 @@ class SecondHalfGoalsRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getScore()).isLessThanOrEqualTo(100.0);
+    }
+
+    @Test
+    @DisplayName("Over 1.5 2H is scored as a two-goal event, not a one-goal event")
+    void over152H_isScoredAsTwoGoalEvent() {
+        FixtureContext context = createVeryHighScoringContext();
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+
+        double expected2HGoals = (Double) result.getFactors().get("expected2HGoals");
+        double poisson = (Double) result.getFactors().get("poissonProbability");
+
+        assertThat(poisson).isEqualTo(poissonAtLeast(expected2HGoals, 2), within(0.01));
+        assertThat(result.getScore()).isEqualTo(poisson, within(0.01));
+        // The same fixture reached the high nineties before the score meant P(2+ goals).
+        assertThat(result.getScore()).isLessThan(80.0);
+    }
+
+    @Test
+    @DisplayName("Over 1.5 2H never approaches certainty, however extreme the fixture")
+    void over152H_neverApproachesCertainty() {
+        FixtureContext context = createVeryHighScoringContext();
+        context.getHomeTeamStats().setScoredAvg2hHome(3.0);
+        context.getHomeTeamStats().setConcededAvg2hHome(3.0);
+        context.getAwayTeamStats().setScoredAvg2hAway(3.0);
+        context.getAwayTeamStats().setConcededAvg2hAway(3.0);
+        context.getHomeTeamStats().setCardsAvgHome(4.0);
+        context.getAwayTeamStats().setCardsAvgAway(4.0);
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+
+        assertThat(result.getMarket()).isEqualTo("Over 1.5 2H Goals");
+        assertThat(result.getScore()).isLessThan(97.0);
+    }
+
+    @Test
+    @DisplayName("correlated late-goal signals cannot compound past the adjustment ceiling")
+    void expectedGoalsAdjustment_isBounded() {
+        FixtureContext context = createVeryHighScoringContext();
+        context.getHomeTeamStats().setCardsAvgHome(6.0);
+        context.getAwayTeamStats().setCardsAvgAway(6.0);
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+
+        double adjustment = (Double) result.getFactors().get("expectedGoalsAdjustment");
+        assertThat(adjustment).isBetween(0.85, 1.20);
+    }
+
+    @Test
+    @DisplayName("a livelier second half still scores strictly higher on the same line")
+    void higherExpectedGoals_scoresStrictlyHigher() {
+        FixtureContext tame = withSecondHalfAverages(createHighScoringContext(), 0.55);
+        FixtureContext lively = withSecondHalfAverages(createHighScoringContext(), 0.68);
+
+        Recommendation tameResult = engine.analyze(tame).orElseThrow();
+        Recommendation livelyResult = engine.analyze(lively).orElseThrow();
+
+        // Scores only compare within a line, so the assertion is only meaningful while both sit
+        // on the same one.
+        assertThat(livelyResult.getMarket()).isEqualTo(tameResult.getMarket());
+        assertThat(livelyResult.getScore()).isGreaterThan(tameResult.getScore());
+    }
+
+    private FixtureContext withSecondHalfAverages(FixtureContext context, double perTeamPerHalf) {
+        context.getHomeTeamStats().setScoredAvg2hHome(perTeamPerHalf);
+        context.getHomeTeamStats().setConcededAvg2hHome(perTeamPerHalf);
+        context.getAwayTeamStats().setScoredAvg2hAway(perTeamPerHalf);
+        context.getAwayTeamStats().setConcededAvg2hAway(perTeamPerHalf);
+        return context;
     }
 
     @Test

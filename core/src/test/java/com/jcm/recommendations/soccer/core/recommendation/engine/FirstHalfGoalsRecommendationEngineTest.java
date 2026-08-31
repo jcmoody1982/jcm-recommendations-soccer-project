@@ -13,7 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.poissonAtLeast;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class FirstHalfGoalsRecommendationEngineTest {
 
@@ -81,14 +83,17 @@ class FirstHalfGoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze applies fast starter multiplier for high API potential ratio")
-    void analyze_appliesFastStarterMultiplier() {
+    @DisplayName("analyze flags fast starters when the provider reads the half hotter than a flat split")
+    void analyze_flagsFastStarters() {
         FixtureContext context = createFastStarterContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getFactors()).containsKey("fastStarterImpliedRatio");
+        Map<String, Object> factors = result.get().getFactors();
+        assertThat(factors).containsKey("frontLoadedRatio");
+        assertThat((Double) factors.get("frontLoadedRatio")).isGreaterThan(1.0);
+        assertThat(factors.get("fastStarterStatus")).isEqualTo("Fast starters detected");
     }
 
     @Test
@@ -162,10 +167,122 @@ class FirstHalfGoalsRecommendationEngineTest {
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        // With very high expected goals and API potential, should recommend O1.5 HT
-        if (result.get().getScore() >= 75.0) {
-            assertThat(result.get().getMarket()).isIn("Over 1.5 HT Goals", "Over 0.5 HT Goals");
-        }
+        assertThat(result.get().getMarket()).isEqualTo("Over 1.5 HT Goals");
+        assertThat(result.get().getFactors().get("goalsNeeded")).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Over 1.5 HT is scored as a two-goal event, not a one-goal event")
+    void over15Ht_isScoredAsTwoGoalEvent() {
+        FixtureContext context = createVeryHighScoringContext();
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+        Map<String, Object> factors = result.getFactors();
+
+        double expected1HGoals = (Double) factors.get("expected1HGoals");
+        double poisson = (Double) factors.get("poissonProbability");
+
+        // A first half of this expectation delivers two goals well under half the time. The old
+        // engine published this fixture in the high eighties.
+        assertThat(poisson).isEqualTo(poissonAtLeast(expected1HGoals, 2), within(0.01));
+        assertThat(result.getScore()).isLessThan(65.0);
+    }
+
+    @Test
+    @DisplayName("Over 1.5 HT never approaches certainty, however extreme the fixture")
+    void over15Ht_neverApproachesCertainty() {
+        FixtureContext context = createVeryHighScoringContext();
+        // Absurd inputs: every signal pushed past anything a real fixture produces.
+        context.getHomeTeamStats().setScoredAvgHtHome(3.0);
+        context.getHomeTeamStats().setConcededAvgHtHome(3.0);
+        context.getAwayTeamStats().setScoredAvgHtAway(3.0);
+        context.getAwayTeamStats().setConcededAvgHtAway(3.0);
+        context.getHomeTeamStats().setXgForAvgHome(4.0);
+        context.getAwayTeamStats().setXgForAvgAway(4.0);
+        context.getPotentials().setO05HtPotential(99.0);
+        context.getPotentials().setO15HtPotential(95.0);
+        context.setHomeTeamForm(TeamRecentForm.builder().teamId(1L).over15Overall(5).build());
+        context.setAwayTeamForm(TeamRecentForm.builder().teamId(2L).over15Overall(5).build());
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+
+        assertThat(result.getMarket()).isEqualTo("Over 1.5 HT Goals");
+        assertThat(result.getScore()).isLessThan(95.0);
+    }
+
+    @Test
+    @DisplayName("Over 0.5 HT stays inside the band a first half can actually reach")
+    void over05Ht_staysWithinRealisticBand() {
+        FixtureContext context = createHighScoringContext();
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+
+        assertThat(result.getMarket()).isEqualTo("Over 0.5 HT Goals");
+        assertThat(result.getScore()).isBetween(60.0, 90.0);
+    }
+
+    @Test
+    @DisplayName("a livelier first half still scores strictly higher on the same line")
+    void higherExpectedGoals_scoresStrictlyHigher() {
+        FixtureContext tame = withHalfTimeAverages(createHighScoringContext(), 0.55, 0.50);
+        FixtureContext lively = withHalfTimeAverages(createHighScoringContext(), 0.75, 0.70);
+
+        Recommendation tameResult = engine.analyze(tame).orElseThrow();
+        Recommendation livelyResult = engine.analyze(lively).orElseThrow();
+
+        // Scores only compare within a line, so the assertion is only meaningful while both sit
+        // on the same one.
+        assertThat(livelyResult.getMarket()).isEqualTo(tameResult.getMarket());
+        assertThat((Double) livelyResult.getFactors().get("expected1HGoals"))
+                .isGreaterThan((Double) tameResult.getFactors().get("expected1HGoals"));
+        assertThat(livelyResult.getScore()).isGreaterThan(tameResult.getScore());
+    }
+
+    private FixtureContext withHalfTimeAverages(FixtureContext context, double homeScored, double awayScored) {
+        context.getHomeTeamStats().setScoredAvgHtHome(homeScored);
+        context.getHomeTeamStats().setConcededAvgHtHome(awayScored);
+        context.getAwayTeamStats().setScoredAvgHtAway(awayScored);
+        context.getAwayTeamStats().setConcededAvgHtAway(homeScored);
+        return context;
+    }
+
+    @Test
+    @DisplayName("Over 1.5 HT is withheld when the provider does not corroborate the line")
+    void over15Ht_withheldWithoutProviderCorroboration() {
+        FixtureContext context = createVeryHighScoringContext();
+        context.getPotentials().setO15HtPotential(35.0);
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+
+        assertThat(result.getMarket()).isEqualTo("Over 0.5 HT Goals");
+    }
+
+    @Test
+    @DisplayName("correlated goal signals cannot compound past the adjustment ceiling")
+    void expectedGoalsAdjustment_isBounded() {
+        FixtureContext context = createXgUnderperformingContext();
+        context.setHomeTeamForm(TeamRecentForm.builder().teamId(1L).over15Overall(5).build());
+        context.setAwayTeamForm(TeamRecentForm.builder().teamId(2L).over15Overall(5).build());
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+
+        double adjustment = (Double) result.getFactors().get("expectedGoalsAdjustment");
+        assertThat(adjustment).isBetween(0.85, 1.20);
+    }
+
+    @Test
+    @DisplayName("the published score is the blend of the Poisson tail and the provider potential")
+    void score_isBlendOfPoissonAndProviderPotential() {
+        FixtureContext context = createHighScoringContext();
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+        Map<String, Object> factors = result.getFactors();
+
+        double poisson = (Double) factors.get("poissonProbability");
+        double potential = (Double) factors.get("apiPotentialForLine");
+
+        assertThat(result.getScore()).isEqualTo((poisson * 0.65) + (potential * 0.35), within(0.01));
+        assertThat(result.getScore()).isBetween(Math.min(poisson, potential), Math.max(poisson, potential));
     }
 
     @Test
