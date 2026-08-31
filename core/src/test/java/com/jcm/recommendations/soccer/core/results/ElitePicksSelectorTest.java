@@ -121,10 +121,90 @@ class ElitePicksSelectorTest {
                 .containsExactly(100L, 200L, 300L, 600L, 700L, 400L);
     }
 
+    @Test
+    void capsTheWholeGoalsOverFamilySoOver15CannotFillTheBoardUnderThreeTypeNames() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        // Over 1.5 full match, Over 1.5 HT and Over 1.5 2H are three separate types, so a per-type
+        // cap of three still allowed nine slots that all read "Over 1.5 something".
+        List<RecommendationSnapshot> day = List.of(
+                snapWithMarket(1L, date, 100L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 93.0, 1.22, 1000L),
+                snapWithMarket(2L, date, 200L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 92.0, 1.20, 2000L),
+                snapWithMarket(3L, date, 300L, "FIRST_HALF_GOALS", "Over 1.5 HT Goals", "STRONG", 91.0, 2.10, 3000L),
+                snapWithMarket(4L, date, 400L, "SECOND_HALF_GOALS", "Over 1.5 2H Goals", "STRONG", 90.0, 2.05, 4000L),
+                snapWithMarket(5L, date, 500L, "OVER_25_GOALS", "Over 2.5 Goals", "STRONG", 89.0, 1.85, 5000L),
+                snapWithMarket(6L, date, 600L, "OVER_GOALS", "Over 2.5 Goals", "STRONG", 88.0, 1.90, 6000L),
+                snapWithMarket(7L, date, 700L, "MATCH_RESULT", "Home Win", "STRONG", 74.0, 1.90, 7000L),
+                snapWithMarket(8L, date, 800L, "BTTS", "BTTS Yes", "STRONG", 71.0, 1.80, 8000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite.stream()
+                .filter(r -> "GOALS_OVER".equals(ElitePicksSelector.marketFamily(r.getType())))
+                .count()).isEqualTo(3);
+        assertThat(elite).extracting(RecommendationSnapshot::getType)
+                .containsExactly("OVER_15_GOALS", "OVER_15_GOALS", "FIRST_HALF_GOALS", "MATCH_RESULT", "BTTS");
+    }
+
+    @Test
+    void groupsEveryGoalsOverTypeIntoOneFamilyAndLeavesOthersAlone() {
+        assertThat(ElitePicksSelector.marketFamily("OVER_15_GOALS")).isEqualTo("GOALS_OVER");
+        assertThat(ElitePicksSelector.marketFamily("OVER_25_GOALS")).isEqualTo("GOALS_OVER");
+        assertThat(ElitePicksSelector.marketFamily("OVER_GOALS")).isEqualTo("GOALS_OVER");
+        assertThat(ElitePicksSelector.marketFamily("FIRST_HALF_GOALS")).isEqualTo("GOALS_OVER");
+        assertThat(ElitePicksSelector.marketFamily("SECOND_HALF_GOALS")).isEqualTo("GOALS_OVER");
+        // Under goals is the opposite read, not the same cluster.
+        assertThat(ElitePicksSelector.marketFamily("UNDER_GOALS")).isEqualTo("UNDER_GOALS");
+        assertThat(ElitePicksSelector.marketFamily("BTTS")).isEqualTo("BTTS");
+        assertThat(ElitePicksSelector.marketFamily(null)).isEmpty();
+    }
+
+    @Test
+    void excludesUnpricedPicksBecauseTheyCannotBeJudged() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        List<RecommendationSnapshot> day = List.of(
+                unpriced(1L, date, 100L, "FIRST_HALF_GOALS", "Over 1.5 HT Goals", 96.0, 1000L),
+                unpriced(2L, date, 200L, "SECOND_HALF_GOALS", "Over 1.5 2H Goals", 95.0, 2000L),
+                snapWithMarket(3L, date, 300L, "BTTS", "BTTS Yes", "STRONG", 80.0, 1.80, 3000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite).extracting(RecommendationSnapshot::getFixtureId).containsExactly(300L);
+        assertThat(elite).allMatch(ElitePicksSelector::hasUsablePrice);
+    }
+
+    @Test
+    void treatsAnUnbettablePriceAsNoPrice() {
+        assertThat(ElitePicksSelector.hasUsablePrice(
+                snapWithMarket(1L, LocalDate.of(2026, 8, 15), 100L, "BTTS", "BTTS Yes", "STRONG", 90.0, 1.0, 1000L)))
+                .isFalse();
+        assertThat(ElitePicksSelector.hasUsablePrice(
+                snapWithMarket(2L, LocalDate.of(2026, 8, 15), 200L, "BTTS", "BTTS Yes", "STRONG", 90.0, 1.01, 2000L)))
+                .isTrue();
+    }
+
     private static RecommendationSnapshot snap(
             Long id, LocalDate date, Long fixtureId, String type, String confidence,
             double score, double odds, long kickoff) {
         return snapWithMarket(id, date, fixtureId, type, type, confidence, score, odds, kickoff);
+    }
+
+    private static RecommendationSnapshot unpriced(
+            Long id, LocalDate date, Long fixtureId, String type, String market,
+            double score, long kickoff) {
+        return RecommendationSnapshot.builder()
+                .id(id)
+                .snapshotDate(date)
+                .fixtureId(fixtureId)
+                .type(type)
+                .market(market)
+                .confidence("STRONG")
+                .score(score)
+                .odds(null)
+                .matchDateUnix(kickoff)
+                .outcome(PickOutcome.PENDING)
+                .build();
     }
 
     private static RecommendationSnapshot snapWithMarket(

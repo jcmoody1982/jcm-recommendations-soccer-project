@@ -2873,12 +2873,21 @@ Engines publish different `score` meanings. Elite v1 constrains the pool to prob
 1. Fetch / reuse grouped recommendations for the page **horizon** (`days` = 3 or 7)
 2. Keep **STRONG** confidence only
 3. Keep eligible %-style types only (below)
+4. Keep only picks carrying a usable price (`odds > 1.0`)
+5. Drop "Over 0.5" markets (temporary, see note below)
 
 **Eligible types (v1):**
 - `MATCH_RESULT`, `BTTS`, `DOUBLE_CHANCE`, `DRAW`, `OVER_GOALS`, `UNDER_GOALS`
 - `OVER_15_GOALS`, `OVER_25_GOALS`
-- `CLEAN_SHEET`, `RESULT_BTTS`, `TOP_VS_BOTTOM`
+- `RESULT_BTTS`, `TOP_VS_BOTTOM`
 - `FIRST_HALF_GOALS`, `SECOND_HALF_GOALS`, `VALUE_BET`
+
+**Price requirement:** Elite is a shortlist to bet, so an unpriced pick has no place on it — without a
+price a selection cannot be judged good or bad, and a market that lands often but pays 1.4 can lose
+money at a high hit rate. In practice this excludes `FIRST_HALF_GOALS` and `SECOND_HALF_GOALS`
+entirely, because `FixtureOdds` carries no half-time or second-half lines and both engines
+hard-code a null price. Those markets keep their own boards; they just cannot reach Elite until the
+lines are sourced.
 
 **Excluded (v1):**
 - `BOOKING_POINTS`, `OVER_CORNERS`, `UNDER_CORNERS`
@@ -2890,7 +2899,25 @@ Engines publish different `score` meanings. Elite v1 constrains the pool to prob
 
 **Dedupe / diversity:**
 - At most **one pick per fixture** (highest-ranked selection wins)
-- At most **3 BTTS** picks on the Elite board (additional Strong BTTS are skipped so other markets can fill the top 10)
+- At most **3 per market family** (`ELITE_MAX_PER_FAMILY`), so no single kind of bet can fill the board
+
+**Market families:** the cap counts families, not types. Capping types did not work: three separate
+types emit an "Over 1.5" market — `OVER_15_GOALS` (full match), `FIRST_HALF_GOALS` (HT) and
+`SECOND_HALF_GOALS` (2H) — so three per type still allowed nine of the ten slots to read "Over 1.5
+something". Those bets all fire on the same underlying read, that the game will have goals in it.
+
+| Family | Types |
+|--------|-------|
+| `GOALS_OVER` | `OVER_GOALS`, `OVER_15_GOALS`, `OVER_25_GOALS`, `FIRST_HALF_GOALS`, `SECOND_HALF_GOALS` |
+| _(own name)_ | every other type stands alone, including `UNDER_GOALS` — the opposite read, not the same cluster |
+
+Grouping is keyed on **type**, not on parsing the market string, which varies per engine and would
+silently regroup on any wording change.
+
+**Known structural bias:** Elite ranks by probability, which inherently favours short prices — Over
+0.5 at 1.06 will always outrank Over 2.5 at 1.90 on probability alone. The "Over 0.5" exclusion and
+the family cap are both mitigations for this. The durable fix is to rank by edge at the price rather
+than by raw probability, which the price requirement above now makes possible.
 
 **Filters (locked):**
 | Filter | Elite respects? |
