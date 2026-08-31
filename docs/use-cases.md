@@ -2873,7 +2873,7 @@ Engines publish different `score` meanings. Elite v1 constrains the pool to prob
 1. Fetch / reuse grouped recommendations for the page **horizon** (`days` = 3 or 7)
 2. Keep **STRONG** confidence only
 3. Keep eligible %-style types only (below)
-4. Keep only picks carrying a usable price (`odds > 1.0`)
+4. Keep only picks carrying a backable price (`odds >= 1.20`, `ELITE_MIN_PRICE`)
 5. Drop "Over 0.5" markets (temporary, see note below)
 
 **Eligible types (v1):**
@@ -2882,12 +2882,29 @@ Engines publish different `score` meanings. Elite v1 constrains the pool to prob
 - `RESULT_BTTS`, `TOP_VS_BOTTOM`
 - `FIRST_HALF_GOALS`, `SECOND_HALF_GOALS`, `VALUE_BET`
 
-**Price requirement:** Elite is a shortlist to bet, so an unpriced pick has no place on it — without a
-price a selection cannot be judged good or bad, and a market that lands often but pays 1.4 can lose
-money at a high hit rate. In practice this excludes `FIRST_HALF_GOALS` and `SECOND_HALF_GOALS`
-entirely, because `FixtureOdds` carries no half-time or second-half lines and both engines
-hard-code a null price. Those markets keep their own boards; they just cannot reach Elite until the
-lines are sourced.
+**Price requirement:** Elite is a shortlist to bet, so a pick needs a price worth backing.
+
+- **No price at all** cannot be judged good or bad. This permanently excludes `FIRST_HALF_GOALS` and
+  `SECOND_HALF_GOALS`, because `FixtureOdds` carries no half-time or second-half lines and both
+  engines hard-code a null price. Those markets keep their own boards.
+- **A price below `ELITE_MIN_PRICE` (1.20)** is not a bet. Ranking by probability pushes the shortest
+  prices to the top, and live data had the board opening with Over 1.5 at 1.01 and Double Chance at
+  1.03 — returns too thin to stake, whatever the hit rate.
+
+**Odds arrive close to kickoff**, so the price requirement makes the board horizon-sensitive.
+Measured on live data (31 Aug 2026), the share of STRONG picks carrying a price by time to kickoff:
+
+| Kickoff in | Priced |
+|------------|--------|
+| < 24h | 51% |
+| 24-48h | 44% |
+| 48-72h | 36% |
+| 72-120h | 2% |
+| > 120h | 0% |
+
+So a 7-day Elite board will draw almost entirely from fixtures inside three days. That is the right
+bias for a board meant to be bet, but it means Elite will often run shorter than 10, and a pick can
+be absent simply because its fixture is still too far out to be priced.
 
 **Excluded (v1):**
 - `BOOKING_POINTS`, `OVER_CORNERS`, `UNDER_CORNERS`

@@ -62,13 +62,19 @@ export function isExcludedFromElitePicks(market: string | null | undefined): boo
 }
 
 /**
- * Elite is a shortlist to bet, and an unpriced pick cannot be judged good or bad. The half-goals
- * engines send a null price because the data model carries no half-time or second-half lines, so
- * they were filling the board with selections nobody could evaluate — and a market that lands often
- * but pays 1.4 can lose money at a high hit rate.
+ * Shortest price Elite will carry. Ranking by probability pushes the shortest prices to the top, and
+ * live data had the board opening with Over 1.5 at 1.01 and Double Chance at 1.03 — returns too thin
+ * to be worth staking, whatever the hit rate.
  */
-export function hasUsablePrice(rec: Recommendation): boolean {
-  return rec.odds != null && rec.odds > 1.0;
+export const ELITE_MIN_PRICE = 1.2;
+
+/**
+ * Elite is a shortlist to bet, so a pick needs a price worth backing. An unpriced pick cannot be
+ * judged good or bad at all — the half-goals engines send a null price because the data model carries
+ * no half-time or second-half lines — and a priced-but-tiny return is not a bet.
+ */
+export function hasBackablePrice(rec: Recommendation): boolean {
+  return rec.odds != null && rec.odds >= ELITE_MIN_PRICE;
 }
 
 export function isEliteEligible(rec: Recommendation): boolean {
@@ -76,7 +82,7 @@ export function isEliteEligible(rec: Recommendation): boolean {
     rec.confidence?.toUpperCase() === 'STRONG'
     && isEliteEligibleType(rec.type)
     && !isExcludedFromElitePicks(rec.market)
-    && hasUsablePrice(rec)
+    && hasBackablePrice(rec)
   );
 }
 

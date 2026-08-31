@@ -86,13 +86,22 @@ public final class ElitePicksSelector {
     }
 
     /**
-     * Elite is a shortlist to bet, and an unpriced pick cannot be judged good or bad. The half-goals
-     * engines hard-code a null price because the data model carries no half-time or second-half
-     * lines, so they were filling the board with selections nobody could evaluate - and a market
-     * that lands often but pays 1.4 can lose money at a high hit rate.
+     * Shortest price Elite will carry. Ranking by probability pushes the shortest prices to the top,
+     * and live data had the board opening with Over 1.5 at 1.01 and Double Chance at 1.03 - returns
+     * too thin to be worth staking, whatever the hit rate.
      */
-    public static boolean hasUsablePrice(RecommendationSnapshot row) {
-        return row != null && row.getOdds() != null && row.getOdds() > 1.0;
+    public static final double ELITE_MIN_PRICE = 1.20;
+
+    /**
+     * Elite is a shortlist to bet, so a pick needs a price worth backing. An unpriced pick cannot be
+     * judged good or bad at all - the half-goals engines hard-code a null price because the data
+     * model carries no half-time or second-half lines - and a priced-but-tiny return is not a bet.
+     *
+     * <p>Distinct from {@code ResultsPerformanceService.hasUsablePrice}, which asks only whether a
+     * price can carry ROI arithmetic after the fact. This asks whether we would stake it.
+     */
+    public static boolean hasBackablePrice(RecommendationSnapshot row) {
+        return row != null && row.getOdds() != null && row.getOdds() >= ELITE_MIN_PRICE;
     }
 
     public static boolean isEliteEligible(RecommendationSnapshot row) {
@@ -100,7 +109,7 @@ public final class ElitePicksSelector {
                 && "STRONG".equalsIgnoreCase(row.getConfidence())
                 && isEliteEligibleType(row.getType())
                 && !isExcludedFromElitePicks(row.getMarket())
-                && hasUsablePrice(row);
+                && hasBackablePrice(row);
     }
 
     /**

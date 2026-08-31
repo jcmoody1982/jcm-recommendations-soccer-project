@@ -171,17 +171,38 @@ class ElitePicksSelectorTest {
         List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
 
         assertThat(elite).extracting(RecommendationSnapshot::getFixtureId).containsExactly(300L);
-        assertThat(elite).allMatch(ElitePicksSelector::hasUsablePrice);
+        assertThat(elite).allMatch(ElitePicksSelector::hasBackablePrice);
     }
 
     @Test
-    void treatsAnUnbettablePriceAsNoPrice() {
-        assertThat(ElitePicksSelector.hasUsablePrice(
-                snapWithMarket(1L, LocalDate.of(2026, 8, 15), 100L, "BTTS", "BTTS Yes", "STRONG", 90.0, 1.0, 1000L)))
-                .isFalse();
-        assertThat(ElitePicksSelector.hasUsablePrice(
-                snapWithMarket(2L, LocalDate.of(2026, 8, 15), 200L, "BTTS", "BTTS Yes", "STRONG", 90.0, 1.01, 2000L)))
+    void excludesPricesTooShortToBeWorthStaking() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        // Probability ranking puts the shortest prices on top, so without a floor the board opened
+        // with Over 1.5 at 1.01 and Double Chance at 1.03.
+        List<RecommendationSnapshot> day = List.of(
+                snapWithMarket(1L, date, 100L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 99.0, 1.01, 1000L),
+                snapWithMarket(2L, date, 200L, "DOUBLE_CHANCE", "Home/Draw (1X)", "STRONG", 98.0, 1.03, 2000L),
+                snapWithMarket(3L, date, 300L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 97.0, 1.19, 3000L),
+                snapWithMarket(4L, date, 400L, "BTTS", "BTTS Yes", "STRONG", 80.0, 1.80, 4000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite).extracting(RecommendationSnapshot::getFixtureId).containsExactly(400L);
+    }
+
+    @Test
+    void acceptsThePriceFloorExactlyAndRejectsJustBelowIt() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        assertThat(ElitePicksSelector.hasBackablePrice(
+                snapWithMarket(1L, date, 100L, "BTTS", "BTTS Yes", "STRONG", 90.0, 1.20, 1000L)))
                 .isTrue();
+        assertThat(ElitePicksSelector.hasBackablePrice(
+                snapWithMarket(2L, date, 200L, "BTTS", "BTTS Yes", "STRONG", 90.0, 1.19, 2000L)))
+                .isFalse();
+        assertThat(ElitePicksSelector.hasBackablePrice(
+                snapWithMarket(3L, date, 300L, "BTTS", "BTTS Yes", "STRONG", 90.0, 1.01, 3000L)))
+                .isFalse();
     }
 
     private static RecommendationSnapshot snap(
