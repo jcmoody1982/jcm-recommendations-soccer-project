@@ -29,9 +29,30 @@ public class ResultsPerformanceService {
     /** Types paused from boards/metrics (engine still exists for later recalibration). */
     private static final Set<String> EXCLUDED_TYPES = Set.of("CLEAN_SHEET");
 
+    /**
+     * Types whose score is published as a probability percentage. Only these can be checked for
+     * calibration — a corners or booking-points score is a predicted count, so comparing it to a
+     * hit rate would be meaningless. Mirrors the {@code scoreUnit: '%'} entries in the site's
+     * recommendation section config.
+     */
+    private static final Set<String> PROBABILITY_SCORED_TYPES = Set.of(
+            "MATCH_RESULT", "BTTS", "DOUBLE_CHANCE", "RESULT_BTTS", "TOP_VS_BOTTOM",
+            "OVER_15_GOALS", "OVER_25_GOALS", "PLAYER_TO_SCORE", "PLAYER_TO_ASSIST",
+            "DRAW", "FIRST_HALF_GOALS", "SECOND_HALF_GOALS", "VALUE_BET",
+            "OVER_GOALS", "UNDER_GOALS", "CLEAN_SHEET");
+
+    /** Inclusive lower bounds of the reliability bands, ascending. */
+    private static final int[] CALIBRATION_BAND_FLOORS = {0, 50, 60, 70, 80, 90};
+
     private final RecommendationSnapshotRepository snapshotRepository;
     private final ResultsProperties resultsProperties;
 
+    /**
+     * Settlement counts plus price-aware economics. Hit rate alone cannot say whether a board is
+     * worth publishing: a 67% hit rate at average odds 1.44 still loses money, because it needs
+     * 69.4% to break even. {@code roi} is profit per unit staked at flat stakes, over the picks
+     * that carried a usable price.
+     */
     public record BucketStats(
             int wins,
             int losses,
@@ -40,13 +61,32 @@ public class ResultsPerformanceService {
             int unsupported,
             Double hitRate,
             int sampleSize,
+            boolean enoughData,
+            int pricedSample,
+            Double avgOdds,
+            Double breakEvenRate,
+            Double profitUnits,
+            Double roi
+    ) {}
+
+    /**
+     * One reliability band: what the engine claimed against what actually happened.
+     * A negative {@code gap} means the band overstates its own chances.
+     */
+    public record CalibrationBand(
+            String band,
+            int sampleSize,
+            Double avgScore,
+            Double hitRate,
+            Double gap,
             boolean enoughData
     ) {}
 
     public record TypePerformance(
             String type,
             BucketStats overall,
-            Map<String, BucketStats> byConfidence
+            Map<String, BucketStats> byConfidence,
+            List<CalibrationBand> calibration
     ) {}
 
     public record PerformanceView(
@@ -107,7 +147,8 @@ public class ResultsPerformanceService {
                             "ELITE", summarize(eliteByType.getOrDefault(entry.getKey(), List.of())),
                             "STRONG", summarize(filterConfidence(typePicks, "STRONG")),
                             "MODERATE", summarize(filterConfidence(typePicks, "MODERATE"))
-                    )
+                    ),
+                    calibrate(entry.getKey(), typePicks)
             ));
         }
         typeRows.sort(Comparator
@@ -190,6 +231,9 @@ public class ResultsPerformanceService {
 
     static BucketStats summarize(List<RecommendationSnapshot> rows) {
         int wins = 0, losses = 0, voids = 0, pending = 0, unsupported = 0;
+        int pricedSample = 0;
+        double oddsSum = 0.0;
+        double profit = 0.0;
         for (RecommendationSnapshot row : rows) {
             PickOutcome outcome = row.getOutcome() == null ? PickOutcome.PENDING : row.getOutcome();
             switch (outcome) {
@@ -199,13 +243,105 @@ public class ResultsPerformanceService {
                 case UNSUPPORTED -> unsupported++;
                 case PENDING -> pending++;
             }
+            if ((outcome == PickOutcome.WIN || outcome == PickOutcome.LOSS) && hasUsablePrice(row)) {
+                pricedSample++;
+                oddsSum += row.getOdds();
+                profit += outcome == PickOutcome.WIN ? row.getOdds() - 1.0 : -1.0;
+            }
         }
         int sampleSize = wins + losses;
-        Double hitRate = null;
+        Double hitRate = sampleSize > 0 ? (wins * 100.0) / sampleSize : null;
         boolean enoughData = sampleSize >= MIN_SAMPLE;
-        if (sampleSize > 0) {
-            hitRate = (wins * 100.0) / sampleSize;
+
+        Double avgOdds = null;
+        Double breakEvenRate = null;
+        Double profitUnits = null;
+        Double roi = null;
+        if (pricedSample > 0) {
+            avgOdds = oddsSum / pricedSample;
+            breakEvenRate = 100.0 / avgOdds;
+            profitUnits = profit;
+            roi = (profit * 100.0) / pricedSample;
         }
-        return new BucketStats(wins, losses, voids, pending, unsupported, hitRate, sampleSize, enoughData);
+
+        return new BucketStats(wins, losses, voids, pending, unsupported, hitRate, sampleSize,
+                enoughData, pricedSample, avgOdds, breakEvenRate, profitUnits, roi);
+    }
+
+    /** A price is only usable for ROI if it could actually be backed at better than evens-out. */
+    static boolean hasUsablePrice(RecommendationSnapshot row) {
+        return row.getOdds() != null && row.getOdds() > 1.0;
+    }
+
+    /**
+     * Bucket settled picks by published score and compare the claim to the outcome. This is the
+     * check that catches an engine drifting away from reality while its hit rate still looks
+     * respectable, and it is why the player prop boards could publish ~80% claims at a 10-19%
+     * strike rate without any existing metric flagging it.
+     */
+    static List<CalibrationBand> calibrate(String type, List<RecommendationSnapshot> rows) {
+        if (type == null || !PROBABILITY_SCORED_TYPES.contains(type) || rows == null) {
+            return List.of();
+        }
+
+        int bandCount = CALIBRATION_BAND_FLOORS.length;
+        int[] wins = new int[bandCount];
+        int[] counts = new int[bandCount];
+        double[] scoreSums = new double[bandCount];
+
+        for (RecommendationSnapshot row : rows) {
+            PickOutcome outcome = row.getOutcome();
+            if (outcome != PickOutcome.WIN && outcome != PickOutcome.LOSS) {
+                continue;
+            }
+            Double score = row.getScore();
+            if (score == null) {
+                continue;
+            }
+            int index = bandIndex(score);
+            counts[index]++;
+            scoreSums[index] += score;
+            if (outcome == PickOutcome.WIN) {
+                wins[index]++;
+            }
+        }
+
+        List<CalibrationBand> bands = new ArrayList<>();
+        for (int i = 0; i < bandCount; i++) {
+            if (counts[i] == 0) {
+                continue;
+            }
+            double avgScore = scoreSums[i] / counts[i];
+            double hitRate = (wins[i] * 100.0) / counts[i];
+            bands.add(new CalibrationBand(
+                    bandLabel(i),
+                    counts[i],
+                    avgScore,
+                    hitRate,
+                    hitRate - avgScore,
+                    counts[i] >= MIN_SAMPLE));
+        }
+        return bands;
+    }
+
+    private static int bandIndex(double score) {
+        int index = 0;
+        for (int i = 0; i < CALIBRATION_BAND_FLOORS.length; i++) {
+            if (score >= CALIBRATION_BAND_FLOORS[i]) {
+                index = i;
+            }
+        }
+        return index;
+    }
+
+    private static String bandLabel(int index) {
+        int floor = CALIBRATION_BAND_FLOORS[index];
+        if (index == 0) {
+            return "<" + CALIBRATION_BAND_FLOORS[1];
+        }
+        if (index == CALIBRATION_BAND_FLOORS.length - 1) {
+            return floor + "+";
+        }
+        return floor + "-" + (CALIBRATION_BAND_FLOORS[index + 1] - 1);
     }
 }

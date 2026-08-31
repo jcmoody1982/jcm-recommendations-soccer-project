@@ -5,6 +5,7 @@ import { resultsService } from '../services/api';
 import { EliteBolt } from '../components';
 import { SECTION_ORDER, sectionTitle } from '../utils/recommendationSections';
 import type {
+  CalibrationBand,
   DayResults,
   PerformanceBucket,
   PerformancePeriod,
@@ -936,6 +937,54 @@ function formatBandHit(bucket: PerformanceBucket): string {
   return `${formatBucketHit(bucket)} (${bucket.sampleSize})`;
 }
 
+function formatRoi(bucket: PerformanceBucket): string {
+  if (bucket.roi == null) return '—';
+  const sign = bucket.roi > 0 ? '+' : '';
+  return `${sign}${bucket.roi.toFixed(1)}%`;
+}
+
+function roiBadgeClass(bucket: PerformanceBucket): string {
+  if (bucket.roi == null) return styles.hitSparse;
+  return bucket.roi > 0 ? styles.hitGood : styles.hitLow;
+}
+
+function roiTitle(bucket: PerformanceBucket): string {
+  if (bucket.roi == null) {
+    return 'No prices captured for this market, so profitability cannot be measured.';
+  }
+  const breakEven = bucket.breakEvenRate != null ? `${bucket.breakEvenRate.toFixed(1)}%` : '—';
+  const odds = bucket.avgOdds != null ? bucket.avgOdds.toFixed(2) : '—';
+  return `Profit per unit staked across ${bucket.pricedSample} priced picks. `
+    + `Average odds ${odds} need a ${breakEven} hit rate to break even.`;
+}
+
+function CalibrationStrip({ bands }: { bands: CalibrationBand[] }) {
+  const settled = bands.filter((band) => band.sampleSize > 0);
+  if (settled.length === 0) return null;
+
+  return (
+    <div className={styles.calibrationStrip}>
+      <span className={styles.calibrationLabel}>Claimed → actual</span>
+      {settled.map((band) => {
+        const overstating = band.gap != null && band.gap < -10;
+        return (
+          <span
+            key={band.band}
+            className={`${styles.calibrationBand} ${overstating ? styles.calibrationBandOff : ''}`}
+            title={`${band.sampleSize} settled picks scored ${band.band}`}
+          >
+            <span className={styles.calibrationBandName}>{band.band}</span>
+            {band.avgScore != null ? band.avgScore.toFixed(0) : '—'}
+            {' → '}
+            {band.hitRate != null ? band.hitRate.toFixed(0) : '—'}
+            <span className={styles.calibrationBandCount}>n={band.sampleSize}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function TypePerformanceList({ rows }: { rows: TypePerformance[] }) {
   return (
     <div className={styles.typePerfListWrap}>
@@ -944,6 +993,7 @@ function TypePerformanceList({ rows }: { rows: TypePerformance[] }) {
         <span>n</span>
         <span>W–L</span>
         <span>Hit</span>
+        <span>ROI</span>
         <span>Elite</span>
         <span>Strong</span>
         <span>Moderate</span>
@@ -965,8 +1015,17 @@ function TypePerformanceList({ rows }: { rows: TypePerformance[] }) {
                   {formatBucketHit(row.overall)}
                 </span>
               </div>
+              <div className={styles.typePerfRoi}>
+                <span
+                  className={`${styles.hitBadge} ${roiBadgeClass(row.overall)}`}
+                  title={roiTitle(row.overall)}
+                >
+                  {formatRoi(row.overall)}
+                </span>
+              </div>
               <div className={styles.typePerfMobileMeta}>
                 <span>{row.overall.sampleSize} graded</span>
+                <span>ROI {formatRoi(row.overall)}</span>
                 <span>
                   <span className={styles.win}>{row.overall.wins}</span>
                   –
@@ -991,6 +1050,7 @@ function TypePerformanceList({ rows }: { rows: TypePerformance[] }) {
                   </span>
                 </div>
               </div>
+              <CalibrationStrip bands={row.calibration ?? []} />
             </li>
           );
         })}
@@ -1009,6 +1069,11 @@ function emptyPerformanceBucket(): PerformanceBucket {
     hitRate: null,
     sampleSize: 0,
     enoughData: false,
+    pricedSample: 0,
+    avgOdds: null,
+    breakEvenRate: null,
+    profitUnits: null,
+    roi: null,
   };
 }
 
@@ -1065,6 +1130,14 @@ function PerformancePanel({
             Window by snapshot date (Europe/London)
             {data.fromDate ? `: ${data.fromDate} → ${data.toDate}` : ` through ${data.toDate}`}.
             {' '}Voids excluded from hit rate. Minimum sample {data.minSample}.
+            {data.overall.pricedSample > 0 && (
+              <>
+                {' '}Overall ROI {formatRoi(data.overall)} at flat stakes over{' '}
+                {data.overall.pricedSample} priced picks
+                {data.overall.breakEvenRate != null
+                  && ` (average odds need ${data.overall.breakEvenRate.toFixed(1)}% to break even)`}.
+              </>
+            )}
           </p>
           <div className={styles.performanceBands}>
             <PerformanceSummary title="Elite" bucket={data.elite ?? emptyPerformanceBucket()} tone="strong" />

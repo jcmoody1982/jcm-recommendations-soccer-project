@@ -3309,14 +3309,28 @@ Hit-rate denominators (UC-034/035) use **only** `WIN` and `LOSS`.
 | Periods | `7d` / `30d` / `90d` / `all` |
 | Minimum sample | Hit rate shown only when `wins + losses >= 10`; otherwise “Not enough data” / `enoughData=false` |
 | UI | Same Results page; toggle **1 - Daily Dashboard \| 2 - Overall Performance Tracker \| 3 - Elite Pick Performance** (no new nav item) |
-| v1 out of scope | ROI %, streaks, charts, per-league |
+| ROI basis | Flat one unit per settled pick that carried odds > 1.0; unpriced picks excluded |
+| Calibration basis | Settled picks bucketed by published score (`<50`, `50-59`, `60-69`, `70-79`, `80-89`, `90+`) |
+| v1 out of scope | Streaks, charts, per-league |
 
-**Statistics (v1):**
+**Statistics:**
 - Overall hit rate for the period
 - Hit rate by confidence (Strong vs Moderate)
 - Hit rate by recommendation type (with Strong/Moderate breakdown)
 - Sample size per bucket
 - By-type table includes **every** `RecommendationType` (Over 1.5 / Over 2.5 included) even when the window has no snapshots yet (sample 0 / not enough data)
+- **ROI, average odds and break-even rate** per bucket. Hit rate alone cannot decide whether a
+  board is worth publishing: 67% at average odds 1.44 still loses money because it needs 69.4% to
+  break even. `roi` is null for markets that carry no price, which is the honest answer rather
+  than an implied zero.
+- **Calibration bands** per type: mean published score against realized hit rate, with the gap.
+  Only computed for types scored as a probability percentage — a corners or booking-points score
+  is a predicted count, so comparing it to a hit rate would be meaningless.
+
+**Why calibration is tracked:** hit rate can look respectable while an engine drifts far from
+reality. The player prop boards published claims around 80% while striking at 10–19%, and no
+existing metric flagged it because neither board carries a price. A reliability band comparing
+claim to outcome catches that class of failure directly.
 
 **UI:**
 - View toggle on Results: **1 - Daily Dashboard** (UC-034) | **2 - Overall Performance Tracker** (UC-035) | **3 - Elite Pick Performance** (UC-037)

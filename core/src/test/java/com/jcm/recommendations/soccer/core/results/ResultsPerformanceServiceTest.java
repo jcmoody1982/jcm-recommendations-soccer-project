@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -121,6 +122,87 @@ class ResultsPerformanceServiceTest {
         assertThat(view.overall().wins()).isEqualTo(1);
         assertThat(view.overall().sampleSize()).isEqualTo(1);
         assertThat(view.elite().wins()).isEqualTo(1);
+    }
+
+    @Test
+    void roiMeasuresProfitAgainstThePriceNotJustTheHitRate() {
+        LocalDate d1 = LocalDate.of(2026, 8, 1);
+        // Two of three land, which reads as a healthy 66.7% hit rate, but at 1.40 the break-even
+        // is 71.4% so the board is still losing money.
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "DOUBLE_CHANCE", "STRONG", PickOutcome.WIN, null, 75.0, 1.40),
+                snap(2L, d1, 200L, "DOUBLE_CHANCE", "STRONG", PickOutcome.WIN, null, 75.0, 1.40),
+                snap(3L, d1, 300L, "DOUBLE_CHANCE", "STRONG", PickOutcome.LOSS, null, 75.0, 1.40)
+        ));
+
+        ResultsPerformanceService.BucketStats stats = service.getPerformance("30d").overall();
+
+        assertThat(stats.hitRate()).isCloseTo(66.67, within(0.01));
+        assertThat(stats.pricedSample()).isEqualTo(3);
+        assertThat(stats.avgOdds()).isCloseTo(1.40, within(0.001));
+        assertThat(stats.breakEvenRate()).isCloseTo(71.43, within(0.01));
+        assertThat(stats.profitUnits()).isCloseTo(-0.20, within(0.001));
+        assertThat(stats.roi()).isCloseTo(-6.67, within(0.01));
+    }
+
+    @Test
+    void unpricedPicksCountTowardHitRateButNotRoi() {
+        LocalDate d1 = LocalDate.of(2026, 8, 1);
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "OVER_CORNERS", "STRONG", PickOutcome.WIN, null, 11.0, null),
+                snap(2L, d1, 200L, "OVER_CORNERS", "STRONG", PickOutcome.LOSS, null, 10.0, 1.0)
+        ));
+
+        ResultsPerformanceService.BucketStats stats = service.getPerformance("30d").overall();
+
+        assertThat(stats.sampleSize()).isEqualTo(2);
+        assertThat(stats.hitRate()).isEqualTo(50.0);
+        assertThat(stats.pricedSample()).isZero();
+        assertThat(stats.roi()).isNull();
+        assertThat(stats.avgOdds()).isNull();
+        assertThat(stats.breakEvenRate()).isNull();
+    }
+
+    @Test
+    void calibrationExposesBandsThatOverstateTheirChances() {
+        LocalDate d1 = LocalDate.of(2026, 8, 1);
+        List<RecommendationSnapshot> rows = List.of(
+                snap(1L, d1, 100L, "PLAYER_TO_ASSIST", "STRONG", PickOutcome.LOSS, null, 92.0, null),
+                snap(2L, d1, 200L, "PLAYER_TO_ASSIST", "STRONG", PickOutcome.LOSS, null, 94.0, null),
+                snap(3L, d1, 300L, "PLAYER_TO_ASSIST", "MODERATE", PickOutcome.WIN, null, 72.0, null),
+                snap(4L, d1, 400L, "PLAYER_TO_ASSIST", "MODERATE", PickOutcome.PENDING, null, 76.0, null));
+
+        List<ResultsPerformanceService.CalibrationBand> bands =
+                ResultsPerformanceService.calibrate("PLAYER_TO_ASSIST", rows);
+
+        ResultsPerformanceService.CalibrationBand top = bands.stream()
+                .filter(b -> "90+".equals(b.band()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(top.sampleSize()).isEqualTo(2);
+        assertThat(top.avgScore()).isEqualTo(93.0);
+        assertThat(top.hitRate()).isZero();
+        assertThat(top.gap()).isEqualTo(-93.0);
+        assertThat(top.enoughData()).isFalse();
+
+        // The pending pick is excluded, so the 70-79 band holds only the settled one.
+        ResultsPerformanceService.CalibrationBand mid = bands.stream()
+                .filter(b -> "70-79".equals(b.band()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(mid.sampleSize()).isEqualTo(1);
+        assertThat(mid.gap()).isEqualTo(28.0);
+    }
+
+    @Test
+    void calibrationSkippedForTypesScoredInCountsRatherThanPercent() {
+        LocalDate d1 = LocalDate.of(2026, 8, 1);
+        List<RecommendationSnapshot> rows = List.of(
+                snap(1L, d1, 100L, "BOOKING_POINTS", "STRONG", PickOutcome.WIN, null, 42.0, null),
+                snap(2L, d1, 200L, "BOOKING_POINTS", "STRONG", PickOutcome.LOSS, null, 38.0, null));
+
+        assertThat(ResultsPerformanceService.calibrate("BOOKING_POINTS", rows)).isEmpty();
+        assertThat(ResultsPerformanceService.calibrate("UNDER_CORNERS", rows)).isEmpty();
     }
 
     private static RecommendationSnapshot snap(

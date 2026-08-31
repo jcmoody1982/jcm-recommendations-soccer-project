@@ -866,6 +866,7 @@
     3.25rem
     3.75rem
     3.75rem
+    4.25rem
     minmax(0, 1fr)
     minmax(0, 1fr)
     minmax(0, 1fr);
@@ -922,12 +923,70 @@
   color: var(--text-muted);
 }
 
-.typePerfHit {
+.typePerfHit,
+.typePerfRoi {
   justify-self: start;
 }
 
 .typePerfBands {
   display: contents;
+}
+
+/* Reliability bands sit under the row and span the full grid width. */
+.calibrationStrip {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  padding-top: 0.3rem;
+  border-top: 1px dashed var(--border-color);
+}
+
+.calibrationLabel {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-right: 0.15rem;
+}
+
+.calibrationBand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.calibrationBandOff {
+  background: rgba(224, 112, 112, 0.14);
+  color: #e07070;
+}
+
+.calibrationBandName {
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.calibrationBandOff .calibrationBandName {
+  color: inherit;
+}
+
+.calibrationBandCount {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+
+.calibrationBandOff .calibrationBandCount {
+  color: inherit;
+  opacity: 0.8;
 }
 
 .typePerfBand {
@@ -1063,7 +1122,8 @@
     grid-template-areas:
       "name hit"
       "meta meta"
-      "bands bands";
+      "bands bands"
+      "calib calib";
     gap: 0.35rem 0.5rem;
     padding: 0.65rem 0.75rem;
     align-items: start;
@@ -1079,8 +1139,13 @@
   }
 
   .typePerfSample,
-  .typePerfRecord {
+  .typePerfRecord,
+  .typePerfRoi {
     display: none;
+  }
+
+  .calibrationStrip {
+    grid-area: calib;
   }
 
   .typePerfMobileMeta {

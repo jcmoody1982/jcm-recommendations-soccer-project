@@ -59,6 +59,24 @@ export interface PerformanceBucket {
   hitRate: number | null;
   sampleSize: number;
   enoughData: boolean;
+  /** Settled picks that carried a usable price; only these contribute to ROI. */
+  pricedSample: number;
+  avgOdds: number | null;
+  /** Hit rate the average price demands before a bet turns a profit. */
+  breakEvenRate: number | null;
+  profitUnits: number | null;
+  /** Profit per unit staked, as a percentage. Null when nothing was priced. */
+  roi: number | null;
+}
+
+/** Published score band against what actually happened. Negative gap means overclaiming. */
+export interface CalibrationBand {
+  band: string;
+  sampleSize: number;
+  avgScore: number | null;
+  hitRate: number | null;
+  gap: number | null;
+  enoughData: boolean;
 }
 
 export interface TypePerformance {
@@ -69,6 +87,8 @@ export interface TypePerformance {
     STRONG: PerformanceBucket;
     MODERATE: PerformanceBucket;
   };
+  /** Empty for engines scored in counts (corners, cards) rather than percentages. */
+  calibration: CalibrationBand[];
 }
 
 export interface ResultsPerformance {
