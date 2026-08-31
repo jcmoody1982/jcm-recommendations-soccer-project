@@ -246,4 +246,32 @@ public final class RecommendationUtils {
     public static double clampScore(double score, double min, double max) {
         return Math.min(max, Math.max(min, score));
     }
+
+    // ===== Poisson goal probabilities =====
+
+    /**
+     * Probability (0-100) of at least {@code minGoals} goals given an expected total of
+     * {@code expectedGoals}, under a Poisson distribution.
+     *
+     * <p>Prefer this over rescaling a goal average onto a 0-100 axis. A rescale has to be clamped
+     * at the top, which ties every high-scoring fixture at exactly 100 and destroys the rank order
+     * the Elite board depends on. A Poisson tail approaches 100 without reaching it, so the best
+     * fixtures stay separable and the number means what it says.
+     */
+    public static double poissonAtLeast(double expectedGoals, int minGoals) {
+        if (minGoals <= 0) {
+            return 100.0;
+        }
+        if (expectedGoals <= 0) {
+            return 0.0;
+        }
+        // P(N >= k) = 1 - sum of P(N = i) for i < k
+        double term = Math.exp(-expectedGoals);
+        double cumulativeBelow = term;
+        for (int i = 1; i < minGoals; i++) {
+            term *= expectedGoals / i;
+            cumulativeBelow += term;
+        }
+        return clampScore((1.0 - cumulativeBelow) * 100.0);
+    }
 }

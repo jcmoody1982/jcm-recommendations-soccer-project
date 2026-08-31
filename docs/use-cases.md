@@ -2209,51 +2209,53 @@ Combined Mismatch Score = Gap Score × Quality Score Multiplier
 
 **Logic:**
 
-*Expected goals (same blend as UC-006):*
+The score is the modelled probability that the fixture clears the line, blended from two
+independent estimates of the same event.
+
+*Expected goals — every goal-volume signal feeds this one number:*
 ```
-Actual Expected = (Home scored + Away scored + Home conceded + Away conceded) / 2
-If xG available:
-  xG Expected = (Home xG for + Away xG for + Home xG against + Away xG against) / 2
-  Final Expected = (Actual × 0.6) + (xG × 0.4)
+Season   = (Home scored + Away scored + Home conceded + Away conceded) / 2   weight 0.50
+xG       = (Home xG for + Away xG for + Home xG against + Away xG against) / 2   weight 0.30
+Form     = same shape from last-x scored/conceded averages                   weight 0.20
+Expected goals = weighted mean, renormalised over whichever inputs are present
 ```
 
-*Over 1.5 rate used in the score:*
+*Poisson half:*
 ```
-If form Over 1.5 % exists: 0.5 × season O1.5 % + 0.5 × form O1.5 %
-Else: season O1.5 %
-```
-
-*Base Weights (form available, total = 1.0):*
-```
-  Home/Away scored avg (season)     × 0.07 each
-  Home/Away conceded avg (season)   × 0.07 each
-  Home/Away scored avg (form)       × 0.10 each
-  Home/Away conceded avg (form)     × 0.07 each
-  Home/Away Over 1.5 % (blended)    × 0.12 each
-  API o15_potential                 × 0.14
+P(2+ goals) = 1 - e^-λ (1 + λ)        where λ = expected goals
 ```
 
-*Redistributed Weights (no form, total = 1.0):*
+*Empirical half — signals already expressed as probabilities of the event:*
 ```
-  Home/Away scored avg (season)     × 0.13 each
-  Home/Away conceded avg (season)   × 0.10 each
-  Home/Away Over 1.5 % (season)     × 0.16 each
-  API o15_potential                 × 0.22
+Team rate = mean of home and away Over 1.5 %      weight 0.30
+            (each: 0.5 × season + 0.5 × form when form exists)
+API o15_potential                                  weight 0.40
+Empirical = weighted mean, renormalised over whichever inputs are present
 ```
 
-**Boosts:**
-- Combined goals average ≥ 2.4 → +5%
-- Combined xG for ≥ 2.2 → +4%
-- Expected goals above the 1.5 line → up to +18 (12 per goal of excess)
+*Final:*
+```
+Score = 0.5 × Poisson + 0.5 × Empirical
+```
+
+**No additive boosts.** The previous scoring summed rescaled goal averages, over-line percentages
+and the API potential into an index, then added a high-scoring boost (+5), an xG boost (+4) and an
+expected-goals lift (up to +18) on top. All three measured goal volume, which the index already
+contained, so a busy fixture was counted three times and could gain 27 points over its base. That
+saturated the 100 clamp, tying every high-scoring fixture at exactly 100 — and since Elite breaks
+ties on shortest price, the board went to whichever tie had the least generous odds. Routing all
+goal evidence through λ and taking a Poisson tail removes both the double-counting and the ceiling.
 
 **Filters (all must pass):**
 - Expected goals ≥ 1.8
 - Score ≥ Moderate threshold
 
-**Thresholds:**
-- **Strong:** Score ≥ 72%
-- **Moderate:** Score 58–71%
-- **Weak:** Score < 58% (filtered out)
+**Thresholds:** rebased for the probability score. Over 1.5 is a high base-rate market — roughly
+three quarters of all fixtures clear it — so a moderate call must sit well above the league
+average or the board is recommending nothing.
+- **Strong:** Score ≥ 82%
+- **Moderate:** Score 72–81%
+- **Weak:** Score < 72% (filtered out)
 
 **Market:** Always `Over 1.5 Goals`. Odds from `odds_ft_over15`.
 
@@ -2281,21 +2283,24 @@ Else: season O1.5 %
 
 **Distinct from UC-006:** UC-006 may select Over 3.5 when expected goals and Over 3.5 rates are high. UC-039 always markets **Over 2.5 Goals** and weights Over 2.5 hit-rates plus `o25_potential` more heavily than UC-006.
 
-**Logic:** Same expected-goals blend and weight layout as UC-038, substituting Over 2.5 percentages and `o25_potential`.
+**Logic:** Same Poisson/empirical blend as UC-038, substituting Over 2.5 percentages and
+`o25_potential`, and requiring three goals rather than two:
+```
+P(3+ goals) = 1 - e^-λ (1 + λ + λ²/2)
+```
 
-**Boosts:**
-- Combined goals average ≥ 3.0 → +5%
-- Combined xG for ≥ 2.8 → +4%
-- Expected goals above the 2.5 line → up to +12 (8 per goal of excess)
+**No additive boosts** — see UC-038 for why they were removed.
 
 **Filters (all must pass):**
 - Expected goals ≥ 2.5
 - Score ≥ Moderate threshold
 
-**Thresholds:**
-- **Strong:** Score ≥ 78%
-- **Moderate:** Score 62–77%
-- **Weak:** Score < 62% (filtered out)
+**Thresholds:** Over 2.5 is a far lower base rate than Over 1.5 — around half of fixtures — so the
+same probability score means something very different here. Even a heavy 4.0 expected-goals
+fixture is only about a 76% chance to clear three goals, so the thresholds sit well below UC-038's.
+- **Strong:** Score ≥ 68%
+- **Moderate:** Score 58–67%
+- **Weak:** Score < 58% (filtered out)
 
 **Market:** Always `Over 2.5 Goals`. Odds from `odds_ft_over25`.
 

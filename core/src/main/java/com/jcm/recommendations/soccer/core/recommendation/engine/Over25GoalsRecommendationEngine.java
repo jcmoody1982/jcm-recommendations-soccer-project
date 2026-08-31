@@ -12,21 +12,20 @@ import org.springframework.stereotype.Component;
 @Component
 public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendationEngine {
 
+    /**
+     * Over 2.5 is a far lower base rate than Over 1.5 — around half of fixtures — so the same
+     * probability score means something very different here and the thresholds sit lower. Even a
+     * heavy 4.0 expected-goals fixture is only about a 76% chance to clear three goals.
+     */
     private static final LineSpec SPEC = new LineSpec(
             RecommendationType.OVER_25_GOALS,
             "Over 2.5 Goals",
             "over25Pct",
             "apiO25Potential",
             2.5,
-            78.0,
-            62.0,
-            3.0,
-            5.0,
-            2.8,
-            4.0,
-            2.5,
-            8.0,
-            12.0
+            68.0,
+            58.0,
+            2.5
     );
 
     @Override

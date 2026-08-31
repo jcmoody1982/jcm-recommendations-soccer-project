@@ -324,4 +324,37 @@ class RecommendationUtilsTest {
             assertEquals(80.0, RecommendationUtils.calculateScoredPercentage(stats));
         }
     }
+
+    @Nested
+    @DisplayName("Poisson goal probabilities")
+    class PoissonAtLeast {
+
+        @Test
+        @DisplayName("matches the Poisson tail for Over 1.5 and Over 2.5")
+        void poissonAtLeast_matchesKnownValues() {
+            // A typical 2.7-goal fixture clears 1.5 about three quarters of the time.
+            assertEquals(75.1, RecommendationUtils.poissonAtLeast(2.7, 2), 0.1);
+            assertEquals(80.1, RecommendationUtils.poissonAtLeast(3.0, 2), 0.1);
+            // The same fixture is a far weaker Over 2.5 proposition.
+            assertEquals(57.7, RecommendationUtils.poissonAtLeast(3.0, 3), 0.1);
+            assertEquals(76.2, RecommendationUtils.poissonAtLeast(4.0, 3), 0.1);
+        }
+
+        @Test
+        @DisplayName("approaches but never reaches certainty")
+        void poissonAtLeast_neverReachesCertainty() {
+            assertTrue(RecommendationUtils.poissonAtLeast(8.0, 2) < 100.0);
+            assertTrue(RecommendationUtils.poissonAtLeast(20.0, 2) < 100.0);
+            // Rank order survives at the top, which a clamped rescale destroys.
+            assertTrue(RecommendationUtils.poissonAtLeast(6.0, 2)
+                    < RecommendationUtils.poissonAtLeast(8.0, 2));
+        }
+
+        @Test
+        @DisplayName("handles degenerate inputs")
+        void poissonAtLeast_handlesEdges() {
+            assertEquals(0.0, RecommendationUtils.poissonAtLeast(0.0, 2));
+            assertEquals(100.0, RecommendationUtils.poissonAtLeast(2.5, 0));
+        }
+    }
 }

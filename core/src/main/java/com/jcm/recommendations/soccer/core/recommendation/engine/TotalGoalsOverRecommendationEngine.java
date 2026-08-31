@@ -19,26 +19,32 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 /**
  * Shared Over X.5 total-goals engine. Line-specific filters, rates, and odds
  * come from {@link LineSpec} (UC-038 Over 1.5, UC-039 Over 2.5).
+ *
+ * <p>The score is the modelled probability that the fixture clears the line, blended from two
+ * estimates of the same event: a Poisson tail on expected goals, and the empirical rate at which
+ * these two teams and the data provider say the line goes over.
+ *
+ * <p>This replaces an additive index that summed rescaled goal averages, over-line percentages and
+ * an API potential, then added a high-scoring boost, an xG boost and an expected-goals lift on
+ * top. All three boosts measured the same thing the index already contained — goal volume — so a
+ * busy fixture was counted three times and could add 27 points to an already-high base. The result
+ * saturated at the 100 clamp, and because the Elite board breaks ties on shortest price, a pile of
+ * fixtures tied at 100 handed the board to whichever had the least generous odds.
  */
 @Slf4j
 public abstract class TotalGoalsOverRecommendationEngine implements RecommendationEngine {
 
-    private static final double WEIGHT_HOME_SCORED_SEASON = 0.07;
-    private static final double WEIGHT_AWAY_SCORED_SEASON = 0.07;
-    private static final double WEIGHT_HOME_CONCEDED_SEASON = 0.07;
-    private static final double WEIGHT_AWAY_CONCEDED_SEASON = 0.07;
-    private static final double WEIGHT_HOME_SCORED_FORM = 0.10;
-    private static final double WEIGHT_AWAY_SCORED_FORM = 0.10;
-    private static final double WEIGHT_HOME_CONCEDED_FORM = 0.07;
-    private static final double WEIGHT_AWAY_CONCEDED_FORM = 0.07;
-    private static final double WEIGHT_HOME_OVER_LINE = 0.12;
-    private static final double WEIGHT_AWAY_OVER_LINE = 0.12;
-    private static final double WEIGHT_API_POTENTIAL = 0.14;
+    /** Split between the Poisson estimate and the empirical over-rates. */
+    private static final double WEIGHT_POISSON = 0.50;
 
-    private static final double WEIGHT_SCORED_SEASON_NO_FORM = 0.13;
-    private static final double WEIGHT_CONCEDED_SEASON_NO_FORM = 0.10;
-    private static final double WEIGHT_OVER_LINE_NO_FORM = 0.16;
-    private static final double WEIGHT_API_POTENTIAL_NO_FORM = 0.22;
+    // Contributions to expected goals, renormalised over whichever inputs are present.
+    private static final double WEIGHT_LAMBDA_SEASON = 0.50;
+    private static final double WEIGHT_LAMBDA_XG = 0.30;
+    private static final double WEIGHT_LAMBDA_FORM = 0.20;
+
+    // Contributions to the empirical over-rate, renormalised over whichever inputs are present.
+    private static final double WEIGHT_EMPIRICAL_TEAM_RATE = 0.30;
+    private static final double WEIGHT_EMPIRICAL_API = 0.40;
 
     protected record LineSpec(
             RecommendationType type,
@@ -48,14 +54,13 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
             double filterMinExpectedGoals,
             double thresholdStrong,
             double thresholdModerate,
-            double highScoringCombinedThreshold,
-            double highScoringBoost,
-            double xgCombinedThreshold,
-            double xgBoost,
-            double line,
-            double expectedGoalsLiftPerGoal,
-            double expectedGoalsLiftCap
-    ) {}
+            double line
+    ) {
+        /** Goals needed to clear the line: 2 for Over 1.5, 3 for Over 2.5. */
+        int goalsNeeded() {
+            return (int) Math.ceil(line);
+        }
+    }
 
     protected abstract LineSpec spec();
 
@@ -88,7 +93,7 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double expectedGoals = calculateExpectedGoals(homeStats, awayStats);
+        double expectedGoals = calculateExpectedGoals(context);
         double homeOverPct = blendedOverPercentage(homeStats, context.hasRecentForm() ? context.getHomeTeamForm() : null);
         double awayOverPct = blendedOverPercentage(awayStats, context.hasRecentForm() ? context.getAwayTeamForm() : null);
 
@@ -127,25 +132,46 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         return Optional.of(recommendation);
     }
 
-    private double calculateExpectedGoals(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+    /**
+     * Expected total goals for the fixture, combining season record, xG and recent form. Every
+     * goal-volume signal now feeds this one number rather than being added separately to the
+     * score, which is what stopped the same evidence being counted three times over.
+     */
+    private double calculateExpectedGoals(FixtureContext context) {
+        TeamSeasonStats homeStats = context.getHomeTeamStats();
+        TeamSeasonStats awayStats = context.getAwayTeamStats();
+
         double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
         double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
         double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
         double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double seasonLambda = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
 
-        double actualGoalsExpected = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
+        double weightedSum = seasonLambda * WEIGHT_LAMBDA_SEASON;
+        double weightUsed = WEIGHT_LAMBDA_SEASON;
 
         Double homeXgFor = homeStats.getXgForAvgHome();
         Double awayXgFor = awayStats.getXgForAvgAway();
         Double homeXgAgainst = homeStats.getXgAgainstAvgHome();
         Double awayXgAgainst = awayStats.getXgAgainstAvgAway();
-
         if (homeXgFor != null && awayXgFor != null && homeXgAgainst != null && awayXgAgainst != null) {
-            double xgExpected = (homeXgFor + awayXgFor + homeXgAgainst + awayXgAgainst) / 2.0;
-            return (actualGoalsExpected * 0.6) + (xgExpected * 0.4);
+            double xgLambda = (homeXgFor + awayXgFor + homeXgAgainst + awayXgAgainst) / 2.0;
+            weightedSum += xgLambda * WEIGHT_LAMBDA_XG;
+            weightUsed += WEIGHT_LAMBDA_XG;
         }
 
-        return actualGoalsExpected;
+        if (context.hasRecentForm()) {
+            TeamRecentForm homeForm = context.getHomeTeamForm();
+            TeamRecentForm awayForm = context.getAwayTeamForm();
+            double formLambda = (safeDouble(homeForm.getScoredAvgHome(), homeScoredAvg)
+                    + safeDouble(awayForm.getScoredAvgAway(), awayScoredAvg)
+                    + safeDouble(homeForm.getConcededAvgHome(), homeConcededAvg)
+                    + safeDouble(awayForm.getConcededAvgAway(), awayConcededAvg)) / 2.0;
+            weightedSum += formLambda * WEIGHT_LAMBDA_FORM;
+            weightUsed += WEIGHT_LAMBDA_FORM;
+        }
+
+        return weightedSum / weightUsed;
     }
 
     private double blendedOverPercentage(TeamSeasonStats stats, TeamRecentForm form) {
@@ -160,84 +186,38 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         return (seasonPct * 0.5) + (normalizePercentage(formPct) * 0.5);
     }
 
+    /**
+     * Blend two independent estimates of the same probability: a Poisson tail on expected goals,
+     * and the rate at which these teams (and the data provider) actually clear the line.
+     */
     private double calculateScore(
             FixtureContext context,
             LineSpec spec,
             double homeOverPct,
             double awayOverPct,
             double expectedGoals) {
-        TeamSeasonStats homeStats = context.getHomeTeamStats();
-        TeamSeasonStats awayStats = context.getAwayTeamStats();
+        double poisson = poissonAtLeast(expectedGoals, spec.goalsNeeded());
+        double empirical = empiricalOverPercentage(context, homeOverPct, awayOverPct);
+        return clampScore((poisson * WEIGHT_POISSON) + (empirical * (1.0 - WEIGHT_POISSON)));
+    }
 
-        double homeScoredSeason = normalizeGoals(calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0));
-        double awayScoredSeason = normalizeGoals(calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0));
-        double homeConcededSeason = normalizeGoals(calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0));
-        double awayConcededSeason = normalizeGoals(calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0));
+    /**
+     * The observed side of the estimate: how often these two teams clear the line, plus the data
+     * provider's own potential for this fixture. Both are already probabilities of the event, so
+     * they combine directly rather than being rescaled onto an arbitrary axis.
+     */
+    private double empiricalOverPercentage(FixtureContext context, double homeOverPct, double awayOverPct) {
+        double teamRate = (homeOverPct + awayOverPct) / 2.0;
+        double weightedSum = teamRate * WEIGHT_EMPIRICAL_TEAM_RATE;
+        double weightUsed = WEIGHT_EMPIRICAL_TEAM_RATE;
 
-        double api = 50.0;
         Double potential = apiPotential(context);
         if (potential != null) {
-            api = normalizePercentage(potential);
+            weightedSum += normalizePercentage(potential) * WEIGHT_EMPIRICAL_API;
+            weightUsed += WEIGHT_EMPIRICAL_API;
         }
 
-        double score;
-        if (context.hasRecentForm()) {
-            double homeScoredForm = normalizeGoals(safeDouble(context.getHomeTeamForm().getScoredAvgHome(), 1.0));
-            double awayScoredForm = normalizeGoals(safeDouble(context.getAwayTeamForm().getScoredAvgAway(), 1.0));
-            double homeConcededForm = normalizeGoals(safeDouble(context.getHomeTeamForm().getConcededAvgHome(), 1.0));
-            double awayConcededForm = normalizeGoals(safeDouble(context.getAwayTeamForm().getConcededAvgAway(), 1.0));
-
-            score = (homeScoredSeason * WEIGHT_HOME_SCORED_SEASON)
-                    + (awayScoredSeason * WEIGHT_AWAY_SCORED_SEASON)
-                    + (homeConcededSeason * WEIGHT_HOME_CONCEDED_SEASON)
-                    + (awayConcededSeason * WEIGHT_AWAY_CONCEDED_SEASON)
-                    + (homeScoredForm * WEIGHT_HOME_SCORED_FORM)
-                    + (awayScoredForm * WEIGHT_AWAY_SCORED_FORM)
-                    + (homeConcededForm * WEIGHT_HOME_CONCEDED_FORM)
-                    + (awayConcededForm * WEIGHT_AWAY_CONCEDED_FORM)
-                    + (homeOverPct * WEIGHT_HOME_OVER_LINE)
-                    + (awayOverPct * WEIGHT_AWAY_OVER_LINE)
-                    + (api * WEIGHT_API_POTENTIAL);
-        } else {
-            score = (homeScoredSeason * WEIGHT_SCORED_SEASON_NO_FORM)
-                    + (awayScoredSeason * WEIGHT_SCORED_SEASON_NO_FORM)
-                    + (homeConcededSeason * WEIGHT_CONCEDED_SEASON_NO_FORM)
-                    + (awayConcededSeason * WEIGHT_CONCEDED_SEASON_NO_FORM)
-                    + (homeOverPct * WEIGHT_OVER_LINE_NO_FORM)
-                    + (awayOverPct * WEIGHT_OVER_LINE_NO_FORM)
-                    + (api * WEIGHT_API_POTENTIAL_NO_FORM);
-        }
-
-        score += highScoringBoost(homeStats, awayStats, spec);
-        score += xgBoost(homeStats, awayStats, spec);
-        score += expectedGoalsLift(expectedGoals, spec);
-        return clampScore(score);
-    }
-
-    private double expectedGoalsLift(double expectedGoals, LineSpec spec) {
-        if (spec.expectedGoalsLiftPerGoal() <= 0) {
-            return 0.0;
-        }
-        double lift = (expectedGoals - spec.line()) * spec.expectedGoalsLiftPerGoal();
-        return Math.max(0.0, Math.min(spec.expectedGoalsLiftCap(), lift));
-    }
-
-    private double highScoringBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats, LineSpec spec) {
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
-        double combined = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
-        return combined >= spec.highScoringCombinedThreshold() ? spec.highScoringBoost() : 0.0;
-    }
-
-    private double xgBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats, LineSpec spec) {
-        Double homeXgFor = homeStats != null ? homeStats.getXgForAvgHome() : null;
-        Double awayXgFor = awayStats != null ? awayStats.getXgForAvgAway() : null;
-        if (homeXgFor == null || awayXgFor == null) {
-            return 0.0;
-        }
-        return (homeXgFor + awayXgFor) >= spec.xgCombinedThreshold() ? spec.xgBoost() : 0.0;
+        return weightedSum / weightUsed;
     }
 
     private ConfidenceLevel determineConfidence(double score, LineSpec spec) {
@@ -299,19 +279,13 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         if (potential != null) {
             factors.put(spec.apiPotentialFactorKey(), normalizePercentage(potential));
         }
-        double expectedLift = expectedGoalsLift(expectedGoals, spec);
-        factors.put("expectedGoalsLiftApplied", expectedLift > 0);
-        if (expectedLift > 0) {
-            factors.put("expectedGoalsLiftAmount", expectedLift);
-        }
+
+        factors.put("poissonProbability", poissonAtLeast(expectedGoals, spec.goalsNeeded()));
+        factors.put("empiricalOverPct", empiricalOverPercentage(context, homeOverPct, awayOverPct));
+        factors.put("goalsNeeded", spec.goalsNeeded());
 
         double combinedGoalsAvg = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
         factors.put("combinedGoalsAvg", combinedGoalsAvg);
-        double highScoringBoost = highScoringBoost(homeStats, awayStats, spec);
-        factors.put("highScoringBoostApplied", highScoringBoost > 0);
-        if (highScoringBoost > 0) {
-            factors.put("highScoringBoostAmount", highScoringBoost);
-        }
 
         Double homeXgFor = homeStats.getXgForAvgHome();
         Double awayXgFor = awayStats.getXgForAvgAway();
@@ -331,11 +305,7 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         if (awayXgAgainst != null) {
             factors.put("awayXgAgainstAvgAway", awayXgAgainst);
         }
-
-        double xgBoost = xgBoost(homeStats, awayStats, spec);
-        factors.put("xgBoostApplied", xgBoost > 0);
-        if (xgBoost > 0) {
-            factors.put("xgBoostAmount", xgBoost);
+        if (xgAvailable) {
             factors.put("combinedXg", homeXgFor + awayXgFor);
         }
 

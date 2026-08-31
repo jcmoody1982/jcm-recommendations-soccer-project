@@ -12,21 +12,20 @@ import org.springframework.stereotype.Component;
 @Component
 public class Over15GoalsRecommendationEngine extends TotalGoalsOverRecommendationEngine {
 
+    /**
+     * Thresholds are rebased for the probability score. Over 1.5 is a high base-rate market —
+     * roughly three quarters of fixtures clear it — so a moderate call has to sit well above the
+     * old 58, or the board recommends nothing more than the league average.
+     */
     private static final LineSpec SPEC = new LineSpec(
             RecommendationType.OVER_15_GOALS,
             "Over 1.5 Goals",
             "over15Pct",
             "apiO15Potential",
             1.8,
+            82.0,
             72.0,
-            58.0,
-            2.4,
-            5.0,
-            2.2,
-            4.0,
-            1.5,
-            12.0,
-            18.0
+            1.5
     );
 
     @Override

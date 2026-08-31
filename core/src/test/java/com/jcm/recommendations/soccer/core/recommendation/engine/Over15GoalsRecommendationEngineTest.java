@@ -132,6 +132,59 @@ class Over15GoalsRecommendationEngineTest {
         assertThat(result.get().getFactors()).containsKeys("homeOverFormPct", "awayOverFormPct");
     }
 
+    @Test
+    @DisplayName("analyze never saturates at 100 even for a goal-fest with perfect over rates")
+    void analyze_extremeFixture_staysBelowCertainty() {
+        Optional<Recommendation> result = engine.analyze(contextWithGoalStats(4.0, 3.5, 3.0, 3.2, 100.0, 100.0));
+
+        assertThat(result).isPresent();
+        // The old additive scoring stacked a high-scoring boost, an xG boost and an
+        // expected-goals lift on an already-high index, hit the 100 clamp, and tied every busy
+        // fixture at exactly 100 — which handed the Elite board to whichever had the shortest price.
+        assertThat(result.get().getScore()).isLessThan(97.0);
+        assertThat(result.get().getScore()).isGreaterThan(85.0);
+    }
+
+    @Test
+    @DisplayName("analyze keeps busier fixtures separable at the top of the range")
+    void analyze_higherExpectedGoals_scoresStrictlyHigher() {
+        double busy = scoreFor(contextWithGoalStats(3.2, 2.8, 2.4, 2.6, 95.0, 95.0));
+        double busier = scoreFor(contextWithGoalStats(4.0, 3.5, 3.0, 3.2, 95.0, 95.0));
+
+        assertThat(busier).isGreaterThan(busy);
+    }
+
+    @Test
+    @DisplayName("analyze reports the Poisson and empirical halves of the estimate")
+    void analyze_exposesBothEstimates() {
+        Optional<Recommendation> result = engine.analyze(highScoringContext());
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getFactors()).containsKeys("poissonProbability", "empiricalOverPct");
+        assertThat(result.get().getFactors()).containsEntry("goalsNeeded", 2);
+        // The published score sits between the two inputs it is blended from.
+        double poisson = (double) result.get().getFactors().get("poissonProbability");
+        double empirical = (double) result.get().getFactors().get("empiricalOverPct");
+        assertThat(result.get().getScore())
+                .isBetween(Math.min(poisson, empirical), Math.max(poisson, empirical));
+    }
+
+    @Test
+    @DisplayName("analyze drops a fixture that only matches the league average")
+    void analyze_averageFixture_isNotPublished() {
+        // Around 2.4 expected goals is close to a typical fixture. Over 1.5 clears in roughly
+        // three quarters of all matches, so an average fixture is not a recommendation.
+        Optional<Recommendation> result = engine.analyze(contextWithGoalStats(1.3, 1.1, 1.1, 1.2, 68.0, 66.0));
+
+        assertThat(result).isEmpty();
+    }
+
+    private double scoreFor(FixtureContext context) {
+        Optional<Recommendation> result = engine.analyze(context);
+        assertThat(result).isPresent();
+        return result.get().getScore();
+    }
+
     private FixtureContext highScoringContext() {
         return contextWithGoalStats(2.5, 1.8, 1.0, 1.4, 82.0, 78.0);
     }
