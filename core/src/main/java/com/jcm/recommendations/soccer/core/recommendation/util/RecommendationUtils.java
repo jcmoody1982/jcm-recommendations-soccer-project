@@ -274,4 +274,64 @@ public final class RecommendationUtils {
         }
         return clampScore((1.0 - cumulativeBelow) * 100.0);
     }
+
+    /** Goal counts past this contribute nothing meaningful to a scoreline sum. */
+    private static final int POISSON_MAX_GOALS = 12;
+
+    /**
+     * Probability (0-100) that both sides score the same number of goals, treating each side's
+     * goals as independent Poisson draws.
+     *
+     * <p>Sums P(home = k) x P(away = k) over plausible scorelines, which is the direct statement of
+     * "the match is level at the end". Proxies for draw likelihood - how close the teams are, how
+     * few goals they score - are already implied by the two expectations, so deriving the
+     * probability here avoids scoring those proxies separately and then having to guess how they
+     * combine.
+     */
+    public static double poissonDrawProbability(double lambdaHome, double lambdaAway) {
+        if (lambdaHome < 0 || lambdaAway < 0) {
+            return 0.0;
+        }
+
+        double homeTerm = Math.exp(-lambdaHome);
+        double awayTerm = Math.exp(-lambdaAway);
+        double drawProbability = homeTerm * awayTerm;
+
+        for (int k = 1; k <= POISSON_MAX_GOALS; k++) {
+            homeTerm *= lambdaHome / k;
+            awayTerm *= lambdaAway / k;
+            drawProbability += homeTerm * awayTerm;
+        }
+
+        return clampScore(drawProbability * 100.0);
+    }
+
+    // ===== Market prices =====
+
+    /**
+     * Home, draw and away probabilities (0-100) with the bookmaker's margin removed.
+     *
+     * <p>Raw inverted odds sum to more than one, so using them directly overstates every outcome.
+     * Returns null when any leg is missing or non-positive.
+     */
+    public static double[] fairOutcomeProbabilities(Double odds1, Double oddsX, Double odds2) {
+        if (odds1 == null || oddsX == null || odds2 == null
+                || odds1 <= 0 || oddsX <= 0 || odds2 <= 0) {
+            return null;
+        }
+
+        double raw1 = 1.0 / odds1;
+        double rawX = 1.0 / oddsX;
+        double raw2 = 1.0 / odds2;
+        double overround = raw1 + rawX + raw2;
+        if (overround <= 0) {
+            return null;
+        }
+
+        return new double[]{
+                (raw1 / overround) * 100.0,
+                (rawX / overround) * 100.0,
+                (raw2 / overround) * 100.0
+        };
+    }
 }

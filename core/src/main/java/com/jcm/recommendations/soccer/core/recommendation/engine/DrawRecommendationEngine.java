@@ -4,8 +4,8 @@ import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.*;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
 import com.jcm.recommendations.soccer.core.recommendation.util.MatchBriefCopy;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils;
 import com.jcm.recommendations.soccer.domain.RefereeStats;
-import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,60 +16,57 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 
 /**
  * UC-019: Draw Recommendations
- * 
- * Identifies fixtures likely to end in a draw based on:
- * - Team draw percentages (season and form)
- * - Evenly matched indicator (PPG + position proximity)
- * - Low-scoring potential (goals scored + defensive strength)
- * - xG similarity factor
- * - Referee draw tendency and cards correlation
- * - Draw specialist detection
- * - Recent draw form count
- * - Match context adjustments
+ *
+ * <p>Publishes a draw only when three things line up: the goal expectations say the match is
+ * genuinely level, the market agrees a draw is live, and the price on offer is worth taking.
+ *
+ * <p>The previous version scored a weighted index of draw proxies - season draw percentages, recent
+ * draw counts, "draw specialist" labels - and then multiplied it by up to four compounding
+ * multipliers. That was measurably anti-predictive: over the last seven days the highest-scoring
+ * band claimed 64.7% and returned 12.1%, and every band got worse as the claimed score rose. The
+ * cause was that the loudest inputs were the noisiest. Draw frequency barely persists between
+ * fixtures, so a team with three draws in five games carries no edge into the next match, yet a
+ * recent-draw streak plus a specialist label could nearly double the score. Raising the old
+ * threshold would therefore have selected harder for noise, not for quality.
+ *
+ * <p>So the index is gone. Draw probability now comes from the scoreline distribution: expected
+ * goals for each side, then the probability that both land on the same number. Closeness and
+ * low-scoring - the two proxies that actually carried signal - are implied by those expectations
+ * rather than scored separately. Draw-heavy form and referee tendencies survive only as reported
+ * colour, because they read as noise once the expectations are in place.
+ *
+ * <p>Because a draw pays around 3.0-4.0, hit rate alone cannot tell us whether the board is
+ * profitable, so publishing is gated on the price rather than on the score.
  */
 @Component
 @Slf4j
 public class DrawRecommendationEngine implements RecommendationEngine {
 
-    // Base weights (sum to 1.0)
-    private static final double WEIGHT_HOME_DRAW_SEASON = 0.10;
-    private static final double WEIGHT_AWAY_DRAW_SEASON = 0.10;
-    private static final double WEIGHT_HOME_DRAW_FORM = 0.08;
-    private static final double WEIGHT_AWAY_DRAW_FORM = 0.08;
-    private static final double WEIGHT_EVENLY_MATCHED = 0.18;
-    private static final double WEIGHT_LOW_SCORING = 0.12;
-    private static final double WEIGHT_XG_SIMILARITY = 0.10;
-    private static final double WEIGHT_REFEREE = 0.09;
-    private static final double WEIGHT_IMPLIED_ODDS = 0.08;
-    private static final double WEIGHT_DEFENSIVE_STRENGTH = 0.07;
+    /** Share of the published probability taken from our own model, the rest from the market. */
+    private static final double WEIGHT_MODEL = 0.45;
+    private static final double WEIGHT_MARKET = 0.55;
 
-    // Weights when xG not available (redistribute 0.10 xG weight)
-    private static final double WEIGHT_HOME_DRAW_SEASON_NO_XG = 0.12;
-    private static final double WEIGHT_AWAY_DRAW_SEASON_NO_XG = 0.12;
-    private static final double WEIGHT_HOME_DRAW_FORM_NO_XG = 0.09;
-    private static final double WEIGHT_AWAY_DRAW_FORM_NO_XG = 0.09;
-    private static final double WEIGHT_EVENLY_MATCHED_NO_XG = 0.20;
-    private static final double WEIGHT_LOW_SCORING_NO_XG = 0.14;
-    private static final double WEIGHT_REFEREE_NO_XG = 0.09;
-    private static final double WEIGHT_IMPLIED_ODDS_NO_XG = 0.08;
-    private static final double WEIGHT_DEFENSIVE_STRENGTH_NO_XG = 0.07;
+    /** How much of the goal expectation comes from xG rather than the scored/conceded record. */
+    private static final double WEIGHT_XG = 0.40;
 
-    // Thresholds — Draw is capped at MODERATE until score calibration improves hit rate
-    private static final double THRESHOLD_MODERATE = 28.0;
+    /** Publishing gates. All must pass; see {@link #evaluateGates}. */
+    private static final double MIN_MODEL_DRAW_PCT = 27.0;
+    private static final double MIN_MARKET_DRAW_PCT = 26.0;
+    private static final double MAX_PPG_GAP = 0.45;
+    private static final double MAX_COMBINED_EXPECTED_GOALS = 2.80;
+    private static final double MIN_EDGE_AT_PRICE = 0.03;
+    private static final double MAX_EDGE_AT_PRICE = 0.25;
 
-    // Draw specialist thresholds
+    /** Below this a venue record is too thin to build an expectation from. */
+    private static final int MIN_VENUE_MATCHES = 4;
+
+    /** Floor on the published probability. Draw stays capped at MODERATE - there is no STRONG tier. */
+    private static final double THRESHOLD_MODERATE = 26.0;
+
+    // Descriptive thresholds — reported, not scored
     private static final double DRAW_SPECIALIST_HIGH = 35.0;
-    private static final double DRAW_SPECIALIST_ABOVE_AVG = 28.0;
-    private static final double DRAW_SPECIALIST_LOW = 20.0;
-
-    // xG similarity thresholds
     private static final double XG_VERY_SIMILAR = 0.2;
-    private static final double XG_SIMILAR = 0.4;
-    private static final double XG_MODERATE_GAP = 0.6;
-
-    // Referee cards thresholds
-    private static final double REFEREE_LOW_CARDS = 3.0;
-    private static final double REFEREE_HIGH_CARDS = 4.0;
+    private static final double REFEREE_DRAW_FRIENDLY_PCT = 30.0;
 
     @Override
     public RecommendationType getType() {
@@ -82,335 +79,154 @@ public class DrawRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        log.debug("Analyzing Draw for fixture: fixtureId={}, {} vs {}", 
+        log.debug("Analyzing Draw for fixture: fixtureId={}, {} vs {}",
                 context.getFixture().getId(),
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
 
-        TeamSeasonStats homeStats = context.getHomeTeamStats();
-        TeamSeasonStats awayStats = context.getAwayTeamStats();
-        boolean hasXgData = hasXgData(homeStats, awayStats);
+        // A draw at the wrong price loses money however level the match is, so no price means no pick.
+        double[] fairOutcomes = fairOutcomes(context);
+        if (fairOutcomes == null) {
+            log.debug("Draw withheld, no complete 1X2 price: fixtureId={}", context.getFixture().getId());
+            return Optional.empty();
+        }
+        double marketDrawPct = fairOutcomes[1];
+        double drawOdds = context.getOdds().getOddsFtX();
 
-        double score = calculateDrawScore(context, hasXgData);
-        
-        // Apply multipliers
-        double drawSpecialistMultiplier = calculateDrawSpecialistMultiplier(homeStats, awayStats);
-        double recentDrawFormMultiplier = calculateRecentDrawFormMultiplier(context);
-        double refereeCarsMultiplier = calculateRefereeCardsMultiplier(context);
-        double matchContextMultiplier = calculateMatchContextMultiplier(context);
+        GoalExpectation expectation = expectedGoals(context.getHomeTeamStats(), context.getAwayTeamStats());
+        if (expectation == null) {
+            log.debug("Draw withheld, venue record too thin to model: fixtureId={}",
+                    context.getFixture().getId());
+            return Optional.empty();
+        }
 
-        score = score * drawSpecialistMultiplier * recentDrawFormMultiplier 
-                * refereeCarsMultiplier * matchContextMultiplier;
+        double modelDrawPct = poissonDrawProbability(expectation.home(), expectation.away());
+        double blendedDrawPct = (modelDrawPct * WEIGHT_MODEL) + (marketDrawPct * WEIGHT_MARKET);
+        double edgeAtPrice = ((modelDrawPct / 100.0) * drawOdds) - 1.0;
 
-        ConfidenceLevel confidence = determineConfidence(score, context);
+        List<String> unmetGates = evaluateGates(context, expectation, modelDrawPct, marketDrawPct, edgeAtPrice);
+        if (!unmetGates.isEmpty()) {
+            log.debug("Draw withheld for fixtureId={}: {}", context.getFixture().getId(), unmetGates);
+            return Optional.empty();
+        }
 
+        ConfidenceLevel confidence = determineConfidence(blendedDrawPct);
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
         }
 
-        Double odds = context.hasOdds() ? context.getOdds().getOddsFtX() : null;
-        Map<String, Object> factors = buildFactors(context, score, hasXgData, 
-                drawSpecialistMultiplier, recentDrawFormMultiplier, 
-                refereeCarsMultiplier, matchContextMultiplier);
+        Map<String, Object> factors = buildFactors(
+                context, expectation, modelDrawPct, marketDrawPct, blendedDrawPct, edgeAtPrice);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.DRAW)
                 .confidence(confidence)
-                .score(score)
+                .score(blendedDrawPct)
                 .market("Draw")
-                .odds(odds)
-                .description(buildDescription(context, confidence, score, factors))
+                .odds(drawOdds)
+                .description(buildDescription(context, confidence, blendedDrawPct, factors))
                 .factors(factors)
                 .build();
 
-        log.info("Draw recommendation generated: fixtureId={}, score={}, confidence={}", 
-                context.getFixture().getId(), String.format("%.1f", score), confidence);
+        log.info("Draw recommendation generated: fixtureId={}, model={}, market={}, published={}, edge={}",
+                context.getFixture().getId(),
+                String.format("%.1f", modelDrawPct),
+                String.format("%.1f", marketDrawPct),
+                String.format("%.1f", blendedDrawPct),
+                String.format("%.3f", edgeAtPrice));
 
         return Optional.of(recommendation);
     }
 
-    private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        return homeStats.getXgForAvgOverall() != null && awayStats.getXgForAvgOverall() != null;
+    /**
+     * Reasons this fixture should not be published, empty when it clears every gate.
+     *
+     * <p>Note the edge requirement is a band rather than a floor. Some edge is unavoidable - the
+     * price has to be beaten for the bet to pay - but a large disagreement with the market is far
+     * more likely to mean our expectations are wrong than that we have found a mispriced match, so
+     * the far tail is rejected rather than treated as the best of the board.
+     */
+    private List<String> evaluateGates(FixtureContext context, GoalExpectation expectation,
+            double modelDrawPct, double marketDrawPct, double edgeAtPrice) {
+        List<String> unmet = new ArrayList<>();
+
+        if (modelDrawPct < MIN_MODEL_DRAW_PCT) {
+            unmet.add(String.format("model draw %.1f%% below %.1f%%", modelDrawPct, MIN_MODEL_DRAW_PCT));
+        }
+        if (marketDrawPct < MIN_MARKET_DRAW_PCT) {
+            unmet.add(String.format("market draw %.1f%% below %.1f%%", marketDrawPct, MIN_MARKET_DRAW_PCT));
+        }
+
+        double ppgGap = ppgGap(context.getHomeTeamStats(), context.getAwayTeamStats());
+        if (ppgGap > MAX_PPG_GAP) {
+            unmet.add(String.format("PPG gap %.2f above %.2f", ppgGap, MAX_PPG_GAP));
+        }
+
+        double combined = expectation.combined();
+        if (combined > MAX_COMBINED_EXPECTED_GOALS) {
+            unmet.add(String.format("expected goals %.2f above %.2f", combined, MAX_COMBINED_EXPECTED_GOALS));
+        }
+
+        if (edgeAtPrice < MIN_EDGE_AT_PRICE) {
+            unmet.add(String.format("edge %.3f below %.3f", edgeAtPrice, MIN_EDGE_AT_PRICE));
+        } else if (edgeAtPrice > MAX_EDGE_AT_PRICE) {
+            unmet.add(String.format("edge %.3f above %.3f, model likely wrong", edgeAtPrice, MAX_EDGE_AT_PRICE));
+        }
+
+        return unmet;
     }
 
-    private double calculateDrawScore(FixtureContext context, boolean hasXgData) {
-        TeamSeasonStats homeStats = context.getHomeTeamStats();
-        TeamSeasonStats awayStats = context.getAwayTeamStats();
-
-        double homeDrawSeason = calculateDrawPercentage(homeStats, true);
-        double awayDrawSeason = calculateDrawPercentage(awayStats, false);
-
-        double homeDrawForm = homeDrawSeason;
-        double awayDrawForm = awayDrawSeason;
-        if (context.hasRecentForm()) {
-            homeDrawForm = calculateFormDrawPercentage(context.getHomeTeamForm().getDrawsHome());
-            awayDrawForm = calculateFormDrawPercentage(context.getAwayTeamForm().getDrawsAway());
+    /** Expected goals for each side, or null when either venue record is too thin. */
+    GoalExpectation expectedGoals(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        if (calculateMatchesAtVenue(homeStats, true) < MIN_VENUE_MATCHES
+                || calculateMatchesAtVenue(awayStats, false) < MIN_VENUE_MATCHES) {
+            return null;
         }
 
-        double evenlyMatched = calculateEvenlyMatchedScore(homeStats, awayStats);
-        double lowScoring = calculateLowScoringScore(homeStats, awayStats);
-        double defensiveStrength = calculateDefensiveStrengthScore(homeStats, awayStats);
-        double refereeFactor = calculateRefereeFactor(context);
+        double recordHome = (calculateVenueGoalsAvg(homeStats, true)
+                + calculateVenueConcededAvg(awayStats, false)) / 2.0;
+        double recordAway = (calculateVenueGoalsAvg(awayStats, false)
+                + calculateVenueConcededAvg(homeStats, true)) / 2.0;
 
-        double impliedOdds = 25.0;
-        if (context.hasOdds() && context.getOdds().getOddsFtX() != null && context.getOdds().getOddsFtX() > 0) {
-            impliedOdds = (1.0 / context.getOdds().getOddsFtX()) * 100;
+        Double homeXgFor = homeStats.getXgForAvgHome();
+        Double homeXgAgainst = homeStats.getXgAgainstAvgHome();
+        Double awayXgFor = awayStats.getXgForAvgAway();
+        Double awayXgAgainst = awayStats.getXgAgainstAvgAway();
+        if (homeXgFor == null || homeXgAgainst == null || awayXgFor == null || awayXgAgainst == null) {
+            return new GoalExpectation(recordHome, recordAway, false);
         }
 
-        double score;
-        if (hasXgData) {
-            double xgSimilarity = calculateXgSimilarityScore(homeStats, awayStats);
-            
-            score = (homeDrawSeason * WEIGHT_HOME_DRAW_SEASON)
-                    + (awayDrawSeason * WEIGHT_AWAY_DRAW_SEASON)
-                    + (homeDrawForm * WEIGHT_HOME_DRAW_FORM)
-                    + (awayDrawForm * WEIGHT_AWAY_DRAW_FORM)
-                    + (evenlyMatched * WEIGHT_EVENLY_MATCHED)
-                    + (lowScoring * WEIGHT_LOW_SCORING)
-                    + (xgSimilarity * WEIGHT_XG_SIMILARITY)
-                    + (refereeFactor * WEIGHT_REFEREE)
-                    + (impliedOdds * WEIGHT_IMPLIED_ODDS)
-                    + (defensiveStrength * WEIGHT_DEFENSIVE_STRENGTH);
-        } else {
-            log.debug("No xG data available, using redistributed weights for fixture: {}", 
-                    context.getFixture().getId());
-            
-            score = (homeDrawSeason * WEIGHT_HOME_DRAW_SEASON_NO_XG)
-                    + (awayDrawSeason * WEIGHT_AWAY_DRAW_SEASON_NO_XG)
-                    + (homeDrawForm * WEIGHT_HOME_DRAW_FORM_NO_XG)
-                    + (awayDrawForm * WEIGHT_AWAY_DRAW_FORM_NO_XG)
-                    + (evenlyMatched * WEIGHT_EVENLY_MATCHED_NO_XG)
-                    + (lowScoring * WEIGHT_LOW_SCORING_NO_XG)
-                    + (refereeFactor * WEIGHT_REFEREE_NO_XG)
-                    + (impliedOdds * WEIGHT_IMPLIED_ODDS_NO_XG)
-                    + (defensiveStrength * WEIGHT_DEFENSIVE_STRENGTH_NO_XG);
-        }
-
-        return score;
+        double xgHome = (homeXgFor + awayXgAgainst) / 2.0;
+        double xgAway = (awayXgFor + homeXgAgainst) / 2.0;
+        return new GoalExpectation(
+                (recordHome * (1 - WEIGHT_XG)) + (xgHome * WEIGHT_XG),
+                (recordAway * (1 - WEIGHT_XG)) + (xgAway * WEIGHT_XG),
+                true);
     }
 
-    private double calculateEvenlyMatchedScore(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double ppgDiff = Math.abs(safeDouble(homeStats.getPpgOverall()) - safeDouble(awayStats.getPpgOverall()));
-        double ppgScore;
-        if (ppgDiff < 0.3) {
-            ppgScore = 100.0;
-        } else if (ppgDiff < 0.5) {
-            ppgScore = 80.0;
-        } else if (ppgDiff < 0.8) {
-            ppgScore = 60.0;
-        } else {
-            ppgScore = 40.0;
-        }
-
-        double positionScore = 50.0;
-        if (homeStats.getPosition() != null && awayStats.getPosition() != null) {
-            int posDiff = Math.abs(homeStats.getPosition() - awayStats.getPosition());
-            if (posDiff <= 3) {
-                positionScore = 100.0;
-            } else if (posDiff <= 6) {
-                positionScore = 75.0;
-            } else if (posDiff <= 10) {
-                positionScore = 50.0;
-            } else {
-                positionScore = 25.0;
-            }
-        }
-
-        return (ppgScore + positionScore) / 2.0;
-    }
-
-    private double calculateLowScoringScore(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-
-        double combinedAvg = (homeGoalsAvg + awayGoalsAvg) / 2.0;
-
-        if (combinedAvg < 1.2) {
-            return 100.0;
-        } else if (combinedAvg < 1.5) {
-            return 75.0;
-        } else if (combinedAvg < 1.8) {
-            return 50.0;
-        } else {
-            return 25.0;
+    /** Expected goals for each side of the fixture. */
+    record GoalExpectation(double home, double away, boolean usedXg) {
+        double combined() {
+            return home + away;
         }
     }
 
-    private double calculateDefensiveStrengthScore(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
-
-        boolean homeTight = homeConcededAvg < 1.0;
-        boolean awayTight = awayConcededAvg < 1.0;
-        boolean homeLeaky = homeConcededAvg > 1.5;
-        boolean awayLeaky = awayConcededAvg > 1.5;
-
-        if (homeTight && awayTight) {
-            return 100.0; // Both defensive = tight game, draw likely
-        } else if (homeTight || awayTight) {
-            return 75.0;
-        } else if (homeLeaky && awayLeaky) {
-            return 25.0; // Both concede a lot = goals likely, not draw
-        } else {
-            return 50.0;
+    private double[] fairOutcomes(FixtureContext context) {
+        if (!context.hasOdds()) {
+            return null;
         }
+        return RecommendationUtils.fairOutcomeProbabilities(
+                context.getOdds().getOddsFt1(),
+                context.getOdds().getOddsFtX(),
+                context.getOdds().getOddsFt2());
     }
 
-    private double calculateXgSimilarityScore(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeXg = safeDouble(homeStats.getXgForAvgOverall());
-        double awayXg = safeDouble(awayStats.getXgForAvgOverall());
-        double xgDiff = Math.abs(homeXg - awayXg);
-
-        if (xgDiff < XG_VERY_SIMILAR) {
-            return 100.0;
-        } else if (xgDiff < XG_SIMILAR) {
-            return 75.0;
-        } else if (xgDiff < XG_MODERATE_GAP) {
-            return 50.0;
-        } else {
-            return 25.0;
-        }
+    private double ppgGap(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        return Math.abs(safeDouble(homeStats.getPpgOverall()) - safeDouble(awayStats.getPpgOverall()));
     }
 
-    private double calculateDrawSpecialistMultiplier(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeDrawPct = calculateDrawPercentage(homeStats, true);
-        double awayDrawPct = calculateDrawPercentage(awayStats, false);
-
-        double homeMultiplier = getDrawSpecialistMultiplier(homeDrawPct);
-        double awayMultiplier = getDrawSpecialistMultiplier(awayDrawPct);
-
-        return (homeMultiplier + awayMultiplier) / 2.0;
-    }
-
-    private double getDrawSpecialistMultiplier(double drawPct) {
-        if (drawPct >= DRAW_SPECIALIST_HIGH) {
-            return 1.20;
-        } else if (drawPct >= DRAW_SPECIALIST_ABOVE_AVG) {
-            return 1.10;
-        } else if (drawPct >= DRAW_SPECIALIST_LOW) {
-            return 1.0;
-        } else {
-            return 0.85;
-        }
-    }
-
-    private double calculateRecentDrawFormMultiplier(FixtureContext context) {
-        if (!context.hasRecentForm()) {
-            return 1.0;
-        }
-
-        int homeDraws = safeInt(context.getHomeTeamForm().getDrawsHome());
-        int awayDraws = safeInt(context.getAwayTeamForm().getDrawsAway());
-        int combinedDraws = homeDraws + awayDraws;
-
-        // Check for very draw-heavy form (3+ draws per team in last 5)
-        if (homeDraws >= 3 || awayDraws >= 3) {
-            return 1.25;
-        } else if (combinedDraws >= 4) {
-            return 1.15;
-        } else if (homeDraws >= 2 || awayDraws >= 2) {
-            return 1.10;
-        } else if (homeDraws == 0 && awayDraws == 0) {
-            return 0.85;
-        }
-        return 1.0;
-    }
-
-    private double calculateRefereeCardsMultiplier(FixtureContext context) {
-        if (!context.hasRefereeStats()) {
-            return 1.0;
-        }
-
-        RefereeStats refStats = context.getRefereeStats();
-        Double cardsPerMatch = refStats.getCardsPerMatchOverall();
-        
-        if (cardsPerMatch == null) {
-            // Try to calculate from totals
-            Integer yellowCards = refStats.getYellowCardsOverall();
-            Integer appearances = refStats.getAppearancesOverall();
-            if (yellowCards != null && appearances != null && appearances > 0) {
-                cardsPerMatch = (double) yellowCards / appearances;
-            }
-        }
-
-        if (cardsPerMatch == null) {
-            return 1.0;
-        }
-
-        if (cardsPerMatch < REFEREE_LOW_CARDS) {
-            return 1.10; // Controlled games, draw likely
-        } else if (cardsPerMatch > REFEREE_HIGH_CARDS) {
-            return 0.95; // Chaotic, less predictable
-        }
-        return 1.0;
-    }
-
-    private double calculateRefereeFactor(FixtureContext context) {
-        if (!context.hasRefereeStats()) {
-            return 50.0;
-        }
-
-        RefereeStats refStats = context.getRefereeStats();
-
-        double drawPct = safeDouble(refStats.getDrawsPer());
-        double drawScore;
-        if (drawPct > 30) {
-            drawScore = 100.0;
-        } else if (drawPct > 25) {
-            drawScore = 75.0;
-        } else if (drawPct > 20) {
-            drawScore = 50.0;
-        } else {
-            drawScore = 25.0;
-        }
-
-        double reliability = 1.0;
-        if (refStats.getAppearancesOverall() != null) {
-            if (refStats.getAppearancesOverall() < 5) {
-                reliability = 0.5;
-            } else if (refStats.getAppearancesOverall() < 10) {
-                reliability = 0.8;
-            }
-        }
-
-        return drawScore * reliability;
-    }
-
-    private double calculateMatchContextMultiplier(FixtureContext context) {
-        TeamSeasonStats homeStats = context.getHomeTeamStats();
-        TeamSeasonStats awayStats = context.getAwayTeamStats();
-
-        double multiplier = 1.0;
-
-        if (homeStats.getPosition() != null && awayStats.getPosition() != null) {
-            int homePos = homeStats.getPosition();
-            int awayPos = awayStats.getPosition();
-
-            // Both mid-table with nothing to play for
-            boolean bothMidTable = homePos >= 8 && homePos <= 14 && awayPos >= 8 && awayPos <= 14;
-            if (bothMidTable) {
-                multiplier *= 1.15;
-            }
-
-            // One team desperate (relegation), other safe - less likely draw
-            boolean oneDesperateOtherSafe = 
-                    (homePos >= 17 && awayPos <= 10) || (awayPos >= 17 && homePos <= 10);
-            if (oneDesperateOtherSafe) {
-                multiplier *= 0.85;
-            }
-
-            // Both teams need points equally (similar positions)
-            int posDiff = Math.abs(homePos - awayPos);
-            if (posDiff <= 2) {
-                multiplier *= 1.05;
-            }
-        }
-
-        return multiplier;
-    }
-
-    ConfidenceLevel determineConfidence(double score, FixtureContext context) {
-        if (score >= THRESHOLD_MODERATE) {
+    ConfidenceLevel determineConfidence(double publishedDrawPct) {
+        if (publishedDrawPct >= THRESHOLD_MODERATE) {
             return ConfidenceLevel.MODERATE;
         }
         return ConfidenceLevel.WEAK;
@@ -420,67 +236,41 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         return value != null ? value : 0;
     }
 
-    private Map<String, Object> buildFactors(FixtureContext context, double score, boolean hasXgData,
-            double drawSpecialistMultiplier, double recentDrawFormMultiplier,
-            double refereeCardsMultiplier, double matchContextMultiplier) {
+    private Map<String, Object> buildFactors(FixtureContext context, GoalExpectation expectation,
+            double modelDrawPct, double marketDrawPct, double blendedDrawPct, double edgeAtPrice) {
         Map<String, Object> factors = new HashMap<>();
-        
+
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        // Core metrics
-        factors.put("drawScore", score);
-        factors.put("homeDrawPctSeason", calculateDrawPercentage(homeStats, true));
-        factors.put("awayDrawPctSeason", calculateDrawPercentage(awayStats, false));
+        factors.put("modelDrawProbability", modelDrawPct);
+        factors.put("marketDrawProbability", marketDrawPct);
+        factors.put("publishedDrawProbability", blendedDrawPct);
+        factors.put("edgeAtPrice", edgeAtPrice);
+        factors.put("drawOdds", context.getOdds().getOddsFtX());
 
-        // Form draw percentages
-        if (context.hasRecentForm()) {
-            factors.put("homeDrawsLast5", safeInt(context.getHomeTeamForm().getDrawsHome()));
-            factors.put("awayDrawsLast5", safeInt(context.getAwayTeamForm().getDrawsAway()));
-        }
+        factors.put("expectedGoalsHome", expectation.home());
+        factors.put("expectedGoalsAway", expectation.away());
+        factors.put("combinedExpectedGoals", expectation.combined());
+        factors.put("xgDataAvailable", expectation.usedXg());
 
-        // Evenly matched details
-        double ppgDiff = Math.abs(safeDouble(homeStats.getPpgOverall()) - safeDouble(awayStats.getPpgOverall()));
-        factors.put("ppgDifference", ppgDiff);
-        factors.put("evenlyMatchedScore", calculateEvenlyMatchedScore(homeStats, awayStats));
-
+        factors.put("ppgDifference", ppgGap(homeStats, awayStats));
         if (homeStats.getPosition() != null && awayStats.getPosition() != null) {
             factors.put("homePosition", homeStats.getPosition());
             factors.put("awayPosition", awayStats.getPosition());
             factors.put("positionDifference", Math.abs(homeStats.getPosition() - awayStats.getPosition()));
         }
 
-        // Low scoring / defensive strength
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        factors.put("homeGoalsAvg", homeGoalsAvg);
-        factors.put("awayGoalsAvg", awayGoalsAvg);
-        factors.put("lowScoringScore", calculateLowScoringScore(homeStats, awayStats));
-
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
-        factors.put("homeConcededAvg", homeConcededAvg);
-        factors.put("awayConcededAvg", awayConcededAvg);
-        factors.put("defensiveStrengthScore", calculateDefensiveStrengthScore(homeStats, awayStats));
-
-        // xG similarity
-        factors.put("xgDataAvailable", hasXgData);
-        if (hasXgData) {
-            double homeXg = safeDouble(homeStats.getXgForAvgOverall());
-            double awayXg = safeDouble(awayStats.getXgForAvgOverall());
-            factors.put("homeXgAvg", homeXg);
-            factors.put("awayXgAvg", awayXg);
-            factors.put("xgDifference", Math.abs(homeXg - awayXg));
-            factors.put("xgSimilarityScore", calculateXgSimilarityScore(homeStats, awayStats));
+        // Reported for context only. These no longer move the score; when they did, the score
+        // tracked draw streaks rather than draw likelihood and the board lost money.
+        double homeDrawPct = calculateDrawPercentage(homeStats, true);
+        double awayDrawPct = calculateDrawPercentage(awayStats, false);
+        factors.put("homeDrawPctSeason", homeDrawPct);
+        factors.put("awayDrawPctSeason", awayDrawPct);
+        if (context.hasRecentForm()) {
+            factors.put("homeDrawsLast5", safeInt(context.getHomeTeamForm().getDrawsHome()));
+            factors.put("awayDrawsLast5", safeInt(context.getAwayTeamForm().getDrawsAway()));
         }
-
-        // Multipliers
-        factors.put("drawSpecialistMultiplier", drawSpecialistMultiplier);
-        factors.put("recentDrawFormMultiplier", recentDrawFormMultiplier);
-        factors.put("refereeCardsMultiplier", refereeCardsMultiplier);
-        factors.put("matchContextMultiplier", matchContextMultiplier);
-
-        // Referee stats
         if (context.hasRefereeStats()) {
             RefereeStats refStats = context.getRefereeStats();
             factors.put("refereeDrawPct", safeDouble(refStats.getDrawsPer()));
@@ -490,73 +280,78 @@ public class DrawRecommendationEngine implements RecommendationEngine {
             }
         }
 
-        // Odds
-        if (context.hasOdds() && context.getOdds().getOddsFtX() != null && context.getOdds().getOddsFtX() > 0) {
-            double impliedProb = (1.0 / context.getOdds().getOddsFtX()) * 100;
-            factors.put("drawOdds", context.getOdds().getOddsFtX());
-            factors.put("impliedProbability", impliedProb);
-            factors.put("valueVsOdds", score - impliedProb);
-        }
+        factors.put("positiveIndicators", positiveIndicators(context, expectation, edgeAtPrice));
+        factors.put("riskFlags", riskFlags(context, expectation));
 
-        // Positive indicators and risk flags
-        List<String> positiveIndicators = new ArrayList<>();
-        List<String> riskFlags = new ArrayList<>();
+        return factors;
+    }
 
-        if (ppgDiff < 0.3) {
-            positiveIndicators.add("Very evenly matched teams (PPG diff < 0.3)");
+    private List<String> positiveIndicators(FixtureContext context, GoalExpectation expectation,
+            double edgeAtPrice) {
+        TeamSeasonStats homeStats = context.getHomeTeamStats();
+        TeamSeasonStats awayStats = context.getAwayTeamStats();
+        List<String> indicators = new ArrayList<>();
+
+        double ppgGap = ppgGap(homeStats, awayStats);
+        if (ppgGap < 0.3) {
+            indicators.add("Very evenly matched teams (PPG diff < 0.3)");
         }
-        if (calculateDrawPercentage(homeStats, true) >= DRAW_SPECIALIST_HIGH 
+        if (Math.abs(expectation.home() - expectation.away()) < 0.15) {
+            indicators.add(String.format("Near-identical goal expectations (%.2f v %.2f)",
+                    expectation.home(), expectation.away()));
+        }
+        if (expectation.combined() < 2.3) {
+            indicators.add(String.format("Low-scoring profile (%.2f expected goals)", expectation.combined()));
+        }
+        indicators.add(String.format("Price carries %.1f%% edge over our estimate", edgeAtPrice * 100));
+
+        if (calculateDrawPercentage(homeStats, true) >= DRAW_SPECIALIST_HIGH
                 || calculateDrawPercentage(awayStats, false) >= DRAW_SPECIALIST_HIGH) {
-            positiveIndicators.add("Draw specialist team(s) involved");
+            indicators.add("Draw specialist team(s) involved");
         }
-        if (hasXgData && Math.abs(safeDouble(homeStats.getXgForAvgOverall()) - safeDouble(awayStats.getXgForAvgOverall())) < XG_VERY_SIMILAR) {
-            positiveIndicators.add("Very similar xG profiles");
+        if (expectation.usedXg()) {
+            indicators.add("Goal expectations corroborated by xG");
         }
-        if (homeConcededAvg < 1.0 && awayConcededAvg < 1.0) {
-            positiveIndicators.add("Both teams defensively strong");
-        }
-        if (context.hasRecentForm()) {
-            int homeDraws = safeInt(context.getHomeTeamForm().getDrawsHome());
-            int awayDraws = safeInt(context.getAwayTeamForm().getDrawsAway());
-            if (homeDraws >= 2 || awayDraws >= 2) {
-                positiveIndicators.add("Recent draw-heavy form");
-            }
-        }
-        if (context.hasRefereeStats() && safeDouble(context.getRefereeStats().getDrawsPer()) > 30) {
-            positiveIndicators.add("Draw-friendly referee");
+        if (context.hasRefereeStats()
+                && safeDouble(context.getRefereeStats().getDrawsPer()) > REFEREE_DRAW_FRIENDLY_PCT) {
+            indicators.add("Draw-friendly referee");
         }
 
-        if (!hasXgData) {
-            riskFlags.add("No xG data available for validation");
+        return indicators;
+    }
+
+    private List<String> riskFlags(FixtureContext context, GoalExpectation expectation) {
+        TeamSeasonStats homeStats = context.getHomeTeamStats();
+        TeamSeasonStats awayStats = context.getAwayTeamStats();
+        List<String> flags = new ArrayList<>();
+
+        if (!expectation.usedXg()) {
+            flags.add("No xG data available for validation");
         }
-        if (homeGoalsAvg > 1.8 && awayGoalsAvg > 1.8) {
-            riskFlags.add("Both teams high-scoring - goals more likely than draw");
+        if (expectation.combined() > 2.5) {
+            flags.add("Goals expected - a draw needs the scoring to stay level");
         }
-        if (homeConcededAvg > 1.5 && awayConcededAvg > 1.5) {
-            riskFlags.add("Both teams defensively weak - goals likely");
+        if (Math.abs(expectation.home() - expectation.away()) > 0.35) {
+            flags.add("One side expected to outscore the other");
         }
         if (context.hasRecentForm()) {
             int homeDraws = safeInt(context.getHomeTeamForm().getDrawsHome());
             int awayDraws = safeInt(context.getAwayTeamForm().getDrawsAway());
             if (homeDraws == 0 && awayDraws == 0) {
-                riskFlags.add("Neither team has drawn recently (decisive form)");
+                flags.add("Neither team has drawn recently (decisive form)");
             }
         }
-        if (homeStats.getPosition() != null && awayStats.getPosition() != null) {
-            if ((homeStats.getPosition() >= 17 && awayStats.getPosition() <= 10) 
-                    || (awayStats.getPosition() >= 17 && homeStats.getPosition() <= 10)) {
-                riskFlags.add("Mismatch in stakes - one team desperate");
-            }
+        if (homeStats.getPosition() != null && awayStats.getPosition() != null
+                && ((homeStats.getPosition() >= 17 && awayStats.getPosition() <= 10)
+                        || (awayStats.getPosition() >= 17 && homeStats.getPosition() <= 10))) {
+            flags.add("Mismatch in stakes - one team desperate");
         }
 
-        factors.put("positiveIndicators", positiveIndicators);
-        factors.put("riskFlags", riskFlags);
-
-        return factors;
+        return flags;
     }
 
-    private String buildDescription(FixtureContext context, ConfidenceLevel confidence, 
-            double score, Map<String, Object> factors) {
+    private String buildDescription(FixtureContext context, ConfidenceLevel confidence,
+            double publishedDrawPct, Map<String, Object> factors) {
         StringBuilder colour = new StringBuilder();
 
         double homeDrawPct = calculateDrawPercentage(context.getHomeTeamStats(), true);
@@ -565,9 +360,11 @@ public class DrawRecommendationEngine implements RecommendationEngine {
             colour.append("Draw specialists meeting under the neon");
         }
 
-        @SuppressWarnings("unchecked")
-        List<String> positiveIndicators = (List<String>) factors.get("positiveIndicators");
-        if (positiveIndicators != null && positiveIndicators.stream().anyMatch(s -> s.contains("xG"))) {
+        TeamSeasonStats homeStats = context.getHomeTeamStats();
+        TeamSeasonStats awayStats = context.getAwayTeamStats();
+        if (homeStats.getXgForAvgOverall() != null && awayStats.getXgForAvgOverall() != null
+                && Math.abs(safeDouble(homeStats.getXgForAvgOverall())
+                        - safeDouble(awayStats.getXgForAvgOverall())) < XG_VERY_SIMILAR) {
             if (!colour.isEmpty()) {
                 colour.append(". ");
             }
@@ -578,7 +375,7 @@ public class DrawRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .selection("Draw")
                 .context(context)
-                .probabilityPct(score)
+                .probabilityPct(publishedDrawPct)
                 .colourNote(colour.isEmpty() ? null : colour.toString())
                 .build());
     }

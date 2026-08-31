@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class DrawRecommendationEngineTest {
 
@@ -31,735 +32,338 @@ class DrawRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze detects evenly matched teams")
-    void analyze_detectsEvenlyMatchedTeams() {
-        FixtureContext context = createEvenlyMatchedContext();
-
-        Optional<Recommendation> result = engine.analyze(context);
+    @DisplayName("analyze publishes a level, well-priced fixture")
+    void analyze_publishesLevelWellPricedFixture() {
+        Optional<Recommendation> result = engine.analyze(drawFriendlyContext());
 
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.DRAW);
         assertThat(result.get().getMarket()).isEqualTo("Draw");
-        assertThat(result.get().getFactors().get("evenlyMatchedScore")).isNotNull();
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
     }
 
-    @Test
-    @DisplayName("analyze detects draw specialists")
-    void analyze_detectsDrawSpecialists() {
-        FixtureContext context = createDrawSpecialistsContext();
+    // ===== The score is a probability now, not an index =====
 
-        Optional<Recommendation> result = engine.analyze(context);
+    @Test
+    @DisplayName("published probability stays inside a realistic draw band")
+    void publishedProbability_staysInRealisticBand() {
+        Optional<Recommendation> result = engine.analyze(drawFriendlyContext());
 
         assertThat(result).isPresent();
-        assertThat((Double) result.get().getFactors().get("drawSpecialistMultiplier")).isGreaterThan(1.0);
-        assertThat(result.get().getDescription()).contains("Draw specialists");
+        // A draw is never a near-certainty. The old index could publish 60+ for a fixture that hit
+        // 12% of the time; anything outside roughly 20-40 is not a draw probability.
+        assertThat(result.get().getScore()).isBetween(20.0, 40.0);
     }
 
     @Test
-    @DisplayName("analyze integrates xG similarity")
-    void analyze_integratesXgSimilarity() {
-        FixtureContext context = createContextWithSimilarXg();
-
-        Optional<Recommendation> result = engine.analyze(context);
+    @DisplayName("published probability is the model/market blend")
+    void publishedProbability_isModelMarketBlend() {
+        Optional<Recommendation> result = engine.analyze(drawFriendlyContext());
 
         assertThat(result).isPresent();
-        assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(true);
-        assertThat(result.get().getFactors()).containsKey("xgSimilarityScore");
-        assertThat(result.get().getFactors()).containsKey("xgDifference");
+        Map<String, Object> factors = result.get().getFactors();
+        double model = (Double) factors.get("modelDrawProbability");
+        double market = (Double) factors.get("marketDrawProbability");
+
+        assertThat((Double) factors.get("publishedDrawProbability"))
+                .isEqualTo(result.get().getScore());
+        assertThat(result.get().getScore())
+                .isCloseTo((model * 0.45) + (market * 0.55), within(0.001));
     }
 
     @Test
-    @DisplayName("analyze tracks defensive strength")
-    void analyze_tracksDefensiveStrength() {
-        FixtureContext context = createDefensiveTeamsContext();
-
-        Optional<Recommendation> result = engine.analyze(context);
+    @DisplayName("model probability comes from the two goal expectations")
+    void modelProbability_derivesFromGoalExpectations() {
+        Optional<Recommendation> result = engine.analyze(drawFriendlyContext());
 
         assertThat(result).isPresent();
-        assertThat(result.get().getFactors()).containsKey("defensiveStrengthScore");
-        assertThat(result.get().getFactors()).containsKey("homeConcededAvg");
-        assertThat(result.get().getFactors()).containsKey("awayConcededAvg");
+        Map<String, Object> factors = result.get().getFactors();
+        assertThat((Double) factors.get("expectedGoalsHome")).isBetween(0.9, 1.4);
+        assertThat((Double) factors.get("expectedGoalsAway")).isBetween(0.9, 1.4);
+        assertThat((Double) factors.get("combinedExpectedGoals")).isCloseTo(
+                (Double) factors.get("expectedGoalsHome") + (Double) factors.get("expectedGoalsAway"),
+                within(0.001));
+        assertThat(factors.get("xgDataAvailable")).isEqualTo(true);
     }
 
     @Test
-    @DisplayName("analyze applies recent draw form multiplier")
-    void analyze_appliesRecentDrawFormMultiplier() {
-        FixtureContext context = createContextWithDrawHeavyForm();
+    @DisplayName("draw-heavy recent form no longer moves the score")
+    void drawHeavyForm_doesNotInflateScore() {
+        // The old engine multiplied by 1.25 for a three-draw streak. Draw frequency does not
+        // persist, so that multiplier was selecting on noise — it must not change the number.
+        Recommendation streak = engine.analyze(drawFriendlyContext(builder -> builder
+                .homeTeamForm(TeamRecentForm.builder().teamId(1L).drawsHome(3).build())
+                .awayTeamForm(TeamRecentForm.builder().teamId(2L).drawsAway(3).build())))
+                .orElseThrow();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Recommendation noDraws = engine.analyze(drawFriendlyContext(builder -> builder
+                .homeTeamForm(TeamRecentForm.builder().teamId(1L).drawsHome(0).build())
+                .awayTeamForm(TeamRecentForm.builder().teamId(2L).drawsAway(0).build())))
+                .orElseThrow();
 
-        assertThat(result).isPresent();
-        assertThat((Double) result.get().getFactors().get("recentDrawFormMultiplier")).isGreaterThan(1.0);
+        assertThat(streak.getScore()).isEqualTo(noDraws.getScore());
+        assertThat(streak.getFactors().get("homeDrawsLast5")).isEqualTo(3);
     }
 
     @Test
-    @DisplayName("analyze applies referee cards multiplier")
-    void analyze_appliesRefereeCardsMultiplier() {
-        FixtureContext context = createContextWithLowCardsReferee();
+    @DisplayName("a draw-friendly referee no longer moves the score")
+    void drawFriendlyReferee_doesNotInflateScore() {
+        Recommendation withReferee = engine.analyze(drawFriendlyContext(builder -> builder
+                .refereeStats(RefereeStats.builder()
+                        .refereeId(1L)
+                        .seasonId(1L)
+                        .appearancesOverall(15)
+                        .drawsPer(34.0)
+                        .cardsPerMatchOverall(2.4)
+                        .build())))
+                .orElseThrow();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Recommendation withoutReferee = engine.analyze(drawFriendlyContext()).orElseThrow();
 
-        assertThat(result).isPresent();
-        assertThat(result.get().getFactors()).containsKey("refereeCardsMultiplier");
-        assertThat(result.get().getFactors()).containsKey("refereeCardsPerMatch");
+        assertThat(withReferee.getScore()).isEqualTo(withoutReferee.getScore());
+        assertThat((Double) withReferee.getFactors().get("refereeDrawPct")).isEqualTo(34.0);
+        assertThat(asStrings(withReferee.getFactors().get("positiveIndicators")))
+                .anyMatch(s -> s.contains("Draw-friendly referee"));
+    }
+
+    // ===== Publishing gates =====
+
+    @Test
+    @DisplayName("no price means no pick")
+    void withoutOdds_isWithheld() {
+        assertThat(engine.analyze(drawFriendlyContext(builder -> builder.odds(null)))).isEmpty();
     }
 
     @Test
-    @DisplayName("analyze applies match context multiplier")
-    void analyze_appliesMatchContextMultiplier() {
-        FixtureContext context = createMidTableContext();
+    @DisplayName("a partial 1X2 cannot be de-vigged, so it is withheld")
+    void withIncompleteOdds_isWithheld() {
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .odds(FixtureOdds.builder().fixtureId(101L).oddsFtX(3.60).build()));
 
-        Optional<Recommendation> result = engine.analyze(context);
-
-        assertThat(result).isPresent();
-        assertThat((Double) result.get().getFactors().get("matchContextMultiplier")).isGreaterThan(1.0);
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
-    @DisplayName("analyze tracks positive indicators")
-    void analyze_tracksPositiveIndicators() {
-        FixtureContext context = createEvenlyMatchedContext();
+    @DisplayName("a short draw price is withheld even when the match is level")
+    void shortPrice_isWithheld() {
+        // Same level fixture, but priced so the bet no longer clears its own cost.
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .odds(odds(2.45, 3.10, 2.80)));
 
-        Optional<Recommendation> result = engine.analyze(context);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getFactors()).containsKey("positiveIndicators");
-        @SuppressWarnings("unchecked")
-        List<String> indicators = (List<String>) result.get().getFactors().get("positiveIndicators");
-        assertThat(indicators).isNotEmpty();
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
-    @DisplayName("analyze tracks risk flags")
-    void analyze_tracksRiskFlags() {
-        FixtureContext context = createHighScoringContext();
+    @DisplayName("an implausibly large edge is withheld rather than treated as the best pick")
+    void oversizedEdge_isWithheld() {
+        // Model says 36%+ against a market read of 27%. That gap is far more likely to mean our
+        // expectations are wrong than that the price is a gift.
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .homeTeamStats(homeStats(stats -> stats
+                        .seasonGoalsHome(15).seasonConcededHome(15)
+                        .xgForAvgHome(0.75).xgAgainstAvgHome(0.75)))
+                .awayTeamStats(awayStats(stats -> stats
+                        .seasonGoalsAway(15).seasonConcededAway(15)
+                        .xgForAvgAway(0.75).xgAgainstAvgAway(0.75))));
 
-        Optional<Recommendation> result = engine.analyze(context);
-
-        // Even high-scoring teams may generate a draw recommendation if other factors align
-        if (result.isPresent()) {
-            assertThat(result.get().getFactors()).containsKey("riskFlags");
-            @SuppressWarnings("unchecked")
-            List<String> flags = (List<String>) result.get().getFactors().get("riskFlags");
-            assertThat(flags).anyMatch(s -> s.contains("high-scoring") || s.contains("goals"));
-        }
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
-    @DisplayName("analyze calculates value vs odds")
-    void analyze_calculatesValueVsOdds() {
-        FixtureContext context = createContextWithOdds();
+    @DisplayName("mismatched teams are withheld")
+    void mismatchedTeams_areWithheld() {
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .homeTeamStats(homeStats(stats -> stats
+                        .ppgOverall(2.5).position(1)
+                        .seasonWinsHome(14).seasonDrawsHome(3).seasonLossesHome(3)
+                        .seasonGoalsHome(42).seasonConcededHome(12)
+                        .xgForAvgHome(2.3).xgAgainstAvgHome(0.6)))
+                .awayTeamStats(awayStats(stats -> stats
+                        .ppgOverall(0.8).position(19)
+                        .seasonWinsAway(2).seasonDrawsAway(3).seasonLossesAway(15)
+                        .seasonGoalsAway(12).seasonConcededAway(40)
+                        .xgForAvgAway(0.7).xgAgainstAvgAway(2.2))));
 
-        Optional<Recommendation> result = engine.analyze(context);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getFactors()).containsKey("drawOdds");
-        assertThat(result.get().getFactors()).containsKey("impliedProbability");
-        assertThat(result.get().getFactors()).containsKey("valueVsOdds");
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
-    @DisplayName("analyze returns empty for mismatched teams")
-    void analyze_withMismatchedTeams_returnsEmpty() {
-        FixtureContext context = createMismatchedTeamsContext();
+    @DisplayName("a high-scoring fixture is withheld however level it looks")
+    void highScoringFixture_isWithheld() {
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .homeTeamStats(homeStats(stats -> stats
+                        .seasonGoalsHome(40).seasonConcededHome(36)
+                        .xgForAvgHome(2.0).xgAgainstAvgHome(1.8)))
+                .awayTeamStats(awayStats(stats -> stats
+                        .seasonGoalsAway(36).seasonConcededAway(38)
+                        .xgForAvgAway(1.8).xgAgainstAvgAway(2.0))));
 
-        Optional<Recommendation> result = engine.analyze(context);
+        assertThat(engine.analyze(context)).isEmpty();
+    }
 
-        // May return empty or weak recommendation filtered out
-        if (result.isPresent()) {
-            // If present, should have lower confidence
-            assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.WEAK);
-        }
+    @Test
+    @DisplayName("a thin venue record is withheld rather than modelled")
+    void thinVenueRecord_isWithheld() {
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .homeTeamStats(homeStats(stats -> stats
+                        .seasonWinsHome(1).seasonDrawsHome(1).seasonLossesHome(1)
+                        .seasonGoalsHome(3).seasonConcededHome(3))));
+
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
     @DisplayName("analyze returns empty when context is incomplete")
-    void analyze_withIncompleteContext_returnsEmpty() {
-        FixtureContext context = createIncompleteContext();
+    void withIncompleteContext_returnsEmpty() {
+        FixtureContext context = FixtureContext.builder()
+                .fixture(createFixture(111L))
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .build();
 
-        Optional<Recommendation> result = engine.analyze(context);
-
-        assertThat(result).isEmpty();
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
-    @Test
-    @DisplayName("Draw confidence is capped at MODERATE (no STRONG tier)")
-    void determineConfidence_cappedAtModerate() {
-        FixtureContext inBand = contextWithDrawOdds(3.50);
-        FixtureContext longshot = contextWithDrawOdds(6.00);
-        FixtureContext noOdds = createEvenlyMatchedContext();
-
-        assertThat(engine.determineConfidence(55.0, inBand)).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(engine.determineConfidence(42.0, longshot)).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(engine.determineConfidence(42.0, noOdds)).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(engine.determineConfidence(30.0, inBand)).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(engine.determineConfidence(20.0, inBand)).isEqualTo(ConfidenceLevel.WEAK);
-    }
+    // ===== Reporting =====
 
     @Test
-    @DisplayName("analyze tracks referee draw percentage")
-    void analyze_tracksRefereeDrawPct() {
-        FixtureContext context = createContextWithDrawFriendlyReferee();
-
-        Optional<Recommendation> result = engine.analyze(context);
+    @DisplayName("factors report the price and the edge taken at it")
+    void factors_reportPriceAndEdge() {
+        Optional<Recommendation> result = engine.analyze(drawFriendlyContext());
 
         assertThat(result).isPresent();
-        assertThat(result.get().getFactors()).containsKey("refereeDrawPct");
-        assertThat((Double) result.get().getFactors().get("refereeDrawPct")).isGreaterThan(25.0);
+        Map<String, Object> factors = result.get().getFactors();
+        assertThat((Double) factors.get("drawOdds")).isEqualTo(3.60);
+        assertThat((Double) factors.get("edgeAtPrice")).isGreaterThan(0.03);
+        assertThat(result.get().getOdds()).isEqualTo(3.60);
     }
 
     @Test
-    @DisplayName("analyze handles no xG data with redistributed weights")
-    void analyze_withNoXgData_usesRedistributedWeights() {
-        FixtureContext context = createContextWithoutXgData();
+    @DisplayName("factors track positive indicators and risk flags")
+    void factors_trackIndicatorsAndFlags() {
+        Optional<Recommendation> result = engine.analyze(drawFriendlyContext());
+
+        assertThat(result).isPresent();
+        assertThat(asStrings(result.get().getFactors().get("positiveIndicators"))).isNotEmpty();
+        assertThat(result.get().getFactors()).containsKey("riskFlags");
+    }
+
+    @Test
+    @DisplayName("missing xG is flagged as a risk")
+    void missingXg_isFlagged() {
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .homeTeamStats(homeStats(stats -> stats
+                        .xgForAvgHome(null).xgAgainstAvgHome(null)))
+                .awayTeamStats(awayStats(stats -> stats
+                        .xgForAvgAway(null).xgAgainstAvgAway(null))));
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(false);
-        // Should still generate valid recommendation
-        assertThat(result.get().getScore()).isGreaterThan(0);
+        assertThat(asStrings(result.get().getFactors().get("riskFlags")))
+                .anyMatch(s -> s.contains("No xG data"));
     }
 
-    // Helper methods to create test contexts
+    @Test
+    @DisplayName("draw specialists still colour the write-up")
+    void drawSpecialists_colourDescription() {
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .homeTeamStats(homeStats(stats -> stats
+                        .ppgOverall(1.3)
+                        .seasonWinsHome(4).seasonDrawsHome(10).seasonLossesHome(6)
+                        .seasonGoalsHome(20).seasonConcededHome(22)
+                        .xgForAvgHome(null).xgAgainstAvgHome(null)))
+                .awayTeamStats(awayStats(stats -> stats
+                        .ppgOverall(1.2)
+                        .seasonWinsAway(3).seasonDrawsAway(9).seasonLossesAway(8)
+                        .seasonGoalsAway(16).seasonConcededAway(24)
+                        .xgForAvgAway(null).xgAgainstAvgAway(null))));
 
-    private FixtureContext contextWithDrawOdds(double drawOdds) {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(9)
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(24)
-                .xgForAvgOverall(1.2)
-                .build();
+        Optional<Recommendation> result = engine.analyze(context);
 
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.3)
-                .position(10)
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(22)
-                .xgForAvgOverall(1.1)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(120L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .odds(FixtureOdds.builder().fixtureId(120L).oddsFtX(drawOdds).build())
-                .build();
+        assertThat(result).isPresent();
+        assertThat(result.get().getDescription()).contains("Draw specialists");
+        assertThat(asStrings(result.get().getFactors().get("positiveIndicators")))
+                .anyMatch(s -> s.contains("Draw specialist"));
     }
 
-    private FixtureContext createEvenlyMatchedContext() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.5)
-                .position(8)
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)  // High draw %
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(24)
-                .xgForAvgOverall(1.3)
-                .build();
+    @Test
+    @DisplayName("Draw confidence is capped at MODERATE (no STRONG tier)")
+    void determineConfidence_cappedAtModerate() {
+        assertThat(engine.determineConfidence(55.0)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(30.0)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(26.0)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(25.9)).isEqualTo(ConfidenceLevel.WEAK);
+    }
 
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)  // Very close PPG
-                .position(9)      // Close position
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(22)
-                .xgForAvgOverall(1.2)  // Similar xG
-                .build();
+    // ===== Helpers =====
 
-        return FixtureContext.builder()
+    /**
+     * A level, low-scoring, fairly priced fixture: both sides expected around 1.1 goals, PPG within
+     * 0.1, and a draw offered at 3.60 against a de-vigged market read of roughly 26.6%.
+     */
+    private FixtureContext drawFriendlyContext() {
+        return drawFriendlyContext(builder -> builder);
+    }
+
+    private FixtureContext drawFriendlyContext(ContextCustomiser customiser) {
+        FixtureContext.FixtureContextBuilder builder = FixtureContext.builder()
                 .fixture(createFixture(101L))
                 .homeTeam(createTeam(1L, "Home Team"))
                 .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
+                .homeTeamStats(homeStats(stats -> stats))
+                .awayTeamStats(awayStats(stats -> stats))
+                .odds(odds(2.45, 3.60, 2.80));
+        return customiser.apply(builder).build();
     }
 
-    private FixtureContext createDrawSpecialistsContext() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.3)
-                .position(10)
-                .seasonWinsHome(4)
-                .seasonDrawsHome(10)  // 50% draws = draw specialist
-                .seasonLossesHome(6)
-                .seasonGoalsHome(20)
-                .seasonConcededHome(22)
-                .xgForAvgOverall(1.1)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.2)
-                .position(11)
-                .seasonWinsAway(3)
-                .seasonDrawsAway(9)  // 45% draws = draw specialist
-                .seasonLossesAway(8)
-                .seasonGoalsAway(16)
-                .seasonConcededAway(24)
-                .xgForAvgOverall(1.0)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(102L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
-    }
-
-    private FixtureContext createContextWithSimilarXg() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(9)
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(22)
-                .xgForAvgOverall(1.25)  // Very similar
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(10)
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(20)
-                .seasonConcededAway(24)
-                .xgForAvgOverall(1.20)  // Very similar - diff < 0.2
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(103L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
-    }
-
-    private FixtureContext createDefensiveTeamsContext() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+    private TeamSeasonStats homeStats(StatsCustomiser customiser) {
+        return customiser.apply(TeamSeasonStats.builder()
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
                 .ppgOverall(1.5)
                 .position(8)
-                .seasonWinsHome(6)
-                .seasonDrawsHome(6)
+                .seasonWinsHome(5)
+                .seasonDrawsHome(7)
                 .seasonLossesHome(8)
-                .seasonGoalsHome(18)
-                .seasonConcededHome(14)  // < 1.0 per game - defensive
-                .xgForAvgOverall(1.2)
-                .build();
+                .seasonGoalsHome(22)
+                .seasonConcededHome(24)
+                .xgForAvgOverall(1.15)
+                .xgForAvgHome(1.15)
+                .xgAgainstAvgHome(1.20)).build();
+    }
 
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+    private TeamSeasonStats awayStats(StatsCustomiser customiser) {
+        return customiser.apply(TeamSeasonStats.builder()
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
                 .ppgOverall(1.4)
                 .position(9)
                 .seasonWinsAway(5)
-                .seasonDrawsAway(7)
-                .seasonLossesAway(8)
-                .seasonGoalsAway(16)
-                .seasonConcededAway(16)  // < 1.0 per game - defensive
-                .xgForAvgOverall(1.1)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(104L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
-    }
-
-    private FixtureContext createContextWithDrawHeavyForm() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(10)
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(24)
-                .xgForAvgOverall(1.2)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.3)
-                .position(11)
-                .seasonWinsAway(5)
                 .seasonDrawsAway(6)
                 .seasonLossesAway(9)
                 .seasonGoalsAway(18)
                 .seasonConcededAway(22)
-                .xgForAvgOverall(1.1)
-                .build();
+                .xgForAvgOverall(1.10)
+                .xgForAvgAway(0.95)
+                .xgAgainstAvgAway(1.10)).build();
+    }
 
-        TeamRecentForm homeForm = TeamRecentForm.builder()
-                .teamId(1L)
-                .drawsHome(3)  // 3+ draws in last 5 = draw-heavy
-                .build();
-
-        TeamRecentForm awayForm = TeamRecentForm.builder()
-                .teamId(2L)
-                .drawsAway(2)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(105L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .homeTeamForm(homeForm)
-                .awayTeamForm(awayForm)
+    private FixtureOdds odds(double home, double draw, double away) {
+        return FixtureOdds.builder()
+                .fixtureId(101L)
+                .oddsFt1(home)
+                .oddsFtX(draw)
+                .oddsFt2(away)
                 .build();
     }
 
-    private FixtureContext createContextWithLowCardsReferee() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(9)
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(24)
-                .xgForAvgOverall(1.2)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.3)
-                .position(10)
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(22)
-                .xgForAvgOverall(1.1)
-                .build();
-
-        RefereeStats refereeStats = RefereeStats.builder()
-                .refereeId(1L)
-                .seasonId(1L)
-                .appearancesOverall(15)
-                .drawsPer(28.0)
-                .cardsPerMatchOverall(2.5)  // Low cards = controlled games
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(106L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .refereeStats(refereeStats)
-                .build();
-    }
-
-    private FixtureContext createMidTableContext() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(10)  // Mid-table
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(24)
-                .xgForAvgOverall(1.2)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.3)
-                .position(12)  // Mid-table
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(22)
-                .xgForAvgOverall(1.1)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(107L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
-    }
-
-    private FixtureContext createHighScoringContext() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.8)
-                .position(5)
-                .seasonWinsHome(8)
-                .seasonDrawsHome(4)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(40)  // High scoring
-                .seasonConcededHome(32)  // Also concedes a lot
-                .xgForAvgOverall(2.0)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.7)
-                .position(6)
-                .seasonWinsAway(7)
-                .seasonDrawsAway(4)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(38)  // High scoring
-                .seasonConcededAway(35)  // Also concedes
-                .xgForAvgOverall(1.9)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(108L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
-    }
-
-    private FixtureContext createContextWithOdds() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(9)
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(24)
-                .xgForAvgOverall(1.2)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.3)
-                .position(10)
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(22)
-                .xgForAvgOverall(1.1)
-                .build();
-
-        FixtureOdds odds = FixtureOdds.builder()
-                .fixtureId(109L)
-                .oddsFtX(3.50)  // Draw odds
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(109L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .odds(odds)
-                .build();
-    }
-
-    private FixtureContext createMismatchedTeamsContext() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(2.5)  // Very strong
-                .position(1)
-                .seasonWinsHome(14)
-                .seasonDrawsHome(3)
-                .seasonLossesHome(3)
-                .seasonGoalsHome(42)
-                .seasonConcededHome(12)
-                .xgForAvgOverall(2.3)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(0.8)  // Very weak - big PPG diff
-                .position(19)
-                .seasonWinsAway(2)
-                .seasonDrawsAway(3)
-                .seasonLossesAway(15)
-                .seasonGoalsAway(12)
-                .seasonConcededAway(40)
-                .xgForAvgOverall(0.7)  // Big xG diff
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(110L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
-    }
-
-    private FixtureContext createIncompleteContext() {
-        return FixtureContext.builder()
-                .fixture(createFixture(111L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .build();
-    }
-
-    private FixtureContext createContextWithDrawFriendlyReferee() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(10)
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(24)
-                .xgForAvgOverall(1.2)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.3)
-                .position(11)
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(22)
-                .xgForAvgOverall(1.1)
-                .build();
-
-        RefereeStats refereeStats = RefereeStats.builder()
-                .refereeId(1L)
-                .seasonId(1L)
-                .appearancesOverall(15)
-                .drawsPer(32.0)  // Draw-friendly > 30%
-                .cardsPerMatchOverall(3.2)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(112L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .refereeStats(refereeStats)
-                .build();
-    }
-
-    private FixtureContext createContextWithoutXgData() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.4)
-                .position(9)
-                .seasonWinsHome(5)
-                .seasonDrawsHome(7)
-                .seasonLossesHome(8)
-                .seasonGoalsHome(22)
-                .seasonConcededHome(24)
-                // No xG data
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .ppgOverall(1.3)
-                .position(10)
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(22)
-                // No xG data
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(113L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
+    @SuppressWarnings("unchecked")
+    private List<String> asStrings(Object value) {
+        return (List<String>) value;
     }
 
     private Fixture createFixture(Long id) {
@@ -777,5 +381,15 @@ class DrawRecommendationEngineTest {
                 .id(id)
                 .name(name)
                 .build();
+    }
+
+    @FunctionalInterface
+    private interface ContextCustomiser {
+        FixtureContext.FixtureContextBuilder apply(FixtureContext.FixtureContextBuilder builder);
+    }
+
+    @FunctionalInterface
+    private interface StatsCustomiser {
+        TeamSeasonStats.TeamSeasonStatsBuilder apply(TeamSeasonStats.TeamSeasonStatsBuilder builder);
     }
 }

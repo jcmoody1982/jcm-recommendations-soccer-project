@@ -1593,168 +1593,112 @@ Form diverges from season if PPG difference > 0.3:
 **User Story:** As a user, I want to find matches with high draw probability for draw betting.
 
 **Data Required:**
-- Team draw percentages (home/away, season + form)
-- Evenly matched stats comparison
-- Goals scored/conceded averages
-- xG comparison
-- odds_ft_x from API
+- Goals scored/conceded averages at venue (W+D+L at venue, never overall `matchesPlayed`)
+- Venue xG for/against (optional, improves the expectations)
+- PPG and league positions
+- `odds_ft_1`, `odds_ft_x`, `odds_ft_2` from API — **all three are mandatory**, both to price the
+  bet and to de-vig the book
+- Team draw percentages and referee tendency (reported as colour only)
 
 **Logic:**
 ```
-Draw Probability Score = weighted average of:
-  - Home team draw % (home, season)               × 0.12
-  - Away team draw % (away, season)               × 0.12
-  - Home team draw % (last 5)                     × 0.10
-  - Away team draw % (last 5)                     × 0.10
-  - Evenly matched indicator                      × 0.20
-  - Low-scoring potential indicator               × 0.15
-  - xG similarity factor                          × 0.11
-  - Implied probability from odds_ft_x            × 0.10
+Expected goals per side (venue W+D+L record, blended 60/40 with venue xG when present):
+  lambda_home = mean(home goals/game at home, away conceded/game away)
+  lambda_away = mean(away goals/game away, home conceded/game at home)
+
+Model draw probability  = sum over k of P(home = k) x P(away = k)   [independent Poisson]
+Market draw probability = de-vigged odds_ft_x
+Published probability   = (0.45 x model) + (0.55 x market)
+Edge at price           = (model / 100) x odds_ft_x - 1
 ```
 
-**Evenly Matched Indicator:**
-```
-Statistical Similarity Score:
-  - PPG difference < 0.3 = High similarity (1.25)
-  - PPG difference 0.3-0.5 = Moderate (1.10)
-  - PPG difference 0.5-0.8 = Slight gap (1.0)
-  - PPG difference > 0.8 = Mismatch (0.75)
+A draw is a scoreline event, so the probability is derived from the scoreline distribution
+directly. How level the sides are and how few goals they score — the two proxies that carried
+real signal — are already implied by the two expectations, so they are no longer scored
+separately and then recombined by guesswork.
 
-League Position Proximity:
-  - Within 3 places = High (1.20)
-  - Within 6 places = Moderate (1.10)
-  - Within 10 places = Slight (1.0)
-  - 10+ places apart = Mismatch (0.80)
+**Why the weighted index was removed:** the previous version scored draw proxies (season draw
+percentages, recent draw counts, "draw specialist" labels, referee tendency) and then multiplied
+the result by up to four compounding multipliers, reaching roughly 2x. Measured over Aug 25-31 it
+was anti-predictive: the 60-69 band claimed 64.7% and returned 12.1%, and every band got worse as
+the claimed score rose. The cause was that the loudest inputs were the noisiest — draw frequency
+barely persists between fixtures, so a three-draw streak plus a specialist label could nearly
+double the score while carrying no edge. Raising the old threshold would have selected *harder*
+for that noise, which is why the fix is a new basis for the number rather than a higher bar on the
+old one.
 
-Combined: Average of both scores
-```
+Draw-heavy form, draw percentages and referee tendency are still reported as colour, but they no
+longer move the score.
 
-**Low-Scoring Potential Indicator:**
-```
-Combined Goals Assessment:
-  - Both teams avg < 1.2 goals/game = High draw potential (1.25)
-  - Both teams avg 1.2-1.5 goals/game = Moderate (1.15)
-  - One team < 1.2, other > 1.5 = Mixed (1.0)
-  - Both teams avg > 1.5 goals/game = Lower draw chance (0.85)
+**Publishing Gates:**
 
-Defensive Strength:
-  - Both teams concede < 1.0/game = Tight game likely (1.20)
-  - Both teams concede > 1.5/game = Goals likely, not draw (0.80)
-```
+Every gate must pass or nothing is published. Because a draw pays around 3.0-4.0, hit rate alone
+cannot say whether the board is profitable, so selectivity is enforced on the price and on the
+match shape rather than on the score.
 
-**xG Similarity Factor:**
-```
-xG Comparison:
-  - |Home xG - Away xG| < 0.2 = Very similar (1.25)
-  - |Home xG - Away xG| 0.2-0.4 = Similar (1.10)
-  - |Home xG - Away xG| 0.4-0.6 = Moderate gap (1.0)
-  - |Home xG - Away xG| > 0.6 = Clear difference (0.80)
-```
+| Gate | Requirement | Reason |
+|------|-------------|--------|
+| Complete 1X2 price | `odds_ft_1`, `odds_ft_x`, `odds_ft_2` all present | Without a price a draw cannot be judged good or bad, and the book cannot be de-vigged |
+| Model draw probability | ≥ 27% | The scoreline distribution has to see a genuinely level match |
+| Market draw probability | ≥ 26% (de-vigged) | Requires the market to agree a draw is live, so we are not betting purely on our own disagreement |
+| PPG gap | ≤ 0.45 | Structural corroboration that the sides are matched |
+| Combined expected goals | ≤ 2.80 | Draws concentrate in low-scoring games |
+| Edge at price | between +3% and +25% | The price must be beaten for the bet to pay, but a very large disagreement more likely means our expectations are wrong than that the price is a gift |
+| Venue matches | ≥ 4 per side | Below this the venue record cannot support an expectation |
 
-**Draw Specialist Detection:**
-```
-High Draw Team:
-  - Draw % > 35% (season) = Draw-prone (1.20)
-  - Draw % 28-35% = Above average (1.10)
-  - Draw % 20-28% = Average (1.0)
-  - Draw % < 20% = Decisive team (0.85)
-```
-
-**Recent Draw Form:**
-```
-Last 5 Matches:
-  - 3+ draws in last 5 = Draw-heavy (1.25)
-  - 2 draws in last 5 = Moderate (1.10)
-  - 1 draw in last 5 = Normal (1.0)
-  - 0 draws in last 5 = Decisive (0.85)
-```
-
-**Match Context Adjustments:**
-```
-Stakes Assessment:
-  - Nothing to play for both teams = Draw more likely (1.15)
-  - Both teams need points equally = Draw possible (1.10)
-  - One team desperate, other safe = Less likely draw (0.85)
-  - Derby/rivalry = Can go either way (1.0)
-```
-
-**Referee Tendency Factor:**
-```
-Referee Draw Rate (from UC-003 data):
-  - Referee draw % > 30% = Draw-friendly (1.20)
-  - Referee draw % 25-30% = Above average (1.10)
-  - Referee draw % 20-25% = Average (1.0)
-  - Referee draw % < 20% = Decisive games (0.90)
-
-Cards Per Match Correlation:
-  - < 3 cards/match = Controlled games, draw likely (1.10)
-  - 3-4 cards/match = Normal (1.0)
-  - > 4 cards/match = Chaotic, less predictable (0.95)
-
-Referee Sample Size:
-  - < 5 appearances: Weight × 0.5 (low confidence)
-  - 5-10 appearances: Weight × 0.8
-  - > 10 appearances: Full weight (1.0)
-```
-
-**Time of Season Factor:**
-```
-Season Phase Assessment:
-  - Final 3 matchdays, both mid-table = Dead rubber (1.25)
-  - Final 5 matchdays, positions settled = Relaxed (1.15)
-  - Opening 5 matchdays = Feeling out period (1.10)
-  - Mid-season = Normal intensity (1.0)
-  - Run-in with stakes = High intensity, decisive (0.85)
-
-Fixture Timing:
-  - Midweek fixture after weekend game = Fatigue, cagey (1.10)
-  - Post-international break = Disruption, draw risk (1.10)
-  - Normal weekend fixture = Standard (1.0)
-```
+The edge requirement is deliberately a **band, not a floor**. Some edge is unavoidable — a bet
+that does not beat its price loses money by construction — but rewarding ever-larger disagreement
+is how the Double Chance board (UC-024) ended up selecting against itself, so the far tail is
+rejected instead of being treated as the pick of the board.
 
 **Thresholds:**
-- **Strong:** Not emitted (capped at Moderate until draw score calibration improves hit rate)
-- **Moderate:** Draw Score ≥ 28
-- **Weak:** Draw Score < 28
+- **Strong:** Not emitted (Draw has no STRONG tier)
+- **Moderate:** Published probability ≥ 26 **and** every publishing gate passed
+- **Weak:** Published probability < 26
+
+The published probability is a real draw probability and sits in a roughly 20-40% band. Under the
+old index the same field could read 60+ for a fixture that hit 12% of the time, and that number
+was being shown to users as a probability.
 
 **Factors Tracked:**
 ```
-- drawScore - overall draw probability score
-- homeDrawPctSeason / awayDrawPctSeason - season draw percentages
-- homeDrawsLast5 / awayDrawsLast5 - recent draw counts
-- ppgDifference / evenlyMatchedScore - team similarity
+- modelDrawProbability - Poisson draw probability from the two goal expectations
+- marketDrawProbability - de-vigged odds_ft_x
+- publishedDrawProbability - the blend, and the value shown as the score
+- edgeAtPrice - (model / 100) x odds_ft_x - 1
+- drawOdds - the price the edge was measured against
+- expectedGoalsHome / expectedGoalsAway / combinedExpectedGoals - the model inputs
+- xgDataAvailable - whether xG corroborated the expectations
+- ppgDifference - team similarity
 - homePosition / awayPosition / positionDifference - league positions
-- homeGoalsAvg / awayGoalsAvg / lowScoringScore - attacking data
-- homeConcededAvg / awayConcededAvg / defensiveStrengthScore - defensive data
-- xgDataAvailable / homeXgAvg / awayXgAvg / xgDifference / xgSimilarityScore - xG metrics
-- drawSpecialistMultiplier / recentDrawFormMultiplier - team multipliers
-- refereeCardsMultiplier / matchContextMultiplier - context multipliers
-- refereeDrawPct / refereeAppearances / refereeCardsPerMatch - referee data
-- drawOdds / impliedProbability / valueVsOdds - betting data
+- homeDrawPctSeason / awayDrawPctSeason - season draw percentages (reported, not scored)
+- homeDrawsLast5 / awayDrawsLast5 - recent draw counts (reported, not scored)
+- refereeDrawPct / refereeAppearances / refereeCardsPerMatch - referee data (reported, not scored)
 - positiveIndicators / riskFlags - analysis summary
 ```
 
 **Positive Indicators Tracked:**
 - Very evenly matched teams (PPG diff < 0.3)
+- Near-identical goal expectations (within 0.15)
+- Low-scoring profile (< 2.3 combined expected goals)
+- Edge the price carries over our estimate
 - Draw specialist team(s) involved (draw % > 35%)
-- Very similar xG profiles (diff < 0.2)
-- Both teams defensively strong (concede < 1.0/game)
-- Recent draw-heavy form (2+ draws in last 5)
+- Goal expectations corroborated by xG
 - Draw-friendly referee (draw % > 30%)
 
 **Risk Flags Tracked:**
 - No xG data available for validation
-- Both teams high-scoring - goals more likely than draw
-- Both teams defensively weak - goals likely
+- Goals expected - a draw needs the scoring to stay level (> 2.5 combined)
+- One side expected to outscore the other (expectation gap > 0.35)
 - Neither team has drawn recently (decisive form)
 - Mismatch in stakes - one team desperate
 
 **Output:**
-- Ranked list of fixtures by draw probability
-- Include: both team draw %, similarity scores, xG comparison
-- Value flag: Compare our probability vs implied odds probability
+- Ranked list of fixtures by published draw probability
+- Include: model and market probabilities side by side, both goal expectations, the price and the
+  edge taken at it
 - Flag: "Draw specialists meeting" when both teams draw > 30%
-- Dynamic weight redistribution when xG data unavailable
+- xG is folded into the expectations when available and simply omitted when not
 
 **Status:** `Implemented`
 

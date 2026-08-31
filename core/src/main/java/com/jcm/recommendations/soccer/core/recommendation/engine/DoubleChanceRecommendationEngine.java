@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils;
+
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
 /**
@@ -474,25 +476,10 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
         if (!context.hasOdds()) {
             return null;
         }
-        Double odds1 = context.getOdds().getOddsFt1();
-        Double oddsX = context.getOdds().getOddsFtX();
-        Double odds2 = context.getOdds().getOddsFt2();
-        if (odds1 == null || oddsX == null || odds2 == null
-                || odds1 <= 0 || oddsX <= 0 || odds2 <= 0) {
-            return null;
-        }
-        double raw1 = 1.0 / odds1;
-        double rawX = 1.0 / oddsX;
-        double raw2 = 1.0 / odds2;
-        double overround = raw1 + rawX + raw2;
-        if (overround <= 0) {
-            return null;
-        }
-        return new double[]{
-                (raw1 / overround) * 100.0,
-                (rawX / overround) * 100.0,
-                (raw2 / overround) * 100.0
-        };
+        return RecommendationUtils.fairOutcomeProbabilities(
+                context.getOdds().getOddsFt1(),
+                context.getOdds().getOddsFtX(),
+                context.getOdds().getOddsFt2());
     }
 
     /**
