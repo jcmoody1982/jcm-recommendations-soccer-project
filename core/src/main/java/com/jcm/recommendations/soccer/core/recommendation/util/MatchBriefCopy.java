@@ -625,7 +625,9 @@ public final class MatchBriefCopy {
             h = 31 * h + Long.hashCode(brief.context().getFixture().getId());
         }
         if (brief.confidence() != null) {
-            h = 31 * h + brief.confidence().hashCode();
+            // Enum.hashCode() is identity-based and changes between JVM runs, which
+            // would reword the same tip on every restart. Hash the name instead.
+            h = 31 * h + brief.confidence().name().hashCode();
         }
         if (brief.probabilityPct() != null) {
             h = 31 * h + Double.hashCode(Math.rint(brief.probabilityPct() * 10));

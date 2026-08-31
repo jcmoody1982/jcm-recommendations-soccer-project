@@ -15,6 +15,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class MatchBriefCopyTest {
 
+    /**
+     * Banned as whole words. Substring matching would flag innocent copy such as
+     * "clocks" (contains "lock") or "rapid" (contains "api").
+     */
+    private static final String[] BANNED_WORDS = {
+            "lock", "locks", "guaranteed", "mortgage", "api", "chips", "juice"
+    };
+
+    private static void assertNoHypeLanguage(String text) {
+        String lower = text.toLowerCase(Locale.ROOT);
+        for (String word : BANNED_WORDS) {
+            assertThat(lower).doesNotContainPattern("\\b" + word + "\\b");
+        }
+        assertThat(lower).doesNotContain("the model");
+    }
+
     @Test
     @DisplayName("narrate keeps real numbers and fixture names without certainty language")
     void narrateIncludesNumbersAndFixture() {
@@ -34,22 +50,17 @@ class MatchBriefCopyTest {
         assertThat(text).contains("84.3%");
         assertThat(text).contains("+11.4%");
         assertThat(text).contains("Team in good form");
+        // Closers vary ("vs", "against", "host"), so assert both sides are named
+        // rather than pinning one separator.
         assertThat(text).contains("Home FC");
         assertThat(text).contains("Away United");
-        assertThat(text).contains("vs");
-        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("lock");
-        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("guaranteed");
-        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("mortgage");
-        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("api");
-        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("the model");
-        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("chips");
-        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("juice");
+        assertNoHypeLanguage(text);
     }
 
     @Test
     @DisplayName("narrate can describe expected totals without probability")
     void narrateExpectedTotals() {
-        FixtureContext context = context(7L, "A", "B");
+        FixtureContext context = context(7L, "Corner City", "Set Piece Rovers");
 
         String text = MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
                 .confidence(ConfidenceLevel.MODERATE)
@@ -64,10 +75,9 @@ class MatchBriefCopyTest {
         assertThat(text).contains("10.4");
         assertThat(text).contains("expected corners");
         assertThat(text).contains("Corner potential reading is strong on the analysis");
-        assertThat(text).contains("A");
-        assertThat(text).contains("B");
-        assertThat(text).contains("vs");
-        assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("api");
+        assertThat(text).contains("Corner City");
+        assertThat(text).contains("Set Piece Rovers");
+        assertNoHypeLanguage(text);
     }
 
     @Test
@@ -85,11 +95,30 @@ class MatchBriefCopyTest {
                     .valuePct(5.0 + fixtureId / 5.0)
                     .colourNote(fixtureId % 2 == 0 ? "Team in good form" : null)
                     .build());
-            assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("api");
-            assertThat(text.toLowerCase(Locale.ROOT)).doesNotContain("the model");
+            assertNoHypeLanguage(text);
             outputs.add(text);
         }
         assertThat(outputs.size()).isGreaterThan(20);
+    }
+
+    @Test
+    @DisplayName("narration is pinned so identity-based hashing cannot creep back in")
+    void narrateIsStableAcrossJvmRuns() {
+        // Template choice must derive only from brief values. Hashing an enum
+        // directly uses its identity hash, which shifts between JVM runs and
+        // silently reworded the same tip on every restart. Update this string
+        // only when the copy itself is deliberately changed.
+        String text = MatchBriefCopy.narrate(MatchBriefCopy.Brief.builder()
+                .confidence(ConfidenceLevel.STRONG)
+                .selection("Home Win")
+                .context(context(2024L, "Anchor FC", "Ballast Town"))
+                .probabilityPct(71.5)
+                .build());
+
+        assertThat(text).isEqualTo(
+                "The work puts it at 71.5%. Mark Home Win on the card. "
+                        + "Strong mark \u2014 the analysis is clear. "
+                        + "The fixture reads Anchor FC vs Ballast Town.");
     }
 
     @Test
