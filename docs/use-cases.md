@@ -1849,10 +1849,25 @@ Value = Calculated Probability - Implied Probability
 Recommend when Value ≥ 5%
 ```
 
+**Scoring (recalibrated):**
+- Fortress / poor-traveler / road-warrior adjustments multiply the relevant side's **win**
+  probability **before** the three outcomes are normalised, so home + draw + away always sums to
+  100 and the combined double chance cannot be inflated past what they imply.
+- Venue win and draw rates are shrunk toward league baselines (45% home win, 28% away win, 25%
+  draw) with four matches of pseudo-evidence, so thin early-season records cannot dominate.
+- The published score is an even blend of the model estimate and the **de-vigged** market
+  probability. Implied prices are normalised across 1/X/2 to strip the bookmaker margin first;
+  the margin is retained only for the synthesized price shown to the user.
+
 **Confidence Levels:**
-- **Strong:** Combined probability ≥ 70% AND Value ≥ 5%
-- **Moderate:** Combined probability ≥ 60%
-- **Weak:** Combined probability < 60% (filter out)
+- **Strong:** Blended probability ≥ 78% (1X) / ≥ 74% (X2) **and a market price is available**
+- **Moderate:** Blended probability ≥ 66% (1X) / ≥ 62% (X2)
+- **Weak:** Below moderate (filter out)
+
+Strong no longer requires the model to beat the price by 5%+. That rule promoted the fixtures
+where the model disagreed most with the market, and since the model ran hot those were its worst
+picks — Strong landed 11 points *below* Moderate over 291 settled picks. Requiring a price instead
+means Strong can only be claimed when the market has been folded into the estimate.
 
 **xG Integration:**
 ```

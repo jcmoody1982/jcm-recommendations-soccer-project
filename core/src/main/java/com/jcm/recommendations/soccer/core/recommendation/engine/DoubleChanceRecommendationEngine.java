@@ -15,22 +15,48 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 
 /**
  * UC-024: Double Chance Recommendations
- * 
- * Identifies fixtures where backing two outcomes (Home/Draw or Draw/Away) 
+ *
+ * Identifies fixtures where backing two outcomes (Home/Draw or Draw/Away)
  * offers strong probability with reduced risk.
- * 
+ *
  * Uses: win rates, PPG, league position, unbeaten rates (fortress/road warrior),
  * recent form, xG data, and value vs odds calculation.
+ *
+ * <p>Calibration notes. Three things made this board overstate itself:
+ * <ul>
+ *   <li>The old STRONG gate required the model to beat the market by five points or more, so it
+ *       promoted exactly the fixtures where the model disagreed most with the price. Because the
+ *       model ran hot, that was adverse selection and STRONG landed below MODERATE.</li>
+ *   <li>Fortress and road-warrior boosts were applied <em>after</em> the three outcome
+ *       probabilities were normalised, which broke the distribution and inflated borderline picks
+ *       into the eighties — the worst-performing band on the board.</li>
+ *   <li>Venue win and draw rates were taken raw, so a team with three home games could show a 67%
+ *       home win rate.</li>
+ * </ul>
+ * The score is now an even blend of the model and the de-vigged market price, the boosts are
+ * applied before normalisation, and venue rates are shrunk toward league baselines.
  */
 @Component
 @Slf4j
 public class DoubleChanceRecommendationEngine implements RecommendationEngine {
 
-    // Probability thresholds
-    private static final double THRESHOLD_STRONG_1X = 70.0;
-    private static final double THRESHOLD_MODERATE_1X = 60.0;
-    private static final double THRESHOLD_STRONG_X2 = 65.0;
-    private static final double THRESHOLD_MODERATE_X2 = 55.0;
+    // Probability thresholds, rebased for the market-blended score
+    private static final double THRESHOLD_STRONG_1X = 78.0;
+    private static final double THRESHOLD_MODERATE_1X = 66.0;
+    private static final double THRESHOLD_STRONG_X2 = 74.0;
+    private static final double THRESHOLD_MODERATE_X2 = 62.0;
+
+    /** Weight on the engine's own estimate; the rest goes to the de-vigged market price. */
+    private static final double MODEL_WEIGHT = 0.50;
+
+    /** Matches of prior evidence blended into every venue rate. */
+    private static final int SHRINKAGE_PSEUDO_MATCHES = 4;
+    private static final double PRIOR_HOME_WIN_PCT = 45.0;
+    private static final double PRIOR_AWAY_WIN_PCT = 28.0;
+    private static final double PRIOR_DRAW_PCT = 25.0;
+
+    /** Applied to a side's win probability before normalisation, not to the combined total. */
+    private static final double CHARACTERISTIC_BOOST = 1.06;
 
     // Value threshold
     private static final double MIN_VALUE_PERCENT = 5.0;
@@ -84,6 +110,21 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         double awayWinProb = calculateWinProbability(context, false, hasXgData);
         double drawProb = calculateDrawProbability(context, hasXgData);
 
+        // Calculate fortress/road warrior factors
+        boolean isFortress = checkFortress(homeStats);
+        boolean isPoorTraveler = checkPoorTraveler(awayStats);
+        boolean isRoadWarrior = checkRoadWarrior(awayStats);
+        boolean isWeakHome = checkWeakHome(homeStats);
+
+        // Boost the side's own win chance before normalising, so the three outcomes stay a
+        // coherent distribution and the combined total cannot be inflated past what they imply.
+        if (isFortress || isPoorTraveler) {
+            homeWinProb *= CHARACTERISTIC_BOOST;
+        }
+        if (isRoadWarrior || isWeakHome) {
+            awayWinProb *= CHARACTERISTIC_BOOST;
+        }
+
         // Normalize to sum to 100
         double total = homeWinProb + drawProb + awayWinProb;
         if (total > 0) {
@@ -93,24 +134,15 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         }
 
         // Calculate double chance probabilities
-        double homeDrawProb = homeWinProb + drawProb;
-        double drawAwayProb = drawProb + awayWinProb;
+        double modelHomeDraw = homeWinProb + drawProb;
+        double modelDrawAway = drawProb + awayWinProb;
 
-        // Calculate fortress/road warrior factors
-        boolean isFortress = checkFortress(homeStats);
-        boolean isPoorTraveler = checkPoorTraveler(awayStats);
-        boolean isRoadWarrior = checkRoadWarrior(awayStats);
-        boolean isWeakHome = checkWeakHome(homeStats);
-
-        // Apply fortress/poor traveler boost to 1X
-        if (isFortress || isPoorTraveler) {
-            homeDrawProb = Math.min(95.0, homeDrawProb * 1.08);
-        }
-
-        // Apply road warrior/weak home boost to X2
-        if (isRoadWarrior || isWeakHome) {
-            drawAwayProb = Math.min(95.0, drawAwayProb * 1.08);
-        }
+        // Blend against the de-vigged market. The price is the best-calibrated estimate available,
+        // and blending also removes the incentive to reward disagreement with it.
+        Double fair1X = fairImplied1X(context);
+        Double fairX2 = fairImpliedX2(context);
+        double homeDrawProb = blendWithMarket(modelHomeDraw, fair1X);
+        double drawAwayProb = blendWithMarket(modelDrawAway, fairX2);
 
         // Calculate value vs odds
         double value1X = 0.0;
@@ -121,12 +153,12 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         if (context.hasOdds()) {
             implied1X = calculateImplied1X(context);
             impliedX2 = calculateImpliedX2(context);
-            
-            if (implied1X != null) {
-                value1X = homeDrawProb - implied1X;
+
+            if (fair1X != null) {
+                value1X = homeDrawProb - fair1X;
             }
-            if (impliedX2 != null) {
-                valueX2 = drawAwayProb - impliedX2;
+            if (fairX2 != null) {
+                valueX2 = drawAwayProb - fairX2;
             }
         }
 
@@ -137,11 +169,15 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         ConfidenceLevel confidence;
 
         boolean prefer1X = homeDrawProb >= drawAwayProb;
-        
-        // Check if either meets threshold with value
-        boolean meets1XStrong = homeDrawProb >= THRESHOLD_STRONG_1X && value1X >= MIN_VALUE_PERCENT;
+
+        // STRONG requires a market-blended estimate. Without a price the score is the unchecked
+        // model output, which is precisely the situation that used to publish false certainty.
+        boolean marketInformed1X = fair1X != null;
+        boolean marketInformedX2 = fairX2 != null;
+
+        boolean meets1XStrong = homeDrawProb >= THRESHOLD_STRONG_1X && marketInformed1X;
         boolean meets1XModerate = homeDrawProb >= THRESHOLD_MODERATE_1X;
-        boolean meetsX2Strong = drawAwayProb >= THRESHOLD_STRONG_X2 && valueX2 >= MIN_VALUE_PERCENT;
+        boolean meetsX2Strong = drawAwayProb >= THRESHOLD_STRONG_X2 && marketInformedX2;
         boolean meetsX2Moderate = drawAwayProb >= THRESHOLD_MODERATE_X2;
 
         if (prefer1X && meets1XModerate) {
@@ -206,8 +242,8 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
             return 33.3;
         }
 
-        // Win percentage component (using venue-specific denominator)
-        double winPct = calculateWinPercentage(stats, isHome);
+        // Win percentage component (venue-specific denominator, shrunk toward the league baseline)
+        double winPct = shrunkWinPercentage(stats, isHome);
 
         // PPG component (normalized to 0-100)
         double ppg = isHome ? safeDouble(stats.getPpgHome()) : safeDouble(stats.getPpgAway());
@@ -318,8 +354,8 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeDrawPct = calculateDrawPercentage(homeStats, true);
-        double awayDrawPct = calculateDrawPercentage(awayStats, false);
+        double homeDrawPct = shrunkDrawPercentage(homeStats, true);
+        double awayDrawPct = shrunkDrawPercentage(awayStats, false);
         double baseDrawProb = (homeDrawPct + awayDrawPct) / 2;
 
         // Similarity bonus based on PPG
@@ -407,6 +443,84 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
         return homeWinPct < WEAK_HOME_WIN_RATE;
     }
 
+    /**
+     * Blend the model estimate with the market. Returns the model unchanged when no price exists,
+     * which is why an unpriced fixture can never reach STRONG.
+     */
+    static double blendWithMarket(double modelProbability, Double fairMarketProbability) {
+        if (fairMarketProbability == null) {
+            return modelProbability;
+        }
+        return (MODEL_WEIGHT * modelProbability) + ((1.0 - MODEL_WEIGHT) * fairMarketProbability);
+    }
+
+    /**
+     * De-vigged 1X probability. The raw implied prices sum to more than 100% because they carry
+     * the bookmaker's margin, so comparing a model probability against them understates value.
+     */
+    private Double fairImplied1X(FixtureContext context) {
+        double[] fair = fairOutcomeProbabilities(context);
+        return fair == null ? null : fair[0] + fair[1];
+    }
+
+    /** De-vigged X2 probability. See {@link #fairImplied1X}. */
+    private Double fairImpliedX2(FixtureContext context) {
+        double[] fair = fairOutcomeProbabilities(context);
+        return fair == null ? null : fair[1] + fair[2];
+    }
+
+    /** Home, draw and away probabilities with the bookmaker's margin removed. */
+    private double[] fairOutcomeProbabilities(FixtureContext context) {
+        if (!context.hasOdds()) {
+            return null;
+        }
+        Double odds1 = context.getOdds().getOddsFt1();
+        Double oddsX = context.getOdds().getOddsFtX();
+        Double odds2 = context.getOdds().getOddsFt2();
+        if (odds1 == null || oddsX == null || odds2 == null
+                || odds1 <= 0 || oddsX <= 0 || odds2 <= 0) {
+            return null;
+        }
+        double raw1 = 1.0 / odds1;
+        double rawX = 1.0 / oddsX;
+        double raw2 = 1.0 / odds2;
+        double overround = raw1 + rawX + raw2;
+        if (overround <= 0) {
+            return null;
+        }
+        return new double[]{
+                (raw1 / overround) * 100.0,
+                (rawX / overround) * 100.0,
+                (raw2 / overround) * 100.0
+        };
+    }
+
+    /**
+     * Empirical Bayes shrinkage toward a league baseline. Venue records are thin early in a
+     * season, and an unshrunk three-game sample was reading as a real signal.
+     */
+    static double shrinkRate(double observedPct, int matchesAtVenue, double priorPct) {
+        if (matchesAtVenue <= 0) {
+            return priorPct;
+        }
+        double weight = matchesAtVenue / (double) (matchesAtVenue + SHRINKAGE_PSEUDO_MATCHES);
+        return (weight * observedPct) + ((1.0 - weight) * priorPct);
+    }
+
+    private double shrunkWinPercentage(TeamSeasonStats stats, boolean isHome) {
+        return shrinkRate(
+                calculateWinPercentage(stats, isHome),
+                calculateMatchesAtVenue(stats, isHome),
+                isHome ? PRIOR_HOME_WIN_PCT : PRIOR_AWAY_WIN_PCT);
+    }
+
+    private double shrunkDrawPercentage(TeamSeasonStats stats, boolean isHome) {
+        return shrinkRate(
+                calculateDrawPercentage(stats, isHome),
+                calculateMatchesAtVenue(stats, isHome),
+                PRIOR_DRAW_PCT);
+    }
+
     private Double calculateImplied1X(FixtureContext context) {
         if (!context.hasOdds()) return null;
         
@@ -468,7 +582,10 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
         factors.put("homeDrawCombined", homeDrawProb);
         factors.put("drawAwayCombined", drawAwayProb);
 
-        // Value vs odds
+        // Value vs odds. `implied` carries the bookmaker margin and drives the published price;
+        // `fairImplied` has it removed and is what the score is blended against.
+        Double fair1X = fairImplied1X(context);
+        Double fairX2 = fairImpliedX2(context);
         if (implied1X != null) {
             factors.put("implied1X", implied1X);
             factors.put("value1X", value1X);
@@ -479,6 +596,13 @@ private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) 
             factors.put("valueX2", valueX2);
             factors.put("combinedX2Odds", 100.0 / impliedX2);
         }
+        if (fair1X != null) {
+            factors.put("fairImplied1X", fair1X);
+        }
+        if (fairX2 != null) {
+            factors.put("fairImpliedX2", fairX2);
+        }
+        factors.put("marketBlended", fair1X != null || fairX2 != null);
 
         // Team characteristics
         factors.put("homeFortress", isFortress);

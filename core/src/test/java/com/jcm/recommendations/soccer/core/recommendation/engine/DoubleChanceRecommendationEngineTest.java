@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class DoubleChanceRecommendationEngineTest {
 
@@ -216,7 +217,143 @@ class DoubleChanceRecommendationEngineTest {
         assertThat(result.get().getFactors()).containsKey("combined1XOdds");
     }
 
+    @Test
+    @DisplayName("analyze only reaches STRONG when a market price backs the estimate")
+    void analyze_strongRequiresMarketPrice() {
+        Optional<Recommendation> priced = engine.analyze(createHeavyFavouriteContext(true));
+        Optional<Recommendation> unpriced = engine.analyze(createHeavyFavouriteContext(false));
+
+        assertThat(priced).isPresent();
+        assertThat(priced.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+
+        // Identical fixture, no price: the score is the unchecked model output, so it is capped
+        // at MODERATE rather than being promoted on the engine's own say-so.
+        assertThat(unpriced).isPresent();
+        assertThat(unpriced.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+    }
+
+    @Test
+    @DisplayName("analyze blends the score toward the market rather than away from it")
+    void analyze_blendsScoreTowardMarket() {
+        double blended = engine.analyze(createHeavyFavouriteContext(true)).orElseThrow().getScore();
+        double modelOnly = engine.analyze(createHeavyFavouriteContext(false)).orElseThrow().getScore();
+
+        // The market rates this side far higher than the model, so blending must pull the score up
+        // toward it. Under the old scoring that same disagreement was booked as "value" instead.
+        assertThat(blended).isGreaterThan(modelOnly);
+        assertThat(priceImplied1X(1.25, 6.0, 12.0)).isGreaterThan(blended);
+    }
+
+    @Test
+    @DisplayName("analyze strips the bookmaker margin before comparing to the model")
+    void analyze_removesOverroundFromImpliedProbability() {
+        Optional<Recommendation> result = engine.analyze(createContextWithOdds());
+
+        assertThat(result).isPresent();
+        double raw = (double) result.get().getFactors().get("implied1X");
+        double fair = (double) result.get().getFactors().get("fairImplied1X");
+
+        assertThat(fair).isLessThan(raw);
+        assertThat(result.get().getFactors()).containsEntry("marketBlended", true);
+    }
+
+    @Test
+    @DisplayName("analyze keeps the outcome probabilities a coherent distribution")
+    void analyze_characteristicBoostDoesNotBreakNormalisation() {
+        Optional<Recommendation> result = engine.analyze(createFortressContext());
+
+        assertThat(result).isPresent();
+        double home = (double) result.get().getFactors().get("homeWinProbability");
+        double draw = (double) result.get().getFactors().get("drawProbability");
+        double away = (double) result.get().getFactors().get("awayWinProbability");
+
+        // The fortress boost is applied before normalising, so the three still sum to 100 and the
+        // combined double chance cannot exceed it.
+        assertThat(home + draw + away).isCloseTo(100.0, within(0.001));
+        assertThat((double) result.get().getFactors().get("homeDrawCombined")).isLessThanOrEqualTo(100.0);
+    }
+
+    @Test
+    @DisplayName("shrinkRate pulls thin venue samples toward the league baseline")
+    void shrinkRate_pullsThinSamplesTowardPrior() {
+        // Three home games, all won, reads as 100% unshrunk.
+        double thin = DoubleChanceRecommendationEngine.shrinkRate(100.0, 3, 45.0);
+        double established = DoubleChanceRecommendationEngine.shrinkRate(100.0, 30, 45.0);
+
+        assertThat(thin).isLessThan(established);
+        assertThat(thin).isLessThan(80.0);
+        assertThat(DoubleChanceRecommendationEngine.shrinkRate(100.0, 0, 45.0)).isEqualTo(45.0);
+    }
+
+    @Test
+    @DisplayName("blendWithMarket returns the model estimate when no price exists")
+    void blendWithMarket_fallsBackToModel() {
+        assertThat(DoubleChanceRecommendationEngine.blendWithMarket(70.0, null)).isEqualTo(70.0);
+        assertThat(DoubleChanceRecommendationEngine.blendWithMarket(70.0, 90.0)).isEqualTo(80.0);
+    }
+
+    private static double priceImplied1X(double odds1, double oddsX, double odds2) {
+        double raw1 = 1.0 / odds1;
+        double rawX = 1.0 / oddsX;
+        double overround = raw1 + rawX + (1.0 / odds2);
+        return ((raw1 + rawX) / overround) * 100.0;
+    }
+
     // Helper methods to create test contexts
+
+    /** A clear home favourite, optionally with a market price attached. */
+    private FixtureContext createHeavyFavouriteContext(boolean withOdds) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .ppgHome(2.6)
+                .ppgOverall(2.3)
+                .position(1)
+                .seasonWinsHome(16)
+                .seasonDrawsHome(3)
+                .seasonLossesHome(1)
+                .seasonGoalsHome(44)
+                .seasonConcededHome(8)
+                .xgForAvgHome(2.4)
+                .xgForAvgOverall(2.2)
+                .xgAgainstAvgHome(0.5)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .ppgAway(0.5)
+                .ppgOverall(0.8)
+                .position(20)
+                .seasonWinsAway(1)
+                .seasonDrawsAway(3)
+                .seasonLossesAway(16)
+                .seasonGoalsAway(9)
+                .seasonConcededAway(40)
+                .xgForAvgAway(0.6)
+                .xgForAvgOverall(0.8)
+                .xgAgainstAvgAway(2.1)
+                .build();
+
+        FixtureContext.FixtureContextBuilder builder = FixtureContext.builder()
+                .fixture(createFixture(113L))
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats);
+
+        if (withOdds) {
+            builder.odds(FixtureOdds.builder()
+                    .fixtureId(113L)
+                    .oddsFt1(1.25)
+                    .oddsFtX(6.00)
+                    .oddsFt2(12.00)
+                    .build());
+        }
+        return builder.build();
+    }
 
     private FixtureContext createStrongHomeContext() {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
