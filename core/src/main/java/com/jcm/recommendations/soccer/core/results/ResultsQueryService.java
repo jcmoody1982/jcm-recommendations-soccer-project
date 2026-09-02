@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 public class ResultsQueryService {
 
     /** Types paused from Results day board and day summaries. */
-    private static final Set<String> EXCLUDED_TYPES = Set.of("CLEAN_SHEET");
+    private static final Set<String> EXCLUDED_TYPES = Set.of();
 
     private final RecommendationSnapshotRepository snapshotRepository;
     private final CompletedMatchRepository completedMatchRepository;

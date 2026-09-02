@@ -26,8 +26,14 @@ public class ResultsPerformanceService {
 
     public static final int MIN_SAMPLE = 10;
 
-    /** Types paused from boards/metrics (engine still exists for later recalibration). */
-    private static final Set<String> EXCLUDED_TYPES = Set.of("CLEAN_SHEET");
+    /**
+     * Types paused from boards/metrics. Empty since CLEAN_SHEET was recalibrated and re-enabled;
+     * kept as the mechanism for pausing a type without deleting its engine.
+     *
+     * <p>Note that CLEAN_SHEET history predating the pause was produced by the old weighted index,
+     * so its early hit rate is not comparable to what the Poisson model publishes now.
+     */
+    private static final Set<String> EXCLUDED_TYPES = Set.of();
 
     /**
      * Types whose score is published as a probability percentage. Only these can be checked for

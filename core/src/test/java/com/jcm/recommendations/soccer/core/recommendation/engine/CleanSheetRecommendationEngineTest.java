@@ -7,9 +7,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class CleanSheetRecommendationEngineTest {
 
@@ -133,15 +135,61 @@ class CleanSheetRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze tracks defensive rating multiplier")
-    void analyze_tracksDefensiveRatingMultiplier() {
+    @DisplayName("published score is the Poisson probability of the opponent being shut out")
+    void analyze_publishesPoissonProbabilityNotAnIndex() {
         FixtureContext context = createStrongDefensiveContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getFactors()).containsKey("defensiveRatingMultiplier");
-        assertThat(result.get().getFactors()).containsKey("opponentWeaknessMultiplier");
+        double lambda = (double) result.get().getFactors().get("opponentExpectedGoals");
+        assertThat(result.get().getScore())
+                .as("score must be exp(-lambda), not a weighted index")
+                .isCloseTo(Math.exp(-lambda) * 100.0, within(0.01));
+    }
+
+    @Test
+    @DisplayName("streaks and opponent weakness are reported but do not scale the score")
+    void analyze_contextualSignalsDoNotInflateScore() {
+        FixtureContext context = createContextWithHotStreak();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        Map<String, Object> factors = result.get().getFactors();
+        assertThat(factors.get("hotDefensiveStreak")).isEqualTo(true);
+        assertThat(factors)
+                .as("the old multiplier stack must be gone")
+                .doesNotContainKeys("defensiveRatingMultiplier", "opponentWeaknessMultiplier", "xgRegressionRisk");
+
+        double lambda = (double) factors.get("opponentExpectedGoals");
+        assertThat(result.get().getScore()).isCloseTo(Math.exp(-lambda) * 100.0, within(0.01));
+    }
+
+    @Test
+    @DisplayName("scores stay in a realistic band for the clean sheet market")
+    void analyze_scoresStayRealistic() {
+        for (FixtureContext context : List.of(
+                createStrongDefensiveContext(), createContextWithXgData(), createContextWithHotStreak())) {
+            Optional<Recommendation> result = engine.analyze(context);
+            assertThat(result).isPresent();
+            assertThat(result.get().getScore())
+                    .as("clean sheets happen in ~32%% of home matches; nothing should approach certainty")
+                    .isGreaterThan(30.0)
+                    .isLessThan(75.0);
+        }
+    }
+
+    @Test
+    @DisplayName("an average fixture lands near the base rate and is not published")
+    void analyze_averageFixtureIsNotPublished() {
+        assertThat(engine.analyze(createLeagueAverageContext())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a thin venue record is not scored")
+    void analyze_thinVenueRecord_returnsEmpty() {
+        assertThat(engine.analyze(createThinVenueRecordContext())).isEmpty();
     }
 
     @Test
@@ -157,15 +205,20 @@ class CleanSheetRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze flags xG regression risk")
-    void analyze_flagsXgRegressionRisk() {
-        FixtureContext context = createContextWithXgRegressionRisk();
-
-        Optional<Recommendation> result = engine.analyze(context);
+    @DisplayName("xG pulls the expected goals toward the underlying numbers")
+    void analyze_xgTempersAnOverperformingDefence() {
+        // Conceding 0.3 at home on a 1.00 xGA: the xG term should hold the estimate above what the
+        // raw conceded rate alone would imply, rather than the old model's regression multiplier.
+        Optional<Recommendation> result = engine.analyze(createContextWithXgRegressionRisk());
 
         assertThat(result).isPresent();
-        assertThat(result.get().getFactors().get("xgRegressionRisk")).isEqualTo(true);
-        assertThat(result.get().getDescription()).contains("xG regression risk");
+        Map<String, Object> factors = result.get().getFactors();
+        double seasonLambda = (double) factors.get("seasonExpectedGoals");
+        double xgLambda = (double) factors.get("xgExpectedGoals");
+        double blended = (double) factors.get("opponentExpectedGoals");
+
+        assertThat(xgLambda).isGreaterThan(seasonLambda);
+        assertThat(blended).isBetween(seasonLambda, xgLambda);
     }
 
     // Helper methods
@@ -360,6 +413,8 @@ class CleanSheetRecommendationEngineTest {
                 .cleanSheetsHome(4)  // 4 of 5 = hot streak
                 .cleanSheetsAway(2)
                 .cleanSheetsOverall(6)
+                .scoredAvgHome(2.0)
+                .scoredAvgAway(1.2)
                 .concededAvgHome(0.2)
                 .concededAvgAway(0.8)
                 .failedToScoreHome(0)
@@ -371,6 +426,8 @@ class CleanSheetRecommendationEngineTest {
                 .cleanSheetsHome(1)
                 .cleanSheetsAway(0)
                 .cleanSheetsOverall(1)
+                .scoredAvgHome(0.8)
+                .scoredAvgAway(0.4)
                 .concededAvgHome(1.5)
                 .concededAvgAway(2.0)
                 .failedToScoreHome(2)  // High FTS
@@ -439,6 +496,100 @@ class CleanSheetRecommendationEngineTest {
                 .fixture(createFixture())
                 .homeTeam(createTeam(1L, "Regression Risk Team"))
                 .awayTeam(createTeam(2L, "Weak Attack"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .build();
+    }
+
+    /** Both sides at the measured league rates: 1.54 scored at home, 1.23 away, over 19 matches. */
+    private FixtureContext createLeagueAverageContext() {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(38)
+                .matchesPlayedHome(19)
+                .matchesPlayedAway(19)
+                .seasonCleanSheetsHome(6)
+                .seasonCleanSheetsAway(4)
+                .seasonCleanSheetsOverall(10)
+                .seasonGoalsHome(29)
+                .seasonGoalsAway(23)
+                .seasonConcededHome(23)
+                .seasonConcededAway(29)
+                .seasonFailedToScoreHome(4)
+                .seasonFailedToScoreAway(6)
+                .seasonFailedToScoreOverall(10)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(38)
+                .matchesPlayedHome(19)
+                .matchesPlayedAway(19)
+                .seasonCleanSheetsHome(6)
+                .seasonCleanSheetsAway(4)
+                .seasonCleanSheetsOverall(10)
+                .seasonGoalsHome(29)
+                .seasonGoalsAway(23)
+                .seasonConcededHome(23)
+                .seasonConcededAway(29)
+                .seasonFailedToScoreHome(4)
+                .seasonFailedToScoreAway(6)
+                .seasonFailedToScoreOverall(10)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Average Home"))
+                .awayTeam(createTeam(2L, "Average Away"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .build();
+    }
+
+    /** A defensive record good enough to score well, on too few matches to believe. */
+    private FixtureContext createThinVenueRecordContext() {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(100L)
+                .matchesPlayed(6)
+                .matchesPlayedHome(3)
+                .matchesPlayedAway(3)
+                .seasonCleanSheetsHome(3)
+                .seasonCleanSheetsAway(1)
+                .seasonCleanSheetsOverall(4)
+                .seasonGoalsHome(9)
+                .seasonGoalsAway(3)
+                .seasonConcededHome(0)
+                .seasonConcededAway(4)
+                .seasonFailedToScoreHome(0)
+                .seasonFailedToScoreAway(1)
+                .seasonFailedToScoreOverall(1)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(100L)
+                .matchesPlayed(6)
+                .matchesPlayedHome(3)
+                .matchesPlayedAway(3)
+                .seasonCleanSheetsHome(1)
+                .seasonCleanSheetsAway(0)
+                .seasonCleanSheetsOverall(1)
+                .seasonGoalsHome(4)
+                .seasonGoalsAway(1)
+                .seasonConcededHome(5)
+                .seasonConcededAway(8)
+                .seasonFailedToScoreHome(1)
+                .seasonFailedToScoreAway(2)
+                .seasonFailedToScoreOverall(3)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Thin Record"))
+                .awayTeam(createTeam(2L, "Thin Opponent"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
                 .build();
