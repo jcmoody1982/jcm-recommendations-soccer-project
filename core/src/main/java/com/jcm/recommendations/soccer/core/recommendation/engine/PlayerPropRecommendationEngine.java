@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.calculateGoalsAvg;
+import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.calculateVenueConcededAvg;
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.safeInt;
 
 /**
@@ -251,10 +251,7 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         if (opponent == null) {
             return 1.0;
         }
-        if (playerIsHome) {
-            return calculateGoalsAvg(opponent.getSeasonConcededAway(), opponent.getMatchesPlayed(), 1.0);
-        }
-        return calculateGoalsAvg(opponent.getSeasonConcededHome(), opponent.getMatchesPlayed(), 1.0);
+        return calculateVenueConcededAvg(opponent, !playerIsHome, 1.0);
     }
 
     private static ConfidenceLevel determineConfidence(double score, PropSpec spec) {

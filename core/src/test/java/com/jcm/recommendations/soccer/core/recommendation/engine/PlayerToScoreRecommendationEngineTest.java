@@ -168,6 +168,8 @@ class PlayerToScoreRecommendationEngineTest {
                         .teamId(1L)
                         .seasonId(100L)
                         .matchesPlayed(10)
+                        .matchesPlayedHome(10)
+                        .matchesPlayedAway(10)
                         .seasonConcededHome(12)
                         .seasonConcededAway(14)
                         .build())
@@ -175,6 +177,8 @@ class PlayerToScoreRecommendationEngineTest {
                         .teamId(2L)
                         .seasonId(100L)
                         .matchesPlayed(10)
+                        .matchesPlayedHome(10)
+                        .matchesPlayedAway(10)
                         .seasonConcededHome(16)
                         .seasonConcededAway(awayConcededAway)
                         .build());

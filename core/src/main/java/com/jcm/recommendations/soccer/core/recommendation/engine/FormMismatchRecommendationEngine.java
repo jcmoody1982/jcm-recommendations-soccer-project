@@ -200,9 +200,7 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
     }
 
     private double calculateGoalsDelta(TeamSeasonStats season, TeamRecentForm form, boolean isHome) {
-        double seasonAvg = isHome 
-                ? calculateGoalsAvg(season.getSeasonGoalsHome(), season.getMatchesPlayed())
-                : calculateGoalsAvg(season.getSeasonGoalsAway(), season.getMatchesPlayed());
+        double seasonAvg = calculateVenueGoalsAvg(season, isHome);
         
         Double formAvg = isHome ? form.getScoredAvgHome() : form.getScoredAvgAway();
 
@@ -243,9 +241,7 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
 
     private double calculateConcededDelta(TeamSeasonStats season, TeamRecentForm form, boolean isHome) {
         // Calculate goals conceded improvement (negative delta = improvement)
-        double seasonAvg = isHome 
-                ? calculateGoalsAvg(season.getSeasonConcededHome(), season.getMatchesPlayed())
-                : calculateGoalsAvg(season.getSeasonConcededAway(), season.getMatchesPlayed());
+        double seasonAvg = calculateVenueConcededAvg(season, isHome);
         
         Double formAvg = isHome ? form.getConcededAvgHome() : form.getConcededAvgAway();
 

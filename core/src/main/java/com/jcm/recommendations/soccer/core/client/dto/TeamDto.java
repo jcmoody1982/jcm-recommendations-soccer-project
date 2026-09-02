@@ -29,6 +29,14 @@ public class TeamDto {
         return stats != null ? stats.getMatchesPlayed() : null;
     }
 
+    public Integer getMatchesPlayedHome() {
+        return stats != null ? stats.getMatchesPlayedHome() : null;
+    }
+
+    public Integer getMatchesPlayedAway() {
+        return stats != null ? stats.getMatchesPlayedAway() : null;
+    }
+
     public Integer getPoints() {
         return stats != null ? stats.getPoints() : null;
     }

@@ -141,10 +141,10 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeScoredAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
+        double awayScoredAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);
+        double homeConcededAvg = calculateVenueConcededAvg(homeStats, true, 1.0);
+        double awayConcededAvg = calculateVenueConcededAvg(awayStats, false, 1.0);
         double seasonLambda = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
 
         double weightedSum = seasonLambda * WEIGHT_LAMBDA_SEASON;
@@ -244,10 +244,10 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         factors.put("expectedGoals", expectedGoals);
         factors.put("line", spec.market());
 
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeScoredAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
+        double awayScoredAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);
+        double homeConcededAvg = calculateVenueConcededAvg(homeStats, true, 1.0);
+        double awayConcededAvg = calculateVenueConcededAvg(awayStats, false, 1.0);
 
         factors.put("homeGoalsScoredAvg", homeScoredAvg);
         factors.put("awayGoalsScoredAvg", awayScoredAvg);

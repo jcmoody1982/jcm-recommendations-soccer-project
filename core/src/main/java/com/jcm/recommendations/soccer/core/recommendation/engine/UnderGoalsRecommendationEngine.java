@@ -113,10 +113,10 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
 
     private double calculateExpectedGoals(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
         // Calculate from actual goals
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeScoredAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
+        double awayScoredAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);
+        double homeConcededAvg = calculateVenueConcededAvg(homeStats, true, 1.0);
+        double awayConcededAvg = calculateVenueConcededAvg(awayStats, false, 1.0);
 
         double actualGoalsExpected = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
 
@@ -140,10 +140,10 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
         // Season stats (inverse normalized - lower goals = higher score)
-        double homeScoredInverse = inverseNormalizeGoals(calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0));
-        double awayScoredInverse = inverseNormalizeGoals(calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0));
-        double homeConcededInverse = inverseNormalizeGoals(calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0));
-        double awayConcededInverse = inverseNormalizeGoals(calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0));
+        double homeScoredInverse = inverseNormalizeGoals(calculateVenueGoalsAvg(homeStats, true, 1.0));
+        double awayScoredInverse = inverseNormalizeGoals(calculateVenueGoalsAvg(awayStats, false, 1.0));
+        double homeConcededInverse = inverseNormalizeGoals(calculateVenueConcededAvg(homeStats, true, 1.0));
+        double awayConcededInverse = inverseNormalizeGoals(calculateVenueConcededAvg(awayStats, false, 1.0));
 
         // Clean sheet percentages
         double homeCleanSheet = calculateCleanSheetPercentageOverall(homeStats);
@@ -222,10 +222,10 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
     }
 
     private double calculateLowScoringBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeScoredAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
+        double awayScoredAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);
+        double homeConcededAvg = calculateVenueConcededAvg(homeStats, true, 1.0);
+        double awayConcededAvg = calculateVenueConcededAvg(awayStats, false, 1.0);
         
         double combinedGoalsAvg = (homeScoredAvg + awayScoredAvg + homeConcededAvg + awayConcededAvg) / 2.0;
         
@@ -303,10 +303,10 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
         factors.put("expectedGoals", expectedGoals);
 
         // Season goal averages
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeScoredAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
+        double awayScoredAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);
+        double homeConcededAvg = calculateVenueConcededAvg(homeStats, true, 1.0);
+        double awayConcededAvg = calculateVenueConcededAvg(awayStats, false, 1.0);
         
         factors.put("homeGoalsScoredAvg", homeScoredAvg);
         factors.put("awayGoalsScoredAvg", awayScoredAvg);

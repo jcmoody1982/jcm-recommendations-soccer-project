@@ -365,8 +365,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
     }
 
     private static double venueGoalsAvg(TeamSeasonStats stats, boolean home) {
-        Integer goals = home ? stats.getSeasonGoalsHome() : stats.getSeasonGoalsAway();
-        return calculateGoalsAvg(goals, stats.getMatchesPlayed(), 1.0);
+        return calculateVenueGoalsAvg(stats, home, 1.0);
     }
 
     private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
@@ -509,8 +508,8 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         }
         
         // Early conceder analysis (full-time conceded as defensive vulnerability signal)
-        double combinedConceded = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0)
-                + calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double combinedConceded = calculateVenueConcededAvg(homeStats, true, 1.0)
+                + calculateVenueConcededAvg(awayStats, false, 1.0);
         factors.put("combinedConcededAvg", combinedConceded);
         
         if (combinedConceded > CONCEDING_MATCHUP_GOALS) {
@@ -590,8 +589,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         if (halfAvg != null) {
             return halfAvg;
         }
-        Integer goals = home ? stats.getSeasonGoalsHome() : stats.getSeasonGoalsAway();
-        return calculateGoalsAvg(goals, stats.getMatchesPlayed(), 1.0) * fallbackRatio;
+        return calculateVenueGoalsAvg(stats, home, 1.0) * fallbackRatio;
     }
 
     private static double halfConcededAvg(TeamSeasonStats stats, boolean home, double fallbackRatio) {
@@ -599,8 +597,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         if (halfAvg != null) {
             return halfAvg;
         }
-        Integer conceded = home ? stats.getSeasonConcededHome() : stats.getSeasonConcededAway();
-        return calculateGoalsAvg(conceded, stats.getMatchesPlayed(), 1.0) * fallbackRatio;
+        return calculateVenueConcededAvg(stats, home, 1.0) * fallbackRatio;
     }
 
     private static double halfBttsPercentage(TeamSeasonStats stats, boolean home) {

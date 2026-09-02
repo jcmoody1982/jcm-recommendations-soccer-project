@@ -439,9 +439,7 @@ private double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
         double formPpg = isHome ? safeDouble(form.getPpgHome()) : safeDouble(form.getPpgAway());
         double ppgDivergence = formPpg - seasonPpg;
 
-        double seasonGoals = isHome 
-                ? calculateGoalsAvg(seasonStats.getSeasonGoalsHome(), seasonStats.getMatchesPlayed(), 1.0)
-                : calculateGoalsAvg(seasonStats.getSeasonGoalsAway(), seasonStats.getMatchesPlayed(), 1.0);
+        double seasonGoals = calculateVenueGoalsAvg(seasonStats, isHome, 1.0);
         double formGoals = isHome ? safeDouble(form.getScoredAvgHome()) : safeDouble(form.getScoredAvgAway());
         double goalsDivergence = formGoals - seasonGoals;
 

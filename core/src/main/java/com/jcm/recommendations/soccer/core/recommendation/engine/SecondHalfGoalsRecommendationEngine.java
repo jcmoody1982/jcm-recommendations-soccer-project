@@ -278,10 +278,10 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
     private double calculateFitnessIndicator(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
         // Teams that score more than they concede tend to have better fitness (can push late)
         // Use goal difference as a proxy for fitness/stamina
-        double homeGoalDiff = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 0.0) 
-                - calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 0.0);
-        double awayGoalDiff = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 0.0)
-                - calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 0.0);
+        double homeGoalDiff = calculateVenueGoalsAvg(homeStats, true, 0.0) 
+                - calculateVenueConcededAvg(homeStats, true, 0.0);
+        double awayGoalDiff = calculateVenueGoalsAvg(awayStats, false, 0.0)
+                - calculateVenueConcededAvg(awayStats, false, 0.0);
         
         // Normalize to percentage (range -2 to +2 typical)
         double avgGoalDiff = (homeGoalDiff + awayGoalDiff) / 2.0;
@@ -296,8 +296,8 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         double avgDrawPct = (homeDrawPct + awayDrawPct) / 2.0;
         
         // Also consider if teams are attacking (high goals avg = more open play)
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeGoalsAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
+        double awayGoalsAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);
         double combinedGoalsIndicator = Math.min(100.0, (homeGoalsAvg + awayGoalsAvg) * 30.0);
         
         // Blend draw likelihood with attacking intent
@@ -354,10 +354,10 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         factors.put("lateGameIntensityScore", calculateLateGameIntensity(homeStats, awayStats));
         
         // Fitness indicator
-        double homeGoalDiff = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 0.0) 
-                - calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 0.0);
-        double awayGoalDiff = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 0.0)
-                - calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 0.0);
+        double homeGoalDiff = calculateVenueGoalsAvg(homeStats, true, 0.0) 
+                - calculateVenueConcededAvg(homeStats, true, 0.0);
+        double awayGoalDiff = calculateVenueGoalsAvg(awayStats, false, 0.0)
+                - calculateVenueConcededAvg(awayStats, false, 0.0);
         factors.put("homeGoalDifferencePerGame", homeGoalDiff);
         factors.put("awayGoalDifferencePerGame", awayGoalDiff);
         factors.put("fitnessIndicatorScore", calculateFitnessIndicator(homeStats, awayStats));
@@ -404,8 +404,8 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         List<String> positiveIndicators = new ArrayList<>();
         List<String> riskFlags = new ArrayList<>();
         
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeGoalsAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
+        double awayGoalsAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);
         double combinedGoals = homeGoalsAvg + awayGoalsAvg;
         
         double homeCsPct = calculateCleanSheetPercentage(homeStats, true);
@@ -426,8 +426,8 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         }
         
         // Late conceder analysis
-        double homeConcededAvg = calculateGoalsAvg(homeStats.getSeasonConcededHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayConcededAvg = calculateGoalsAvg(awayStats.getSeasonConcededAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeConcededAvg = calculateVenueConcededAvg(homeStats, true, 1.0);
+        double awayConcededAvg = calculateVenueConcededAvg(awayStats, false, 1.0);
         double combinedConceded = homeConcededAvg + awayConcededAvg;
         factors.put("combinedConcededAvg", combinedConceded);
         
@@ -495,8 +495,7 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         if (halfAvg != null) {
             return halfAvg;
         }
-        Integer goals = home ? stats.getSeasonGoalsHome() : stats.getSeasonGoalsAway();
-        return calculateGoalsAvg(goals, stats.getMatchesPlayed(), 1.0) * fallbackRatio;
+        return calculateVenueGoalsAvg(stats, home, 1.0) * fallbackRatio;
     }
 
     private static double halfConcededAvg(TeamSeasonStats stats, boolean home, double fallbackRatio) {
@@ -504,8 +503,7 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         if (halfAvg != null) {
             return halfAvg;
         }
-        Integer conceded = home ? stats.getSeasonConcededHome() : stats.getSeasonConcededAway();
-        return calculateGoalsAvg(conceded, stats.getMatchesPlayed(), 1.0) * fallbackRatio;
+        return calculateVenueConcededAvg(stats, home, 1.0) * fallbackRatio;
     }
 
     private static boolean hasHalfGoalStats(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {

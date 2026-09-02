@@ -137,10 +137,10 @@ class RecommendationUtilsTest {
         }
 
         @Test
-        @DisplayName("calculateWinPercentage returns default for null matches played")
-        void calculateWinPercentage_returnsDefaultForNullMatchesPlayed() {
+        @DisplayName("calculateWinPercentage returns default when there is no venue record")
+        void calculateWinPercentage_returnsDefaultWithoutVenueRecord() {
             TeamSeasonStats stats = new TeamSeasonStats();
-            stats.setMatchesPlayed(null);
+            stats.setMatchesPlayed(38);
             assertEquals(33.3, RecommendationUtils.calculateWinPercentage(stats, true));
         }
 
@@ -148,7 +148,8 @@ class RecommendationUtilsTest {
         @DisplayName("calculateWinPercentage calculates home wins correctly")
         void calculateWinPercentage_calculatesHomeWinsCorrectly() {
             TeamSeasonStats stats = new TeamSeasonStats();
-            stats.setMatchesPlayed(10);
+            stats.setMatchesPlayed(20);
+            stats.setMatchesPlayedHome(10);
             stats.setSeasonWinsHome(6);
             assertEquals(60.0, RecommendationUtils.calculateWinPercentage(stats, true));
         }
@@ -157,7 +158,8 @@ class RecommendationUtilsTest {
         @DisplayName("calculateWinPercentage calculates away wins correctly")
         void calculateWinPercentage_calculatesAwayWinsCorrectly() {
             TeamSeasonStats stats = new TeamSeasonStats();
-            stats.setMatchesPlayed(10);
+            stats.setMatchesPlayed(20);
+            stats.setMatchesPlayedAway(10);
             stats.setSeasonWinsAway(3);
             assertEquals(30.0, RecommendationUtils.calculateWinPercentage(stats, false));
         }
@@ -166,9 +168,35 @@ class RecommendationUtilsTest {
         @DisplayName("calculateDrawPercentage calculates correctly")
         void calculateDrawPercentage_calculatesCorrectly() {
             TeamSeasonStats stats = new TeamSeasonStats();
-            stats.setMatchesPlayed(10);
+            stats.setMatchesPlayed(20);
+            stats.setMatchesPlayedHome(10);
             stats.setSeasonDrawsHome(4);
             assertEquals(40.0, RecommendationUtils.calculateDrawPercentage(stats, true));
+        }
+
+        @Test
+        @DisplayName("venue rates divide by venue matches, not the whole season")
+        void venueRates_divideByVenueMatches() {
+            TeamSeasonStats stats = new TeamSeasonStats();
+            stats.setMatchesPlayed(20);
+            stats.setMatchesPlayedHome(10);
+            stats.setSeasonWinsHome(6);
+
+            // Dividing 6 home wins by all 20 matches would report 30%.
+            assertEquals(60.0, RecommendationUtils.calculateWinPercentage(stats, true));
+        }
+
+        @Test
+        @DisplayName("venue matches fall back to wins plus draws plus losses")
+        void venueMatches_fallBackToResults() {
+            TeamSeasonStats stats = new TeamSeasonStats();
+            stats.setMatchesPlayed(20);
+            stats.setSeasonWinsHome(6);
+            stats.setSeasonDrawsHome(3);
+            stats.setSeasonLossesHome(1);
+
+            assertEquals(10, RecommendationUtils.calculateMatchesAtVenue(stats, true));
+            assertEquals(60.0, RecommendationUtils.calculateWinPercentage(stats, true));
         }
     }
 
@@ -186,7 +214,8 @@ class RecommendationUtilsTest {
         @DisplayName("calculateCleanSheetPercentage calculates home correctly")
         void calculateCleanSheetPercentage_calculatesHomeCorrectly() {
             TeamSeasonStats stats = new TeamSeasonStats();
-            stats.setMatchesPlayed(10);
+            stats.setMatchesPlayed(20);
+            stats.setMatchesPlayedHome(10);
             stats.setSeasonCleanSheetsHome(5);
             assertEquals(50.0, RecommendationUtils.calculateCleanSheetPercentage(stats, true));
         }
@@ -215,7 +244,8 @@ class RecommendationUtilsTest {
         @DisplayName("calculateFailedToScorePercentage calculates correctly")
         void calculateFailedToScorePercentage_calculatesCorrectly() {
             TeamSeasonStats stats = new TeamSeasonStats();
-            stats.setMatchesPlayed(10);
+            stats.setMatchesPlayed(20);
+            stats.setMatchesPlayedHome(10);
             stats.setSeasonFailedToScoreHome(3);
             assertEquals(30.0, RecommendationUtils.calculateFailedToScorePercentage(stats, true));
         }
@@ -299,9 +329,51 @@ class RecommendationUtilsTest {
         @DisplayName("calculateConcededAvg calculates correctly")
         void calculateConcededAvg_calculatesCorrectly() {
             TeamSeasonStats stats = new TeamSeasonStats();
-            stats.setMatchesPlayed(10);
+            stats.setMatchesPlayed(20);
+            stats.setMatchesPlayedHome(10);
             stats.setSeasonConcededHome(12);
             assertEquals(1.2, RecommendationUtils.calculateConcededAvg(stats, true));
+        }
+
+        @Test
+        @DisplayName("calculateConcededAvg prefers the feed's own per-game average")
+        void calculateConcededAvg_prefersReportedAverage() {
+            TeamSeasonStats stats = new TeamSeasonStats();
+            stats.setMatchesPlayed(20);
+            stats.setMatchesPlayedHome(10);
+            stats.setSeasonConcededHome(12);
+            stats.setConcededAvgHome(0.68);
+
+            assertEquals(0.68, RecommendationUtils.calculateConcededAvg(stats, true));
+        }
+
+        @Test
+        @DisplayName("calculateVenueGoalsAvg prefers the feed's own per-game average")
+        void calculateVenueGoalsAvg_prefersReportedAverage() {
+            TeamSeasonStats stats = new TeamSeasonStats();
+            stats.setMatchesPlayedHome(19);
+            stats.setSeasonGoalsHome(57);
+            stats.setScoredAvgHome(3.0);
+
+            assertEquals(3.0, RecommendationUtils.calculateVenueGoalsAvg(stats, true, 1.0));
+        }
+
+        @Test
+        @DisplayName("calculateVenueGoalsAvg falls back to venue goals over venue matches")
+        void calculateVenueGoalsAvg_fallsBackToDivision() {
+            TeamSeasonStats stats = new TeamSeasonStats();
+            stats.setMatchesPlayed(38);
+            stats.setMatchesPlayedHome(19);
+            stats.setSeasonGoalsHome(57);
+
+            assertEquals(3.0, RecommendationUtils.calculateVenueGoalsAvg(stats, true, 1.0));
+        }
+
+        @Test
+        @DisplayName("calculateVenueGoalsAvg returns the caller's default when the venue is unknown")
+        void calculateVenueGoalsAvg_returnsDefaultWithoutVenueRecord() {
+            assertEquals(1.0, RecommendationUtils.calculateVenueGoalsAvg(new TeamSeasonStats(), true, 1.0));
+            assertEquals(0.0, RecommendationUtils.calculateVenueGoalsAvg(null, true, 0.0));
         }
     }
 

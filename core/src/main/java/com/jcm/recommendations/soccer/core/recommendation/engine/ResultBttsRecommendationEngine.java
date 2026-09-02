@@ -304,7 +304,7 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double scoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 0.0);
+        double scoredAvg = calculateVenueGoalsAvg(homeStats, true, 0.0);
         double concededAvg = calculateConcededAvg(homeStats, true);
 
         // The winner must score enough and leak enough for BTTS to land alongside the win
@@ -331,7 +331,7 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double scoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 0.0);
+        double scoredAvg = calculateVenueGoalsAvg(awayStats, false, 0.0);
         double concededAvg = calculateConcededAvg(awayStats, false);
 
         if (scoredAvg < AWAY_SCORED_MIN || concededAvg < AWAY_CONCEDED_MIN) {
@@ -356,8 +356,8 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 0.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 0.0);
+        double homeScoredAvg = calculateVenueGoalsAvg(homeStats, true, 0.0);
+        double awayScoredAvg = calculateVenueGoalsAvg(awayStats, false, 0.0);
 
         // A score draw needs both sides scoring regularly
         if (homeScoredAvg < DRAW_SCORED_MIN || awayScoredAvg < DRAW_SCORED_MIN) {
@@ -401,8 +401,8 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         factors.put("selectedResultType", best.resultType);
 
         // Goals data backing the market requirements
-        double homeScoredAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 0.0);
-        double awayScoredAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 0.0);
+        double homeScoredAvg = calculateVenueGoalsAvg(homeStats, true, 0.0);
+        double awayScoredAvg = calculateVenueGoalsAvg(awayStats, false, 0.0);
         factors.put("homeScoredAvg", homeScoredAvg);
         factors.put("awayScoredAvg", awayScoredAvg);
         factors.put("homeConcededAvg", calculateConcededAvg(homeStats, true));

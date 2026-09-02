@@ -237,9 +237,7 @@ public class CleanSheetRecommendationEngine implements RecommendationEngine {
             }
 
             // Check if opponent is scoring less than xG (good for clean sheet)
-            double opponentActualGoals = !isHomeTeam 
-                    ? calculateGoalsAvg(opponentStats.getSeasonGoalsHome(), opponentStats.getMatchesPlayed(), 1.0)
-                    : calculateGoalsAvg(opponentStats.getSeasonGoalsAway(), opponentStats.getMatchesPlayed(), 1.0);
+            double opponentActualGoals = calculateVenueGoalsAvg(opponentStats, !isHomeTeam, 1.0);
             if (opponentXg > 0 && opponentActualGoals < opponentXg * 0.80) {
                 opponentXgOverperformance = true;
                 score *= XG_OVERPERFORMANCE_BONUS;

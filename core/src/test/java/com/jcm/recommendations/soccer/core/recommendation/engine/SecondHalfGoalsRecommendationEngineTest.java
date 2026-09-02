@@ -284,6 +284,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(35)    // 1.75 per game
                 .seasonConcededHome(20) // 1.0 per game
                 .seasonDrawsHome(5)
@@ -297,6 +299,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(28)    // 1.4 per game
                 .seasonConcededAway(25) // 1.25 per game
                 .seasonDrawsAway(6)
@@ -320,6 +324,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(12)    // 0.6 per game
                 .seasonConcededHome(10) // 0.5 per game
                 .seasonDrawsHome(8)
@@ -331,6 +337,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(10)    // 0.5 per game
                 .seasonConcededAway(12) // 0.6 per game
                 .seasonDrawsAway(9)
@@ -352,6 +360,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(30)
                 .seasonConcededHome(18)
                 .seasonDrawsHome(5)
@@ -367,6 +377,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(25)
                 .seasonConcededAway(22)
                 .seasonDrawsAway(6)
@@ -392,6 +404,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(38)    // 1.9 per game
                 .seasonConcededHome(24)
                 .seasonDrawsHome(5)
@@ -403,6 +417,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(32)    // 1.6 per game
                 .seasonConcededAway(26)
                 .seasonDrawsAway(5)
@@ -424,6 +440,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(38)    // High scoring
                 .seasonConcededHome(25)
                 .seasonDrawsHome(5)
@@ -435,6 +453,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(32)    // High scoring
                 .seasonConcededAway(28)
                 .seasonDrawsAway(4)
@@ -456,6 +476,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(28)
                 .seasonConcededHome(32)  // High conceded
                 .seasonDrawsHome(6)
@@ -467,6 +489,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(25)
                 .seasonConcededAway(30)  // High conceded
                 .seasonDrawsAway(5)
@@ -488,6 +512,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(48)    // 2.4 per game
                 .seasonConcededHome(28)
                 .seasonDrawsHome(4)
@@ -501,6 +527,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(42)    // 2.1 per game
                 .seasonConcededAway(30)
                 .seasonDrawsAway(4)
@@ -532,6 +560,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(35)
                 .seasonConcededHome(20)
                 .seasonDrawsHome(5)
@@ -544,6 +574,8 @@ class SecondHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(28)
                 .seasonConcededAway(25)
                 .seasonDrawsAway(6)

@@ -30,14 +30,16 @@ public class TeamStatsDto {
     @JsonProperty("seasonLossesNum_away")
     private Integer seasonLossesAway;
 
-    @JsonProperty("seasonGoals_overall")
+    @JsonProperty("seasonScoredNum_overall")
+    @JsonAlias({"seasonGoals_overall"})
     private Integer seasonGoalsOverall;
-    @JsonProperty("seasonGoalsNum_home")
+    @JsonProperty("seasonScoredNum_home")
     private Integer seasonGoalsHome;
-    @JsonProperty("seasonGoalsNum_away")
+    @JsonProperty("seasonScoredNum_away")
     private Integer seasonGoalsAway;
 
-    @JsonProperty("seasonConceded_overall")
+    @JsonProperty("seasonConcededNum_overall")
+    @JsonAlias({"seasonConceded_overall"})
     private Integer seasonConcededOverall;
     @JsonProperty("seasonConcededNum_home")
     private Integer seasonConcededHome;
@@ -68,11 +70,11 @@ public class TeamStatsDto {
     @JsonProperty("seasonBTTSPercentage_away")
     private Double seasonBttsPercentageAway;
 
-    @JsonProperty("seasonOver15_overall")
+    @JsonProperty("seasonOver15Num_overall")
     private Integer seasonOver15Overall;
-    @JsonProperty("seasonOver25_overall")
+    @JsonProperty("seasonOver25Num_overall")
     private Integer seasonOver25Overall;
-    @JsonProperty("seasonOver35_overall")
+    @JsonProperty("seasonOver35Num_overall")
     private Integer seasonOver35Overall;
 
     @JsonProperty("seasonOver15Percentage_overall")
@@ -201,8 +203,29 @@ public class TeamStatsDto {
     @JsonProperty("xg_against_avg_away")
     private Double xgAgainstAvgAway;
 
+    @JsonProperty("seasonMatchesPlayed_overall")
     private Integer matchesPlayed;
+    @JsonProperty("seasonMatchesPlayed_home")
+    private Integer matchesPlayedHome;
+    @JsonProperty("seasonMatchesPlayed_away")
+    private Integer matchesPlayedAway;
+
     private Integer points;
-    @JsonProperty("table_position")
+
+    @JsonProperty("leaguePosition_overall")
+    @JsonAlias({"table_position"})
     private Integer position;
+
+    /**
+     * The feed carries points-per-game but no season points total, so rebuild it from results.
+     */
+    public Integer getPoints() {
+        if (points != null) {
+            return points;
+        }
+        if (seasonWinsOverall == null || seasonDrawsOverall == null) {
+            return null;
+        }
+        return (3 * seasonWinsOverall) + seasonDrawsOverall;
+    }
 }

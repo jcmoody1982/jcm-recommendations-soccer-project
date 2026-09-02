@@ -223,8 +223,8 @@ double expectedCorners = calculateExpectedCorners(context);
 
     private double calculatePlayingStyleMultiplier(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
         // Attacking teams tend to win more corners
-        double homeGoalsAvg = calculateGoalsAvg(homeStats.getSeasonGoalsHome(), homeStats.getMatchesPlayed(), 1.0);
-        double awayGoalsAvg = calculateGoalsAvg(awayStats.getSeasonGoalsAway(), awayStats.getMatchesPlayed(), 1.0);
+        double homeGoalsAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
+        double awayGoalsAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);
 
         double multiplier = 1.0;
 

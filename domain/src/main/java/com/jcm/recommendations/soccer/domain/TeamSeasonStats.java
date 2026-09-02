@@ -26,6 +26,8 @@ public class TeamSeasonStats {
     private Long seasonId;
 
     private Integer matchesPlayed;
+    private Integer matchesPlayedHome;
+    private Integer matchesPlayedAway;
     private Integer points;
     private Integer position;
 
@@ -84,6 +86,14 @@ public class TeamSeasonStats {
     private Double cardsAvgOverall;
     private Double cardsAvgHome;
     private Double cardsAvgAway;
+
+    private Double scoredAvgOverall;
+    private Double scoredAvgHome;
+    private Double scoredAvgAway;
+
+    private Double concededAvgOverall;
+    private Double concededAvgHome;
+    private Double concededAvgAway;
 
     // Expected Goals (xG) data
     private Double xgForAvgOverall;

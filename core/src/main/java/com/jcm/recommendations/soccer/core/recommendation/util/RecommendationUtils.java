@@ -76,39 +76,43 @@ public final class RecommendationUtils {
     // ===== Win/Loss/Draw percentage calculations =====
 
     public static double calculateWinPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+        int matches = calculateMatchesAtVenue(stats, isHome);
+        if (matches == 0) {
             return 33.3;
         }
         int wins = isHome ? safeInt(stats.getSeasonWinsHome()) : safeInt(stats.getSeasonWinsAway());
-        return (wins * 100.0) / stats.getMatchesPlayed();
+        return (wins * 100.0) / matches;
     }
 
     public static double calculateLossPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+        int matches = calculateMatchesAtVenue(stats, isHome);
+        if (matches == 0) {
             return 33.3;
         }
         int losses = isHome ? safeInt(stats.getSeasonLossesHome()) : safeInt(stats.getSeasonLossesAway());
-        return (losses * 100.0) / stats.getMatchesPlayed();
+        return (losses * 100.0) / matches;
     }
 
     public static double calculateDrawPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+        int matches = calculateMatchesAtVenue(stats, isHome);
+        if (matches == 0) {
             return 25.0;
         }
         int draws = isHome ? safeInt(stats.getSeasonDrawsHome()) : safeInt(stats.getSeasonDrawsAway());
-        return (draws * 100.0) / stats.getMatchesPlayed();
+        return (draws * 100.0) / matches;
     }
 
     // ===== Clean sheet calculations =====
 
     public static double calculateCleanSheetPercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+        int matches = calculateMatchesAtVenue(stats, isHome);
+        if (matches == 0) {
             return 30.0;
         }
         int cleanSheets = isHome 
                 ? safeInt(stats.getSeasonCleanSheetsHome()) 
                 : safeInt(stats.getSeasonCleanSheetsAway());
-        return (cleanSheets * 100.0) / stats.getMatchesPlayed();
+        return (cleanSheets * 100.0) / matches;
     }
 
     public static double calculateCleanSheetPercentageOverall(TeamSeasonStats stats) {
@@ -122,13 +126,14 @@ public final class RecommendationUtils {
     // ===== Failed to score calculations =====
 
     public static double calculateFailedToScorePercentage(TeamSeasonStats stats, boolean isHome) {
-        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
+        int matches = calculateMatchesAtVenue(stats, isHome);
+        if (matches == 0) {
             return 20.0;
         }
         int fts = isHome 
                 ? safeInt(stats.getSeasonFailedToScoreHome()) 
                 : safeInt(stats.getSeasonFailedToScoreAway());
-        return (fts * 100.0) / stats.getMatchesPlayed();
+        return (fts * 100.0) / matches;
     }
 
     public static double calculateFailedToScorePercentageOverall(TeamSeasonStats stats) {
@@ -142,13 +147,7 @@ public final class RecommendationUtils {
     // ===== Conceded calculations =====
 
     public static double calculateConcededAvg(TeamSeasonStats stats, boolean isHome) {
-        if (stats == null || stats.getMatchesPlayed() == null || stats.getMatchesPlayed() == 0) {
-            return 1.0;
-        }
-        int conceded = isHome 
-                ? safeInt(stats.getSeasonConcededHome()) 
-                : safeInt(stats.getSeasonConcededAway());
-        return conceded / (double) stats.getMatchesPlayed();
+        return calculateVenueConcededAvg(stats, isHome, 1.0);
     }
 
     // ===== Scored percentage =====
@@ -162,11 +161,17 @@ public final class RecommendationUtils {
     }
 
     /**
-     * Venue match count from W+D+L (home or away). Prefer this over matchesPlayed/2.
+     * Venue match count (home or away). Uses the feed's own venue count when present and falls
+     * back to W+D+L. Never use overall matchesPlayed as the divisor for a venue-only numerator:
+     * that understates every home and away rate by roughly half.
      */
     public static int calculateMatchesAtVenue(TeamSeasonStats stats, boolean isHome) {
         if (stats == null) {
             return 0;
+        }
+        Integer reported = isHome ? stats.getMatchesPlayedHome() : stats.getMatchesPlayedAway();
+        if (reported != null && reported > 0) {
+            return reported;
         }
         if (isHome) {
             return safeInt(stats.getSeasonWinsHome())
@@ -200,18 +205,48 @@ public final class RecommendationUtils {
     }
 
     public static double calculateVenueGoalsAvg(TeamSeasonStats stats, boolean isHome) {
+        return calculateVenueGoalsAvg(stats, isHome, 0.0);
+    }
+
+    /**
+     * Goals scored per game at the given venue. Prefers the feed's own per-game average and
+     * otherwise divides venue goals by venue matches.
+     */
+    public static double calculateVenueGoalsAvg(TeamSeasonStats stats, boolean isHome, double defaultValue) {
+        if (stats == null) {
+            return defaultValue;
+        }
+        Double reported = isHome ? stats.getScoredAvgHome() : stats.getScoredAvgAway();
+        if (reported != null && reported >= 0.0) {
+            return reported;
+        }
         int matches = calculateMatchesAtVenue(stats, isHome);
         if (matches == 0) {
-            return 0.0;
+            return defaultValue;
         }
         int goals = isHome ? safeInt(stats.getSeasonGoalsHome()) : safeInt(stats.getSeasonGoalsAway());
         return goals / (double) matches;
     }
 
     public static double calculateVenueConcededAvg(TeamSeasonStats stats, boolean isHome) {
+        return calculateVenueConcededAvg(stats, isHome, 0.0);
+    }
+
+    /**
+     * Goals conceded per game at the given venue. Prefers the feed's own per-game average and
+     * otherwise divides venue goals conceded by venue matches.
+     */
+    public static double calculateVenueConcededAvg(TeamSeasonStats stats, boolean isHome, double defaultValue) {
+        if (stats == null) {
+            return defaultValue;
+        }
+        Double reported = isHome ? stats.getConcededAvgHome() : stats.getConcededAvgAway();
+        if (reported != null && reported >= 0.0) {
+            return reported;
+        }
         int matches = calculateMatchesAtVenue(stats, isHome);
         if (matches == 0) {
-            return 0.0;
+            return defaultValue;
         }
         int conceded = isHome ? safeInt(stats.getSeasonConcededHome()) : safeInt(stats.getSeasonConcededAway());
         return conceded / (double) matches;

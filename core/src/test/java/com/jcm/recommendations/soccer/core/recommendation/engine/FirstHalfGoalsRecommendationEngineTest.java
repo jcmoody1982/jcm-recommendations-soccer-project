@@ -328,6 +328,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(40)    // 2.0 per game
                 .seasonConcededHome(25) // 1.25 per game
                 .seasonBttsPercentageHome(65.0)
@@ -340,6 +342,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(35)    // 1.75 per game
                 .seasonConcededAway(28) // 1.4 per game
                 .seasonBttsPercentageAway(60.0)
@@ -370,6 +374,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(12)    // 0.6 per game
                 .seasonConcededHome(10) // 0.5 per game
                 .seasonBttsPercentageHome(25.0)
@@ -379,6 +385,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(10)    // 0.5 per game
                 .seasonConcededAway(12) // 0.6 per game
                 .seasonBttsPercentageAway(30.0)
@@ -398,6 +406,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(30)
                 .seasonConcededHome(18)
                 .seasonBttsPercentageHome(55.0)
@@ -411,6 +421,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(25)
                 .seasonConcededAway(22)
                 .seasonBttsPercentageAway(50.0)
@@ -442,6 +454,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(38)    // 1.9 per game
                 .seasonConcededHome(24)
                 .seasonBttsPercentageHome(60.0)
@@ -451,6 +465,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(32)    // 1.6 per game
                 .seasonConcededAway(26)
                 .seasonBttsPercentageAway(55.0)
@@ -478,6 +494,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(35)
                 .seasonConcededHome(20)
                 .seasonBttsPercentageHome(60.0)
@@ -487,6 +505,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(30)
                 .seasonConcededAway(25)
                 .seasonBttsPercentageAway(55.0)
@@ -515,6 +535,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(30)
                 .seasonConcededHome(35)  // 1.75 per game - high
                 .seasonBttsPercentageHome(70.0)
@@ -524,6 +546,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(28)
                 .seasonConcededAway(30)  // 1.5 per game - high
                 .seasonBttsPercentageAway(65.0)
@@ -551,6 +575,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(38)    // 1.9 per game
                 .seasonConcededHome(24)
                 .seasonBttsPercentageHome(60.0)
@@ -560,6 +586,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(32)    // 1.6 per game
                 .seasonConcededAway(26)
                 .seasonBttsPercentageAway(55.0)
@@ -601,6 +629,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(45)    // 2.25 per game
                 .seasonConcededHome(25)
                 .seasonBttsPercentageHome(70.0)
@@ -612,6 +642,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(38)    // 1.9 per game
                 .seasonConcededAway(30)
                 .seasonBttsPercentageAway(65.0)
@@ -649,6 +681,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsHome(26)    // 1.3 actual - underperforming vs xG of 2.0
                 .seasonConcededHome(22)
                 .seasonBttsPercentageHome(55.0)
@@ -660,6 +694,8 @@ class FirstHalfGoalsRecommendationEngineTest {
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
+                .matchesPlayedHome(20)
+                .matchesPlayedAway(20)
                 .seasonGoalsAway(24)    // 1.2 actual - underperforming vs xG of 1.8
                 .seasonConcededAway(24)
                 .seasonBttsPercentageAway(50.0)
