@@ -97,10 +97,28 @@ class ElitePicksSelectorTest {
     void screensExcludedLinesWithoutCatchingTheLinesWeKeep() {
         assertThat(ElitePicksSelector.isExcludedFromElitePicks("Over 3.5 Goals")).isTrue();
         assertThat(ElitePicksSelector.isExcludedFromElitePicks("Over 0.5 HT Goals")).isTrue();
+        assertThat(ElitePicksSelector.isExcludedFromElitePicks("Under 1.5 Goals")).isTrue();
         assertThat(ElitePicksSelector.isExcludedFromElitePicks("Over 2.5 Goals")).isFalse();
         assertThat(ElitePicksSelector.isExcludedFromElitePicks("Over 1.5 Goals")).isFalse();
+        assertThat(ElitePicksSelector.isExcludedFromElitePicks("Under 2.5 Goals")).isFalse();
         assertThat(ElitePicksSelector.isExcludedFromElitePicks("Under 3.5 Goals")).isFalse();
         assertThat(ElitePicksSelector.isExcludedFromElitePicks(null)).isFalse();
+    }
+
+    @Test
+    void excludesUnder15FromEveryTypeThatCanEmitIt() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        // Under 1.5 lands ~20% of the time but is only ever labelled above the engine's STRONG line,
+        // so it arrives Elite-eligible by construction. Under 2.5 is the line we still carry.
+        List<RecommendationSnapshot> day = List.of(
+                snapWithMarket(1L, date, 100L, "UNDER_GOALS", "Under 1.5 Goals", "STRONG", 86.0, 3.4, 1000L),
+                snapWithMarket(2L, date, 200L, "VALUE_BET", "Under 1.5 Goals", "STRONG", 84.0, 3.6, 2000L),
+                snapWithMarket(3L, date, 300L, "UNDER_GOALS", "Under 2.5 Goals", "STRONG", 72.0, 1.9, 3000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite).extracting(RecommendationSnapshot::getFixtureId).containsExactly(300L);
     }
 
     @Test
