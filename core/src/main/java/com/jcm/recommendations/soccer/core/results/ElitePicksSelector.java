@@ -78,11 +78,23 @@ public final class ElitePicksSelector {
     }
 
     /**
-     * Temporary: Over 0.5 half-goals score too high and crowd out other Elite picks.
-     * Over 1.5 half-goals remain eligible.
+     * Goal lines Elite will not carry, screened on the market string because three types can emit
+     * them - OVER_GOALS, TOP_VS_BOTTOM and VALUE_BET - and all three are Elite-eligible.
+     *
+     * <p>Over 0.5: half-goals score too high and crowd out everything else. Over 1.5 stays eligible.
+     *
+     * <p>Over 3.5: lands in about 30% of matches, but the engines only attach the label above their
+     * STRONG line, so the pick is published claiming 80+ on a 30% event and is Elite-eligible by
+     * construction - a moderate Over 3.5 cannot exist. Over 2.5 is the highest line we trust.
      */
+    private static final List<String> EXCLUDED_MARKET_LINES = List.of("over 0.5", "over 3.5");
+
     public static boolean isExcludedFromElitePicks(String market) {
-        return market != null && market.toLowerCase(Locale.ROOT).contains("over 0.5");
+        if (market == null) {
+            return false;
+        }
+        String lower = market.toLowerCase(Locale.ROOT);
+        return EXCLUDED_MARKET_LINES.stream().anyMatch(lower::contains);
     }
 
     /**

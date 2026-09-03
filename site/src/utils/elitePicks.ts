@@ -56,9 +56,22 @@ export function marketFamily(type: string | null | undefined): string {
   return TYPE_FAMILIES[upper] ?? upper;
 }
 
-/** Temporary: Over 0.5 half-goals crowd Elite until scoring is tuned. Over 1.5 remains eligible. */
+/**
+ * Goal lines Elite will not carry, screened on the market string because three types can emit them —
+ * OVER_GOALS, TOP_VS_BOTTOM and VALUE_BET — and all three are Elite-eligible.
+ *
+ * Over 0.5: half-goals score too high and crowd out everything else. Over 1.5 stays eligible.
+ *
+ * Over 3.5: lands in about 30% of matches, but the engines only attach the label above their STRONG
+ * line, so the pick is published claiming 80+ on a 30% event and is Elite-eligible by construction —
+ * a moderate Over 3.5 cannot exist. Over 2.5 is the highest line we trust.
+ */
+const EXCLUDED_MARKET_LINES = ['over 0.5', 'over 3.5'];
+
 export function isExcludedFromElitePicks(market: string | null | undefined): boolean {
-  return market != null && market.toLowerCase().includes('over 0.5');
+  if (market == null) return false;
+  const lower = market.toLowerCase();
+  return EXCLUDED_MARKET_LINES.some((line) => lower.includes(line));
 }
 
 /**

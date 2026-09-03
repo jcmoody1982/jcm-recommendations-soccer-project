@@ -77,6 +77,33 @@ class ElitePicksSelectorTest {
     }
 
     @Test
+    void excludesOver35FromEveryTypeThatCanEmitIt() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        // Over 3.5 lands ~30% of the time but is only ever labelled above the engines' STRONG line,
+        // so it arrives Elite-eligible by construction. Over 2.5 is the highest line we carry.
+        List<RecommendationSnapshot> day = List.of(
+                snapWithMarket(1L, date, 100L, "OVER_GOALS", "Over 3.5 Goals", "STRONG", 88.0, 2.6, 1000L),
+                snapWithMarket(2L, date, 200L, "TOP_VS_BOTTOM", "Over 3.5 Goals", "STRONG", 86.0, 2.5, 2000L),
+                snapWithMarket(3L, date, 300L, "VALUE_BET", "Over 3.5 Goals", "STRONG", 84.0, 2.8, 3000L),
+                snapWithMarket(4L, date, 400L, "OVER_25_GOALS", "Over 2.5 Goals", "STRONG", 70.0, 1.7, 4000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite).extracting(RecommendationSnapshot::getFixtureId).containsExactly(400L);
+    }
+
+    @Test
+    void screensExcludedLinesWithoutCatchingTheLinesWeKeep() {
+        assertThat(ElitePicksSelector.isExcludedFromElitePicks("Over 3.5 Goals")).isTrue();
+        assertThat(ElitePicksSelector.isExcludedFromElitePicks("Over 0.5 HT Goals")).isTrue();
+        assertThat(ElitePicksSelector.isExcludedFromElitePicks("Over 2.5 Goals")).isFalse();
+        assertThat(ElitePicksSelector.isExcludedFromElitePicks("Over 1.5 Goals")).isFalse();
+        assertThat(ElitePicksSelector.isExcludedFromElitePicks("Under 3.5 Goals")).isFalse();
+        assertThat(ElitePicksSelector.isExcludedFromElitePicks(null)).isFalse();
+    }
+
+    @Test
     void capsAnySingleMarketAtThreeSoItCannotFillTheBoard() {
         LocalDate date = LocalDate.of(2026, 8, 15);
         // Over 1.5 clears in roughly three quarters of fixtures, so on probability alone it
