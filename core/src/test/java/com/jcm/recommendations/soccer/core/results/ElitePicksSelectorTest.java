@@ -149,6 +149,40 @@ class ElitePicksSelectorTest {
     }
 
     @Test
+    void capsOver15AtThreeEvenWhenValueBetSitsOutsideTheGoalsOverFamily() {
+        LocalDate date = LocalDate.of(2026, 8, 15);
+        // VALUE_BET is not in the goals-over family, so without a line cap it could add three more
+        // Over 1.5 slots on top of the three the family already allows.
+        List<RecommendationSnapshot> day = List.of(
+                snapWithMarket(1L, date, 100L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 93.0, 1.22, 1000L),
+                snapWithMarket(2L, date, 200L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 92.0, 1.20, 2000L),
+                snapWithMarket(3L, date, 300L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 91.0, 1.24, 3000L),
+                snapWithMarket(4L, date, 400L, "VALUE_BET", "Over 1.5 Goals", "STRONG", 90.0, 1.30, 4000L),
+                snapWithMarket(5L, date, 500L, "VALUE_BET", "Over 1.5 Goals", "STRONG", 89.0, 1.35, 5000L),
+                snapWithMarket(6L, date, 600L, "FIRST_HALF_GOALS", "Over 1.5 HT Goals", "STRONG", 88.0, 2.10, 6000L),
+                snapWithMarket(7L, date, 700L, "OVER_25_GOALS", "Over 2.5 Goals", "STRONG", 74.0, 1.85, 7000L),
+                snapWithMarket(8L, date, 800L, "BTTS", "BTTS Yes", "STRONG", 71.0, 1.80, 8000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite.stream().filter(r -> ElitePicksSelector.isOver15Line(r.getMarket())).count())
+                .isEqualTo(3);
+        assertThat(elite).extracting(RecommendationSnapshot::getType)
+                .contains("BTTS");
+    }
+
+    @Test
+    void treatsHalfAndFullOver15AsTheSameLineAndLeavesCornersAlone() {
+        assertThat(ElitePicksSelector.isOver15Line("Over 1.5 Goals")).isTrue();
+        assertThat(ElitePicksSelector.isOver15Line("Over 1.5 HT Goals")).isTrue();
+        assertThat(ElitePicksSelector.isOver15Line("Over 1.5 2H Goals")).isTrue();
+        assertThat(ElitePicksSelector.isOver15Line("Over 2.5 Goals")).isFalse();
+        assertThat(ElitePicksSelector.isOver15Line("Over 10.5 Corners")).isFalse();
+        assertThat(ElitePicksSelector.isOver15Line(null)).isFalse();
+    }
+
+    @Test
     void capsTheWholeGoalsOverFamilySoOver15CannotFillTheBoardUnderThreeTypeNames() {
         LocalDate date = LocalDate.of(2026, 8, 15);
         // Over 1.5 full match, Over 1.5 HT and Over 1.5 2H are three separate types, so a per-type

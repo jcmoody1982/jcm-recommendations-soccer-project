@@ -13,7 +13,7 @@ import java.util.Set;
 
 /**
  * UC-036 / UC-037: rank Strong %-style snapshot picks into Elite
- * (top 10, ≤1 per fixture, ≤3 per market family, priced only).
+ * (top 10, ≤1 per fixture, ≤3 per market family, ≤3 Over 1.5, priced only).
  * Mirrors {@code site/src/utils/elitePicks.ts}.
  */
 public final class ElitePicksSelector {
@@ -32,6 +32,13 @@ public final class ElitePicksSelector {
      * budget.
      */
     public static final int ELITE_MAX_PER_FAMILY = 3;
+
+    /**
+     * Most Over 1.5 slots Elite will carry, across every type that can emit that line. The family
+     * cap alone is not enough: VALUE_BET is Elite-eligible, sells Over 1.5, and is not in the
+     * goals-over family, so it could take another three slots that all read the same bet.
+     */
+    public static final int ELITE_MAX_OVER_15 = 3;
 
     private static final Set<String> ELIGIBLE_TYPES = Set.of(
             "MATCH_RESULT",
@@ -98,6 +105,14 @@ public final class ElitePicksSelector {
     }
 
     /**
+     * Full-match Over 1.5, Over 1.5 HT and Over 1.5 2H are the same high-base-rate read. Does not
+     * match Over 10.5 / 11.5 corners — those strings do not contain {@code over 1.5}.
+     */
+    public static boolean isOver15Line(String market) {
+        return market != null && market.toLowerCase(Locale.ROOT).contains("over 1.5");
+    }
+
+    /**
      * Shortest price Elite will carry. Ranking by probability pushes the shortest prices to the top,
      * and live data had the board opening with Over 1.5 at 1.01 and Double Chance at 1.03 - returns
      * too thin to be worth staking, whatever the hit rate.
@@ -143,6 +158,7 @@ public final class ElitePicksSelector {
 
         Set<Long> seenFixtures = new HashSet<>();
         Map<String, Integer> familyCounts = new HashMap<>();
+        int over15Count = 0;
         List<RecommendationSnapshot> elite = new ArrayList<>();
         for (RecommendationSnapshot row : pool) {
             Long fixtureId = row.getFixtureId();
@@ -154,8 +170,15 @@ public final class ElitePicksSelector {
             if (familyCount >= ELITE_MAX_PER_FAMILY) {
                 continue;
             }
+            boolean over15 = isOver15Line(row.getMarket());
+            if (over15 && over15Count >= ELITE_MAX_OVER_15) {
+                continue;
+            }
             seenFixtures.add(fixtureId);
             familyCounts.put(family, familyCount + 1);
+            if (over15) {
+                over15Count++;
+            }
             elite.add(row);
             if (elite.size() >= limit) {
                 break;

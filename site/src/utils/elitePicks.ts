@@ -31,6 +31,13 @@ export const ELITE_PICKS_LIMIT = 10;
  */
 export const ELITE_MAX_PER_FAMILY = 3;
 
+/**
+ * Most Over 1.5 slots Elite will carry, across every type that can emit that line. The family cap
+ * alone is not enough: VALUE_BET is Elite-eligible, sells Over 1.5, and is not in the goals-over
+ * family, so it could take another three slots that all read the same bet.
+ */
+export const ELITE_MAX_OVER_15 = 3;
+
 const ELITE_TYPE_SET = new Set<string>(ELITE_ELIGIBLE_TYPES);
 
 /**
@@ -75,6 +82,14 @@ export function isExcludedFromElitePicks(market: string | null | undefined): boo
 }
 
 /**
+ * Full-match Over 1.5, Over 1.5 HT and Over 1.5 2H are the same high-base-rate read. Does not match
+ * Over 10.5 / 11.5 corners — those strings do not contain `over 1.5`.
+ */
+export function isOver15Line(market: string | null | undefined): boolean {
+  return market != null && market.toLowerCase().includes('over 1.5');
+}
+
+/**
  * Shortest price Elite will carry. Ranking by probability pushes the shortest prices to the top, and
  * live data had the board opening with Over 1.5 at 1.01 and Double Chance at 1.03 — returns too thin
  * to be worth staking, whatever the hit rate.
@@ -112,7 +127,8 @@ function compareEliteRank(a: Recommendation, b: Recommendation): number {
 
 /**
  * Rank Strong %-style picks into Elite Picks (UC-036).
- * At most one selection per fixture; default cap 10; at most 3 of any one market family; priced only.
+ * At most one selection per fixture; default cap 10; at most 3 of any one market family;
+ * at most 3 Over 1.5; priced only.
  */
 export function selectElitePicks(
   recommendations: Recommendation[],
@@ -124,6 +140,7 @@ export function selectElitePicks(
 
   const seenFixtures = new Set<number>();
   const familyCounts = new Map<string, number>();
+  let over15Count = 0;
   const elite: Recommendation[] = [];
 
   for (const rec of pool) {
@@ -133,8 +150,12 @@ export function selectElitePicks(
     const familyCount = familyCounts.get(family) ?? 0;
     if (familyCount >= ELITE_MAX_PER_FAMILY) continue;
 
+    const over15 = isOver15Line(rec.market);
+    if (over15 && over15Count >= ELITE_MAX_OVER_15) continue;
+
     seenFixtures.add(rec.fixtureId);
     familyCounts.set(family, familyCount + 1);
+    if (over15) over15Count += 1;
     elite.push(rec);
     if (elite.length >= limit) break;
   }
