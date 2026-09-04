@@ -41,7 +41,7 @@ public class PickSettlementGrader {
             case OVER_CORNERS, UNDER_CORNERS -> gradeCorners(snapshot.getMarket(), match);
             case BOOKING_POINTS -> gradeBookingPoints(snapshot.getMarket(), match);
             case BTTS -> gradeBtts(snapshot.getMarket(), match);
-            case OVER_GOALS, UNDER_GOALS, OVER_15_GOALS, OVER_25_GOALS ->
+            case OVER_GOALS, UNDER_GOALS, OVER_05_GOALS, OVER_15_GOALS, OVER_25_GOALS ->
                     gradeOverUnderGoals(snapshot.getMarket(), match, true);
             case MATCH_RESULT -> gradeTeamOrDraw(snapshot, match, true);
             case DRAW -> gradeDraw(match);

@@ -122,6 +122,16 @@ function glyph(type: MarketIconId) {
           <path className={styles.strokeSecondary} d="M10 26.5h20" strokeWidth="1.8" />
           <path className={styles.strokePrimary} d="M20 25V12.5" strokeWidth="2" />
           <path className={styles.strokePrimary} d="M15.5 17L20 12.5 24.5 17" strokeWidth="2" />
+          <text x="20" y="33" textAnchor="middle" className={styles.halfMark} style={{ fontSize: '7.5px' }}>2.5</text>
+        </g>
+      );
+    case 'OVER_05_GOALS':
+      return (
+        <g>
+          <path className={styles.strokeSecondary} d="M10 24.5h20" strokeWidth="1.8" />
+          <path className={styles.strokePrimary} d="M20 23V11" strokeWidth="2" />
+          <path className={styles.strokePrimary} d="M15.5 15.5L20 11 24.5 15.5" strokeWidth="2" />
+          <text x="20" y="33" textAnchor="middle" className={styles.halfMark} style={{ fontSize: '7.5px' }}>0.5</text>
         </g>
       );
     case 'OVER_15_GOALS':

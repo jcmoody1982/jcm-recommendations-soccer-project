@@ -143,6 +143,15 @@ class OverGoalsRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze never steps up to Over 3.5")
+    void analyze_neverStepsUpToOver35() {
+        Optional<Recommendation> result = engine.analyze(createHighScoringContext());
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Over 2.5 Goals");
+    }
+
+    @Test
     @DisplayName("analyze tracks Over 3.5 percentages")
     void analyze_tracksOver35Percentages() {
         FixtureContext context = createHighScoringContext();

@@ -43,7 +43,7 @@ public class ResultsPerformanceService {
      */
     private static final Set<String> PROBABILITY_SCORED_TYPES = Set.of(
             "MATCH_RESULT", "BTTS", "DOUBLE_CHANCE", "RESULT_BTTS", "TOP_VS_BOTTOM",
-            "OVER_15_GOALS", "OVER_25_GOALS", "PLAYER_TO_SCORE", "PLAYER_TO_ASSIST",
+            "OVER_05_GOALS", "OVER_15_GOALS", "OVER_25_GOALS", "PLAYER_TO_SCORE", "PLAYER_TO_ASSIST",
             "DRAW", "FIRST_HALF_GOALS", "SECOND_HALF_GOALS", "VALUE_BET",
             "OVER_GOALS", "UNDER_GOALS", "CLEAN_SHEET");
 

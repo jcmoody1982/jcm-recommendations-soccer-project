@@ -1,4 +1,4 @@
-import type { RecommendationType } from '../types';
+import type { Recommendation, RecommendationType } from '../types';
 
 export interface SectionConfig {
   title: string;
@@ -25,6 +25,7 @@ export const SECTION_ORDER: RecommendationType[] = [
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
   'VALUE_BET',
+  'OVER_05_GOALS',
   'OVER_GOALS',
   'UNDER_GOALS',
   'BOOKING_POINTS',
@@ -115,8 +116,14 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
     scoreUnit: '%',
     showPrice: true,
   },
+  OVER_05_GOALS: {
+    title: 'Over 0.5 Goals',
+    scoreLabel: 'Probability',
+    scoreUnit: '%',
+    showPrice: true,
+  },
   OVER_GOALS: {
-    title: 'Over Goals',
+    title: 'Over 2.5 Goals',
     scoreLabel: 'Probability',
     scoreUnit: '%',
     showPrice: true,
@@ -177,4 +184,22 @@ export function sectionTitle(type: RecommendationType | string): string {
 
 export function sectionDomId(type: RecommendationType): string {
   return `rec-section-${type}`;
+}
+
+/** Over 0.5 board only carries a quote longer than 1.20. */
+export const OVER_05_MIN_PRICE = 1.2;
+
+/**
+ * Line filters for the goals boards: Over Goals is Over 2.5 only, Over 0.5 requires a
+ * backable price. Other sections pass through unchanged.
+ */
+export function includeInMarketSection(rec: Recommendation): boolean {
+  const market = rec.market?.toLowerCase() ?? '';
+  if (rec.type === 'OVER_GOALS') {
+    return market.includes('over 2.5');
+  }
+  if (rec.type === 'OVER_05_GOALS') {
+    return market.includes('over 0.5') && rec.odds != null && rec.odds > OVER_05_MIN_PRICE;
+  }
+  return true;
 }

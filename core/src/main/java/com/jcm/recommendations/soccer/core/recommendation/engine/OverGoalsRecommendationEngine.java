@@ -83,7 +83,7 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        String market = determineMarket(context, expectedGoals, score);
+        String market = "Over 2.5 Goals";
         Double odds = getOddsForMarket(context, market);
         Map<String, Object> factors = buildFactors(context, score, expectedGoals);
 
@@ -236,25 +236,6 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
             return ConfidenceLevel.MODERATE;
         }
         return ConfidenceLevel.WEAK;
-    }
-
-    private String determineMarket(FixtureContext context, double expectedGoals, double score) {
-        TeamSeasonStats homeStats = context.getHomeTeamStats();
-        TeamSeasonStats awayStats = context.getAwayTeamStats();
-        
-        // Check Over 3.5 eligibility
-        if (expectedGoals >= 3.5 && score >= THRESHOLD_STRONG) {
-            // Also check if teams have reasonable Over 3.5 percentages
-            double homeOver35 = safePercentage(homeStats.getSeasonOver35PercentageOverall());
-            double awayOver35 = safePercentage(awayStats.getSeasonOver35PercentageOverall());
-            double avgOver35 = (homeOver35 + awayOver35) / 2.0;
-            
-            // Require at least 40% average Over 3.5 rate for O3.5 recommendation
-            if (avgOver35 >= 40.0) {
-                return "Over 3.5 Goals";
-            }
-        }
-        return "Over 2.5 Goals";
     }
 
     private Map<String, Object> buildFactors(FixtureContext context, double score, double expectedGoals) {

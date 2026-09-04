@@ -156,6 +156,8 @@ class RecommendationServiceTest {
 
         assertThat(result).containsKey(RecommendationType.BTTS);
         assertThat(result.get(RecommendationType.BTTS)).hasSize(1);
+        assertThat(result).containsKey(RecommendationType.OVER_05_GOALS);
+        assertThat(result.get(RecommendationType.OVER_05_GOALS)).isEmpty();
         assertThat(result).containsKey(RecommendationType.OVER_15_GOALS);
         assertThat(result.get(RecommendationType.OVER_15_GOALS)).isEmpty();
         assertThat(result).containsKey(RecommendationType.OVER_25_GOALS);

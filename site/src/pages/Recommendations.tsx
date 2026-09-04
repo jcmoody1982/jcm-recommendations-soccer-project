@@ -22,14 +22,17 @@ import {
 } from '../utils/elitePicks';
 import {
   SECTION_ORDER,
+  includeInMarketSection,
   sectionTitle,
 } from '../utils/recommendationSections';
 import styles from './Recommendations.module.css';
 
 /** Always render these boards so a Strong-only view is not mistaken for a missing market. */
 const PINNED_EMPTY_TYPES: RecommendationType[] = [
+  'OVER_05_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
+  'OVER_GOALS',
   'PLAYER_TO_SCORE',
   'PLAYER_TO_ASSIST',
 ];
@@ -245,6 +248,9 @@ export default function Recommendations() {
 
       const recs = groupedRecommendations[type] || [];
       const next = recs.filter((rec: Recommendation) => {
+        if (!includeInMarketSection(rec)) {
+          return false;
+        }
         if (!matchesConfidence(rec.confidence, confidenceFilter)) {
           return false;
         }
@@ -304,6 +310,7 @@ export default function Recommendations() {
     for (const type of SECTION_ORDER) {
       const recs = groupedRecommendations[type] || [];
       counts[type] = recs.filter((rec: Recommendation) => {
+        if (!includeInMarketSection(rec)) return false;
         if (!matchesConfidence(rec.confidence, confidenceFilter)) return false;
         if (searchLower) {
           const matchesSearch =

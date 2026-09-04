@@ -72,6 +72,11 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
 
     protected abstract Double oddsForMarket(FixtureContext context);
 
+    /** Override to require a backable price. Default publishes priced and unpriced alike. */
+    protected boolean passesOddsGate(Double odds) {
+        return true;
+    }
+
     @Override
     public RecommendationType getType() {
         return spec().type();
@@ -109,6 +114,11 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
             return Optional.empty();
         }
 
+        Double odds = oddsForMarket(context);
+        if (!passesOddsGate(odds)) {
+            return Optional.empty();
+        }
+
         Map<String, Object> factors = buildFactors(context, spec, score, expectedGoals, homeOverPct, awayOverPct);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
@@ -116,7 +126,7 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
                 .confidence(confidence)
                 .score(score)
                 .market(spec.market())
-                .odds(oddsForMarket(context))
+                .odds(odds)
                 .description(RecommendationFactory.buildExpectedValueDescription(
                         confidence, spec.market(), expectedGoals, "expected goals", context))
                 .factors(factors)
