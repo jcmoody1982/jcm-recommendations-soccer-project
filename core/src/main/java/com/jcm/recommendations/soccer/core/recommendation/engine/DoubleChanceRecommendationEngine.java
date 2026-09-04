@@ -63,6 +63,12 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
     // Value threshold
     private static final double MIN_VALUE_PERCENT = 5.0;
 
+    /**
+     * Shortest Double Chance price the board will carry. Ranking by probability pushes heavy
+     * favourites into 1X at ~1.05, which is not a stakeable return.
+     */
+    private static final double MIN_PRICE = 1.20;
+
     // Fortress/Road Warrior thresholds
     private static final double FORTRESS_UNBEATEN_THRESHOLD = 60.0;
     private static final double ROAD_WARRIOR_UNBEATEN_THRESHOLD = 50.0;
@@ -209,6 +215,11 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
             } else {
                 odds = calculateX2Odds(context);
             }
+        }
+        if (odds == null || odds < MIN_PRICE) {
+            log.debug("Double Chance rejected on price: fixtureId={}, market={}, odds={}",
+                    context.getFixture().getId(), market, odds);
+            return Optional.empty();
         }
 
         Map<String, Object> factors = buildFactors(context, homeWinProb, drawProb, awayWinProb,

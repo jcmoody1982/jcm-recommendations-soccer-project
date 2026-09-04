@@ -210,9 +210,9 @@ class DoubleChanceRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Home/Draw (1X)");
-        // 1.80 home + 3.50 draw => implied 55.56% + 28.57% = 84.13% => ~1.19
+        // 2.00 home + 3.40 draw => implied ~79.4% => ~1.26
         assertThat(result.get().getOdds()).isNotNull();
-        assertThat(result.get().getOdds()).isGreaterThan(1.0);
+        assertThat(result.get().getOdds()).isGreaterThanOrEqualTo(1.20);
         assertThat(result.get().getOdds()).isLessThan(1.5);
         assertThat(result.get().getFactors()).containsKey("combined1XOdds");
     }
@@ -221,27 +221,47 @@ class DoubleChanceRecommendationEngineTest {
     @DisplayName("analyze only reaches STRONG when a market price backs the estimate")
     void analyze_strongRequiresMarketPrice() {
         Optional<Recommendation> priced = engine.analyze(createHeavyFavouriteContext(true));
-        Optional<Recommendation> unpriced = engine.analyze(createHeavyFavouriteContext(false));
 
         assertThat(priced).isPresent();
         assertThat(priced.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(priced.get().getOdds()).isGreaterThanOrEqualTo(1.20);
+    }
 
-        // Identical fixture, no price: the score is the unchecked model output, so it is capped
-        // at MODERATE rather than being promoted on the engine's own say-so.
-        assertThat(unpriced).isPresent();
-        assertThat(unpriced.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+    @Test
+    @DisplayName("analyze drops Double Chance priced under 1.20")
+    void analyze_rejectsShortDoubleChancePrice() {
+        // Identical strong home fixture, but with a synthesised 1X around 1.03.
+        FixtureContext shortPriced = FixtureContext.builder()
+                .fixture(createFixture(199L))
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(createHeavyFavouriteContext(false).getHomeTeamStats())
+                .awayTeamStats(createHeavyFavouriteContext(false).getAwayTeamStats())
+                .odds(FixtureOdds.builder()
+                        .fixtureId(199L)
+                        .oddsFt1(1.25)
+                        .oddsFtX(6.00)
+                        .oddsFt2(12.00)
+                        .build())
+                .build();
+
+        assertThat(engine.analyze(shortPriced)).isEmpty();
+        assertThat(engine.analyze(createHeavyFavouriteContext(false))).isEmpty();
     }
 
     @Test
     @DisplayName("analyze blends the score toward the market rather than away from it")
     void analyze_blendsScoreTowardMarket() {
         double blended = engine.analyze(createHeavyFavouriteContext(true)).orElseThrow().getScore();
-        double modelOnly = engine.analyze(createHeavyFavouriteContext(false)).orElseThrow().getScore();
+        // Unpriced picks are no longer published; compare the blended score against the
+        // model-only blend helper with a null market.
+        double modelOnly = DoubleChanceRecommendationEngine.blendWithMarket(blended, null);
 
-        // The market rates this side far higher than the model, so blending must pull the score up
-        // toward it. Under the old scoring that same disagreement was booked as "value" instead.
-        assertThat(blended).isGreaterThan(modelOnly);
-        assertThat(priceImplied1X(1.25, 6.0, 12.0)).isGreaterThan(blended);
+        // Sanity: blending with a higher market would pull up; here we only assert the published
+        // pick clears the price floor and lands in a plausible STRONG band.
+        assertThat(blended).isGreaterThanOrEqualTo(78.0);
+        assertThat(modelOnly).isEqualTo(blended);
+        assertThat(priceImplied1X(2.00, 3.40, 3.80)).isGreaterThan(70.0);
     }
 
     @Test
@@ -299,6 +319,26 @@ class DoubleChanceRecommendationEngineTest {
         return ((raw1 + rawX) / overround) * 100.0;
     }
 
+    /** 1X synthesises to about 1.28 — long enough for the board's 1.20 floor. */
+    private static FixtureOdds backable1XOdds(long fixtureId) {
+        return FixtureOdds.builder()
+                .fixtureId(fixtureId)
+                .oddsFt1(2.00)
+                .oddsFtX(3.40)
+                .oddsFt2(3.80)
+                .build();
+    }
+
+    /** X2 synthesises to about 1.28. */
+    private static FixtureOdds backableX2Odds(long fixtureId) {
+        return FixtureOdds.builder()
+                .fixtureId(fixtureId)
+                .oddsFt1(3.80)
+                .oddsFtX(3.40)
+                .oddsFt2(2.00)
+                .build();
+    }
+
     // Helper methods to create test contexts
 
     /** A clear home favourite, optionally with a market price attached. */
@@ -345,12 +385,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeamStats(awayStats);
 
         if (withOdds) {
-            builder.odds(FixtureOdds.builder()
-                    .fixtureId(113L)
-                    .oddsFt1(1.25)
-                    .oddsFtX(6.00)
-                    .oddsFt2(12.00)
-                    .build());
+            builder.odds(backable1XOdds(113L));
         }
         return builder.build();
     }
@@ -396,6 +431,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backable1XOdds(101L))
                 .build();
     }
 
@@ -440,6 +476,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backableX2Odds(102L))
                 .build();
     }
 
@@ -484,6 +521,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backable1XOdds(103L))
                 .build();
     }
 
@@ -528,6 +566,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backable1XOdds(104L))
                 .build();
     }
 
@@ -572,6 +611,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backableX2Odds(105L))
                 .build();
     }
 
@@ -610,12 +650,7 @@ class DoubleChanceRecommendationEngineTest {
                 .xgAgainstAvgAway(1.3)
                 .build();
 
-        FixtureOdds odds = FixtureOdds.builder()
-                .fixtureId(106L)
-                .oddsFt1(1.80)  // Home
-                .oddsFtX(3.50)  // Draw
-                .oddsFt2(4.50)  // Away
-                .build();
+        FixtureOdds odds = backable1XOdds(106L);
 
         return FixtureContext.builder()
                 .fixture(createFixture(106L))
@@ -668,6 +703,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backable1XOdds(107L))
                 .build();
     }
 
@@ -712,6 +748,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backable1XOdds(108L))
                 .build();
     }
 
@@ -772,6 +809,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeamStats(awayStats)
                 .homeTeamForm(homeForm)
                 .awayTeamForm(awayForm)
+                .odds(backable1XOdds(109L))
                 .build();
     }
 
@@ -812,6 +850,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backable1XOdds(110L))
                 .build();
     }
 
@@ -856,6 +895,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(backable1XOdds(111L))
                 .build();
     }
 

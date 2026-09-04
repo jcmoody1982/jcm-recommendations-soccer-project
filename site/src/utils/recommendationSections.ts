@@ -185,17 +185,23 @@ export function sectionDomId(type: RecommendationType): string {
   return `rec-section-${type}`;
 }
 
-/** Over 0.5 board only carries a quote longer than 1.20. */
-export const OVER_05_MIN_PRICE = 1.2;
+/** Over 0.5 / Double Chance boards only carry a quote at or above 1.20. */
+export const MIN_BACKABLE_PRICE = 1.2;
+
+/** @deprecated Prefer {@link MIN_BACKABLE_PRICE}. */
+export const OVER_05_MIN_PRICE = MIN_BACKABLE_PRICE;
 
 /**
- * Line filters for the goals boards. Over 0.5 only shows when the market is full-match
- * Over 0.5 and the price is longer than 1.20. Other sections pass through unchanged.
+ * Line filters for the goals and double-chance boards. Over 0.5 only shows full-match Over 0.5
+ * above 1.20; Double Chance drops anything priced under 1.20. Other sections pass through.
  */
 export function includeInMarketSection(rec: Recommendation): boolean {
   if (rec.type === 'OVER_05_GOALS') {
     const market = rec.market?.toLowerCase() ?? '';
-    return market.includes('over 0.5') && rec.odds != null && rec.odds > OVER_05_MIN_PRICE;
+    return market.includes('over 0.5') && rec.odds != null && rec.odds > MIN_BACKABLE_PRICE;
+  }
+  if (rec.type === 'DOUBLE_CHANCE') {
+    return rec.odds != null && rec.odds >= MIN_BACKABLE_PRICE;
   }
   return true;
 }
