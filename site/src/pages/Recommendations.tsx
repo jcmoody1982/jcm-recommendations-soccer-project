@@ -32,7 +32,6 @@ const PINNED_EMPTY_TYPES: RecommendationType[] = [
   'OVER_05_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
-  'OVER_GOALS',
   'PLAYER_TO_SCORE',
   'PLAYER_TO_ASSIST',
 ];

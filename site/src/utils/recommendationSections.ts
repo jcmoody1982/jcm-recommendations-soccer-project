@@ -17,6 +17,7 @@ export const SECTION_ORDER: RecommendationType[] = [
   'DOUBLE_CHANCE',
   'RESULT_BTTS',
   'TOP_VS_BOTTOM',
+  'OVER_05_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
   'PLAYER_TO_SCORE',
@@ -25,8 +26,6 @@ export const SECTION_ORDER: RecommendationType[] = [
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
   'VALUE_BET',
-  'OVER_05_GOALS',
-  'OVER_GOALS',
   'UNDER_GOALS',
   'BOOKING_POINTS',
   'OVER_CORNERS',
@@ -190,15 +189,12 @@ export function sectionDomId(type: RecommendationType): string {
 export const OVER_05_MIN_PRICE = 1.2;
 
 /**
- * Line filters for the goals boards: Over Goals is Over 2.5 only, Over 0.5 requires a
- * backable price. Other sections pass through unchanged.
+ * Line filters for the goals boards. Over 0.5 only shows when the market is full-match
+ * Over 0.5 and the price is longer than 1.20. Other sections pass through unchanged.
  */
 export function includeInMarketSection(rec: Recommendation): boolean {
-  const market = rec.market?.toLowerCase() ?? '';
-  if (rec.type === 'OVER_GOALS') {
-    return market.includes('over 2.5');
-  }
   if (rec.type === 'OVER_05_GOALS') {
+    const market = rec.market?.toLowerCase() ?? '';
     return market.includes('over 0.5') && rec.odds != null && rec.odds > OVER_05_MIN_PRICE;
   }
   return true;
