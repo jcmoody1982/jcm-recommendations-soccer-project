@@ -350,4 +350,161 @@ public class ResultsPerformanceService {
         }
         return floor + "-" + (CALIBRATION_BAND_FLOORS[index + 1] - 1);
     }
+
+    /**
+     * Calibration drift alert for a specific recommendation type.
+     * A negative gap means the engine is overconfident (claiming higher than actual).
+     */
+    public record CalibrationDriftAlert(
+            String type,
+            int sampleSize,
+            Double avgClaimedScore,
+            Double actualHitRate,
+            Double calibrationGap,
+            boolean driftDetected,
+            String severity
+    ) {}
+
+    /**
+     * Alert threshold for calibration drift detection.
+     * Gaps beyond this are flagged as potential issues.
+     */
+    private static final double CALIBRATION_DRIFT_WARNING_THRESHOLD = 5.0;
+    private static final double CALIBRATION_DRIFT_CRITICAL_THRESHOLD = 10.0;
+
+    /**
+     * Check calibration drift for all probability-scored types over a rolling window.
+     * Returns alerts for any types where claimed scores diverge significantly from hit rates.
+     *
+     * <p>Use this for automated monitoring: a 7-day rolling window catches recent degradation
+     * before it accumulates into the 30-day metrics.
+     */
+    public List<CalibrationDriftAlert> getCalibrationDriftAlerts(int rollingDays) {
+        LocalDate toDate = LocalDate.now(resultsProperties.zoneId());
+        LocalDate fromDate = toDate.minusDays(rollingDays - 1);
+
+        List<RecommendationSnapshot> rows = loadRows(fromDate, toDate).stream()
+                .filter(ResultsPerformanceService::isIncludedType)
+                .filter(r -> PROBABILITY_SCORED_TYPES.contains(r.getType()))
+                .toList();
+
+        Map<String, List<RecommendationSnapshot>> byType = new LinkedHashMap<>();
+        for (RecommendationSnapshot row : rows) {
+            String type = row.getType();
+            if (type != null) {
+                byType.computeIfAbsent(type, k -> new ArrayList<>()).add(row);
+            }
+        }
+
+        List<CalibrationDriftAlert> alerts = new ArrayList<>();
+        for (Map.Entry<String, List<RecommendationSnapshot>> entry : byType.entrySet()) {
+            CalibrationDriftAlert alert = analyzeCalibrationDrift(entry.getKey(), entry.getValue());
+            if (alert != null) {
+                alerts.add(alert);
+            }
+        }
+
+        alerts.sort(Comparator
+                .comparing(CalibrationDriftAlert::driftDetected).reversed()
+                .thenComparing(a -> Math.abs(a.calibrationGap() != null ? a.calibrationGap() : 0.0),
+                        Comparator.reverseOrder()));
+
+        return alerts;
+    }
+
+    private CalibrationDriftAlert analyzeCalibrationDrift(String type, List<RecommendationSnapshot> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return null;
+        }
+
+        int wins = 0;
+        int settled = 0;
+        double scoreSum = 0.0;
+        int scoreCount = 0;
+
+        for (RecommendationSnapshot row : rows) {
+            PickOutcome outcome = row.getOutcome();
+            if (outcome == PickOutcome.WIN) {
+                wins++;
+                settled++;
+            } else if (outcome == PickOutcome.LOSS) {
+                settled++;
+            }
+
+            if (row.getScore() != null && (outcome == PickOutcome.WIN || outcome == PickOutcome.LOSS)) {
+                scoreSum += row.getScore();
+                scoreCount++;
+            }
+        }
+
+        if (settled < MIN_SAMPLE || scoreCount == 0) {
+            return new CalibrationDriftAlert(type, settled, null, null, null, false, "INSUFFICIENT_DATA");
+        }
+
+        double avgClaimedScore = scoreSum / scoreCount;
+        double actualHitRate = (wins * 100.0) / settled;
+        double calibrationGap = actualHitRate - avgClaimedScore;
+
+        boolean driftDetected = Math.abs(calibrationGap) >= CALIBRATION_DRIFT_WARNING_THRESHOLD;
+        String severity;
+        if (Math.abs(calibrationGap) >= CALIBRATION_DRIFT_CRITICAL_THRESHOLD) {
+            severity = "CRITICAL";
+        } else if (Math.abs(calibrationGap) >= CALIBRATION_DRIFT_WARNING_THRESHOLD) {
+            severity = "WARNING";
+        } else {
+            severity = "OK";
+        }
+
+        return new CalibrationDriftAlert(
+                type,
+                settled,
+                avgClaimedScore,
+                actualHitRate,
+                calibrationGap,
+                driftDetected,
+                severity
+        );
+    }
+
+    /**
+     * Summary of calibration health across all types.
+     */
+    public record CalibrationHealthSummary(
+            int totalTypes,
+            int typesWithSufficientData,
+            int typesWithDrift,
+            int criticalAlerts,
+            int warningAlerts,
+            List<CalibrationDriftAlert> alerts
+    ) {}
+
+    /**
+     * Get overall calibration health for the system.
+     */
+    public CalibrationHealthSummary getCalibrationHealth(int rollingDays) {
+        List<CalibrationDriftAlert> alerts = getCalibrationDriftAlerts(rollingDays);
+
+        int totalTypes = alerts.size();
+        int typesWithSufficientData = (int) alerts.stream()
+                .filter(a -> !"INSUFFICIENT_DATA".equals(a.severity()))
+                .count();
+        int typesWithDrift = (int) alerts.stream()
+                .filter(CalibrationDriftAlert::driftDetected)
+                .count();
+        int criticalAlerts = (int) alerts.stream()
+                .filter(a -> "CRITICAL".equals(a.severity()))
+                .count();
+        int warningAlerts = (int) alerts.stream()
+                .filter(a -> "WARNING".equals(a.severity()))
+                .count();
+
+        return new CalibrationHealthSummary(
+                totalTypes,
+                typesWithSufficientData,
+                typesWithDrift,
+                criticalAlerts,
+                warningAlerts,
+                alerts
+        );
+    }
 }

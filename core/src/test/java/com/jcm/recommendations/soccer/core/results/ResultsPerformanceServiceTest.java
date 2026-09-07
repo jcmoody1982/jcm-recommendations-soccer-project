@@ -204,6 +204,122 @@ class ResultsPerformanceServiceTest {
         assertThat(ResultsPerformanceService.calibrate("UNDER_CORNERS", rows)).isEmpty();
     }
 
+    @Test
+    void calibrationDriftDetectsOverconfidentEngines() {
+        LocalDate today = LocalDate.now();
+        LocalDate d1 = today.minusDays(3);
+        LocalDate d2 = today.minusDays(2);
+        LocalDate d3 = today.minusDays(1);
+        
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "BTTS", "STRONG", PickOutcome.WIN, null, 80.0, 1.80),
+                snap(2L, d1, 200L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.80),
+                snap(3L, d2, 300L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.70),
+                snap(4L, d2, 400L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.70),
+                snap(5L, d3, 500L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.80),
+                snap(6L, d3, 600L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.80),
+                snap(7L, d1, 700L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.80),
+                snap(8L, d2, 800L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.70),
+                snap(9L, d3, 900L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.80),
+                snap(10L, d1, 1000L, "BTTS", "STRONG", PickOutcome.LOSS, null, 80.0, 1.80)
+        ));
+
+        var alerts = service.getCalibrationDriftAlerts(7);
+
+        assertThat(alerts).hasSize(1);
+        var bttsAlert = alerts.get(0);
+        assertThat(bttsAlert.type()).isEqualTo("BTTS");
+        assertThat(bttsAlert.sampleSize()).isEqualTo(10);
+        assertThat(bttsAlert.avgClaimedScore()).isEqualTo(80.0);
+        assertThat(bttsAlert.actualHitRate()).isEqualTo(10.0);
+        assertThat(bttsAlert.calibrationGap()).isCloseTo(-70.0, within(0.1));
+        assertThat(bttsAlert.driftDetected()).isTrue();
+        assertThat(bttsAlert.severity()).isEqualTo("CRITICAL");
+    }
+
+    @Test
+    void calibrationDriftDoesNotAlertWhenWellCalibrated() {
+        LocalDate today = LocalDate.now();
+        LocalDate d1 = today.minusDays(3);
+        LocalDate d2 = today.minusDays(2);
+        
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(2L, d1, 200L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(3L, d2, 300L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.70),
+                snap(4L, d2, 400L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.70),
+                snap(5L, d1, 500L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(6L, d1, 600L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(7L, d2, 700L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(8L, d2, 800L, "BTTS", "STRONG", PickOutcome.LOSS, null, 70.0, 1.70),
+                snap(9L, d1, 900L, "BTTS", "STRONG", PickOutcome.LOSS, null, 70.0, 1.80),
+                snap(10L, d1, 1000L, "BTTS", "STRONG", PickOutcome.LOSS, null, 70.0, 1.80)
+        ));
+
+        var alerts = service.getCalibrationDriftAlerts(7);
+
+        assertThat(alerts).hasSize(1);
+        var bttsAlert = alerts.get(0);
+        assertThat(bttsAlert.actualHitRate()).isEqualTo(70.0);
+        assertThat(bttsAlert.calibrationGap()).isCloseTo(0.0, within(0.1));
+        assertThat(bttsAlert.driftDetected()).isFalse();
+        assertThat(bttsAlert.severity()).isEqualTo("OK");
+    }
+
+    @Test
+    void calibrationHealthSummaryAggregatesAlerts() {
+        LocalDate today = LocalDate.now();
+        LocalDate d1 = today.minusDays(3);
+        
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(2L, d1, 200L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(3L, d1, 300L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.70),
+                snap(4L, d1, 400L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.70),
+                snap(5L, d1, 500L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(6L, d1, 600L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(7L, d1, 700L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(8L, d1, 800L, "BTTS", "STRONG", PickOutcome.LOSS, null, 70.0, 1.70),
+                snap(9L, d1, 900L, "BTTS", "STRONG", PickOutcome.LOSS, null, 70.0, 1.80),
+                snap(10L, d1, 1000L, "BTTS", "STRONG", PickOutcome.LOSS, null, 70.0, 1.80),
+                snap(11L, d1, 1100L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(12L, d1, 1200L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(13L, d1, 1300L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(14L, d1, 1400L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(15L, d1, 1500L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(16L, d1, 1600L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(17L, d1, 1700L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(18L, d1, 1800L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(19L, d1, 1900L, "DRAW", "MODERATE", PickOutcome.LOSS, null, 30.0, 3.20),
+                snap(20L, d1, 2000L, "DRAW", "MODERATE", PickOutcome.WIN, null, 30.0, 3.20)
+        ));
+
+        var summary = service.getCalibrationHealth(7);
+
+        assertThat(summary.totalTypes()).isEqualTo(2);
+        assertThat(summary.typesWithSufficientData()).isEqualTo(2);
+        assertThat(summary.typesWithDrift()).isEqualTo(1);
+        assertThat(summary.criticalAlerts()).isEqualTo(1);
+        assertThat(summary.warningAlerts()).isEqualTo(0);
+    }
+
+    @Test
+    void calibrationDriftReportsInsufficientDataWhenTooFewSamples() {
+        LocalDate today = LocalDate.now();
+        LocalDate d1 = today.minusDays(3);
+        
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.80),
+                snap(2L, d1, 200L, "BTTS", "STRONG", PickOutcome.LOSS, null, 70.0, 1.80)
+        ));
+
+        var alerts = service.getCalibrationDriftAlerts(7);
+
+        assertThat(alerts).hasSize(1);
+        assertThat(alerts.get(0).severity()).isEqualTo("INSUFFICIENT_DATA");
+        assertThat(alerts.get(0).driftDetected()).isFalse();
+    }
+
     private static RecommendationSnapshot snap(
             Long id,
             LocalDate date,

@@ -52,4 +52,24 @@ public class ResultsController {
             return ResponseEntity.badRequest().build();
         }
     }
+
+    @GetMapping("/calibration/health")
+    public ResponseEntity<ResultsPerformanceService.CalibrationHealthSummary> getCalibrationHealth(
+            @RequestParam(required = false, defaultValue = "7") int days) {
+        if (days < 1 || days > 90) {
+            log.warn("Invalid calibration health request: days={}", days);
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(resultsPerformanceService.getCalibrationHealth(days));
+    }
+
+    @GetMapping("/calibration/drift")
+    public ResponseEntity<java.util.List<ResultsPerformanceService.CalibrationDriftAlert>> getCalibrationDriftAlerts(
+            @RequestParam(required = false, defaultValue = "7") int days) {
+        if (days < 1 || days > 90) {
+            log.warn("Invalid calibration drift request: days={}", days);
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(resultsPerformanceService.getCalibrationDriftAlerts(days));
+    }
 }
