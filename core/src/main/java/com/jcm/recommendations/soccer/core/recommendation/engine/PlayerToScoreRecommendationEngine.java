@@ -13,9 +13,9 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 public class PlayerToScoreRecommendationEngine extends PlayerPropRecommendationEngine {
 
     /**
-     * Thresholds sit far below the old 72/58 pair because they are now real probabilities: an
-     * elite 0.55 goals-per-90 striker playing a full match is only a 42% chance to score, so any
-     * threshold above that was unreachable by construction.
+     * Thresholds sit on the calibrated Poisson score (lambda already dampened). The old 33/25
+     * pair labelled almost every pick STRONG while realised hit rates sat near 25%. 42/35 keeps
+     * only the right tail of the post-calibration distribution.
      */
     private static final PropSpec SPEC = new PropSpec(
             RecommendationType.PLAYER_TO_SCORE,
@@ -23,8 +23,8 @@ public class PlayerToScoreRecommendationEngine extends PlayerPropRecommendationE
             0.25,
             0.55,
             0.18,
-            33.0,
-            25.0
+            42.0,
+            35.0
     );
 
     @Override

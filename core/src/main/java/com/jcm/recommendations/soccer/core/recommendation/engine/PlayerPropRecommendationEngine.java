@@ -26,14 +26,14 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
  *
  * <p>The published score is the modelled probability that the player records at least one event
  * in this fixture, from a Poisson draw on their expected event count:
- * {@code P(>=1) = 1 - exp(-lambda)}. Lambda is the player's shrunk per-90 rate scaled by the
- * minutes they are expected to play and by how leaky the opponent is.
+ * {@code P(>=1) = 1 - exp(-lambda)}. Lambda is the player's shrunk per-90 rate scaled by expected
+ * minutes, a tight opponent factor, and an empirical calibration dampener.
  *
- * <p>This replaces an earlier weighted index that combined rate, minutes and opponent strength on
- * a 0-100 scale. That index answered "how good is this player?" rather than "will he do it in this
- * match?", so it published scores far above what the market can produce: at the elite per-90 rates
- * below, a full ninety minutes is only a 42% chance of a goal and a 33% chance of an assist, yet
- * the old moderate threshold alone was 58. Every pick it published overstated its own ceiling.
+ * <p>Production grading (2026-09-04 to 2026-09-10) showed raw Poisson scores ~18–23pp above
+ * realised hit rates: selecting the best candidate per fixture (winner's curse), treating season
+ * minutes as guaranteed, and a wide opponent multiplier all inflated lambda. Rank boosts were
+ * removed, the opponent factor was narrowed to 0.90–1.10, and {@link #LAMBDA_CALIBRATION} pulls
+ * the residual gap down without pretending the model is fully calibrated.
  */
 @Slf4j
 public abstract class PlayerPropRecommendationEngine implements RecommendationEngine {
@@ -50,16 +50,18 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
 
     /** Typical goals conceded per match, used to turn opponent leakiness into a multiplier. */
     private static final double LEAGUE_AVG_CONCEDED = 1.35;
-    private static final double OPPONENT_FACTOR_MIN = 0.75;
-    private static final double OPPONENT_FACTOR_MAX = 1.35;
+    private static final double OPPONENT_FACTOR_MIN = 0.90;
+    private static final double OPPONENT_FACTOR_MAX = 1.10;
+
+    /**
+     * Scales lambda after rate × minutes × opponent. Chosen from the ~0.75 residual needed once
+     * rank boosts and the wide opponent band are removed; not a full empirical Bayes fit.
+     */
+    static final double LAMBDA_CALIBRATION = 0.75;
 
     /** Assumed minutes when a player has no recorded per-match average. */
     private static final double DEFAULT_EXPECTED_MINUTES = 70.0;
     private static final double FULL_MATCH_MINUTES = 90.0;
-
-    /** A club's primary scorer takes a larger share of the team's chances than a squad player. */
-    private static final double RANK_ONE_MULTIPLIER = 1.10;
-    private static final double RANK_TWO_MULTIPLIER = 1.05;
 
     /**
      * @param minPer90 rate a player must clear to be considered at all
@@ -165,7 +167,7 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
             double expectedEvents = shrunkRate
                     * (expectedMinutes / FULL_MATCH_MINUTES)
                     * opponentFactor
-                    * rankMultiplier(player);
+                    * LAMBDA_CALIBRATION;
             double score = probabilityOfAtLeastOne(expectedEvents);
             candidates.add(new Candidate(
                     player, isHome, teamName, rate, shrunkRate, expectedMinutes,
@@ -224,27 +226,13 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         return Math.min(FULL_MATCH_MINUTES, perMatch);
     }
 
-    /** Opponent leakiness as a multiplier around 1.0, so it scales lambda rather than rescaling it. */
+    /** Opponent leakiness as a tight multiplier around 1.0 (0.90–1.10). */
     static double opponentFactor(double opponentConcededAvg) {
         if (opponentConcededAvg <= 0) {
             return 1.0;
         }
         double factor = opponentConcededAvg / LEAGUE_AVG_CONCEDED;
         return Math.min(OPPONENT_FACTOR_MAX, Math.max(OPPONENT_FACTOR_MIN, factor));
-    }
-
-    static double rankMultiplier(PlayerSeasonStats player) {
-        Integer rank = player.getRankInClubTopScorer();
-        if (rank == null) {
-            return 1.0;
-        }
-        if (rank == 1) {
-            return RANK_ONE_MULTIPLIER;
-        }
-        if (rank == 2) {
-            return RANK_TWO_MULTIPLIER;
-        }
-        return 1.0;
     }
 
     private static double opponentConcededAvg(TeamSeasonStats opponent, boolean playerIsHome) {
