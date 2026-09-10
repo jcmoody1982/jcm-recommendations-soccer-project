@@ -22,6 +22,9 @@ class PlayerToScoreRecommendationEngineTest {
     /** Goals conceded over 10 matches that lands the opponent on the league-average rate. */
     private static final int NEUTRAL_DEFENCE_CONCEDED = 14;
 
+    /** Soft defence so calibrated lambda clears the raised moderate floor in fixture tests. */
+    private static final int LEAKY_DEFENCE_CONCEDED = 25;
+
     private PlayerToScoreRecommendationEngine engine;
 
     @BeforeEach
@@ -39,7 +42,7 @@ class PlayerToScoreRecommendationEngineTest {
     @DisplayName("analyze picks the highest per-90 regular across both squads")
     void analyze_picksBestScorer() {
         Optional<Recommendation> result = engine.analyze(contextWithPlayers(
-                scorer(10L, "Mohamed Salah", 0.72, 18, 1500, 1),
+                scorer(10L, "Mohamed Salah", 0.85, 18, 1500, 1),
                 scorer(11L, "Squad Forward", 0.28, 10, 700, 3)));
 
         assertThat(result).isPresent();
@@ -47,29 +50,30 @@ class PlayerToScoreRecommendationEngineTest {
         assertThat(result.get().getMarket()).isEqualTo("Mohamed Salah to score");
         assertThat(result.get().getOdds()).isNull();
         assertThat(result.get().getFactors()).containsEntry("playerId", 10L);
-        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.STRONG);
+        assertThat(result.get().getScore()).isLessThan(55.0);
     }
 
     @Test
-    @DisplayName("analyze publishes a probability the market can actually produce")
+    @DisplayName("analyze publishes a calibrated probability below the raw Poisson ceiling")
     void analyze_eliteScorer_staysWithinRealisticRange() {
         Optional<Recommendation> result = engine.analyze(contextWithOpponentConceded(
-                scorer(10L, "Elite Striker", 0.55, 20, 1600, null),
-                NEUTRAL_DEFENCE_CONCEDED));
+                scorer(10L, "Elite Striker", 0.85, 20, 1600, null),
+                LEAKY_DEFENCE_CONCEDED));
 
         assertThat(result).isPresent();
-        // A 0.55-per-90 striker over a full match is a ~42% chance to score. The old weighted
-        // index published 58 as its *floor*, so guard the whole band, not just the 100 clamp.
+        // Raw Poisson on 0.85 per-90 over 90 minutes is ~57%; calibration + floors keep the
+        // published score in the mid band the board can defend.
         assertThat(result.get().getScore()).isLessThan(50.0);
-        assertThat(result.get().getScore()).isGreaterThan(25.0);
+        assertThat(result.get().getScore()).isGreaterThan(35.0);
     }
 
     @Test
     @DisplayName("analyze prefers the proven scorer over an equal-rate small sample")
     void analyze_thinSample_isShrunkTowardPrior() {
         Optional<Recommendation> result = engine.analyze(contextWithPlayers(
-                scorer(10L, "Proven Starter", 0.60, 20, 1600, null),
-                scorer(11L, "Hot Streak Sub", 0.60, 6, 400, null)));
+                scorer(10L, "Proven Starter", 0.80, 20, 1600, null),
+                scorer(11L, "Hot Streak Sub", 0.80, 6, 400, null)));
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Proven Starter to score");
@@ -78,13 +82,13 @@ class PlayerToScoreRecommendationEngineTest {
     @Test
     @DisplayName("analyze scores a part-time player below a full-match player on the same rate")
     void analyze_expectedMinutes_lowerTheScore() {
-        PlayerSeasonStats fullMatch = scorer(10L, "Ninety Minute Man", 0.70, 20, 1600, null);
+        PlayerSeasonStats fullMatch = scorer(10L, "Ninety Minute Man", 0.85, 20, 1600, null);
         fullMatch.setMinPerMatch(90);
-        PlayerSeasonStats partial = scorer(10L, "Hour Player", 0.70, 20, 1600, null);
-        partial.setMinPerMatch(55);
+        PlayerSeasonStats partial = scorer(10L, "Hour Player", 0.85, 20, 1600, null);
+        partial.setMinPerMatch(70);
 
-        double fullScore = scoreFor(fullMatch);
-        double partialScore = scoreFor(partial);
+        double fullScore = scoreFor(fullMatch, LEAKY_DEFENCE_CONCEDED);
+        double partialScore = scoreFor(partial, LEAKY_DEFENCE_CONCEDED);
 
         assertThat(partialScore).isLessThan(fullScore);
     }
@@ -129,9 +133,17 @@ class PlayerToScoreRecommendationEngineTest {
         assertThat(PlayerPropRecommendationEngine.probabilityOfAtLeastOne(10.0)).isLessThan(100.0);
     }
 
-    private double scoreFor(PlayerSeasonStats player) {
+    @Test
+    @DisplayName("opponentFactor stays within the tight 0.90–1.10 band")
+    void opponentFactor_isClampedTightly() {
+        assertThat(PlayerPropRecommendationEngine.opponentFactor(0.5)).isEqualTo(0.90);
+        assertThat(PlayerPropRecommendationEngine.opponentFactor(1.35)).isEqualTo(1.0);
+        assertThat(PlayerPropRecommendationEngine.opponentFactor(3.0)).isEqualTo(1.10);
+    }
+
+    private double scoreFor(PlayerSeasonStats player, int concededAway) {
         Optional<Recommendation> result = engine.analyze(
-                contextWithOpponentConceded(player, NEUTRAL_DEFENCE_CONCEDED));
+                contextWithOpponentConceded(player, concededAway));
         assertThat(result).isPresent();
         return result.get().getScore();
     }
