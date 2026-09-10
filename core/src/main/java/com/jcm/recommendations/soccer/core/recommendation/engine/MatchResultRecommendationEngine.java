@@ -35,6 +35,8 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.SquadValue
  * - Motivation factor (title race, relegation battle)
  *
  * Odds are used only for value vs market and confidence — not as a base-model input.
+ * Raw home-win probabilities at or above {@code MAX_PUBLISH_PROBABILITY} are withheld:
+ * that overconfident tail underperformed the moderate band on recent graded boards.
  */
 @Component
 @Slf4j
@@ -95,6 +97,12 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     // Thresholds — raised after ~34% hit rate; Away tips paused until recalibrated
     private static final double THRESHOLD_STRONG = 62.0;
     private static final double THRESHOLD_MODERATE = 55.0;
+    /**
+     * Soft ceiling: on the 2026-09-04..10 board, raw home-win scores in the mid/high 60s–70s
+     * were badly overconfident (65–70 band ~35% hit / −44% ROI) while 55–62 was the only
+     * profitable slice. Do not publish at or above this raw model probability.
+     */
+    private static final double MAX_PUBLISH_PROBABILITY = 65.0;
     private static final double VALUE_THRESHOLD = 5.0;
     /** STRONG also requires outcome odds not longer than this when odds are present. */
     private static final double STRONG_MAX_ODDS = 2.50;
@@ -168,6 +176,14 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         final String outcomeType = "HOME";
         final String recommendedOutcome = context.getHomeTeam().getName();
         final double bestProb = homeWinProb;
+
+        if (bestProb >= MAX_PUBLISH_PROBABILITY) {
+            log.debug("Skipping overconfident Match Result tip: fixtureId={}, homeProb={}, max={}",
+                    context.getFixture().getId(),
+                    String.format("%.1f", bestProb),
+                    MAX_PUBLISH_PROBABILITY);
+            return Optional.empty();
+        }
 
         double valueVsOdds = 0.0;
         Double odds = null;

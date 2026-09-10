@@ -326,6 +326,25 @@ class BttsRecommendationEngineTest {
     }
 
     @Test
+    void analyze_withLongOdds_returnsEmpty() {
+        FixtureContext context = createContextWithBttsStatsAndOdds(90.0, 90.0, 1.85);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void analyze_withShortOdds_stillPublishes() {
+        FixtureContext context = createContextWithBttsStatsAndOdds(90.0, 90.0, 1.55);
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getOdds()).isEqualTo(1.55);
+    }
+
+    @Test
     void analyze_missingApiPotential_renormalizesWithoutFakeFifty() {
         FixtureContext context = createContextWithBttsStats(80.0, 80.0, false);
 
@@ -364,6 +383,21 @@ class BttsRecommendationEngineTest {
 
     private FixtureContext createContextWithBttsStats(double homeBtts, double awayBtts) {
         return createContextWithBttsStats(homeBtts, awayBtts, true);
+    }
+
+    private FixtureContext createContextWithBttsStatsAndOdds(double homeBtts, double awayBtts, double oddsBttsYes) {
+        return FixtureContext.builder()
+                .fixture(createFixture())
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(baseHomeStats(homeBtts).build())
+                .awayTeamStats(baseAwayStats(awayBtts).build())
+                .potentials(createPotentials(70.0))
+                .odds(FixtureOdds.builder()
+                        .fixtureId(1000L)
+                        .oddsBttsYes(oddsBttsYes)
+                        .build())
+                .build();
     }
 
     private FixtureContext createContextWithBttsStats(double homeBtts, double awayBtts, boolean withPotential) {

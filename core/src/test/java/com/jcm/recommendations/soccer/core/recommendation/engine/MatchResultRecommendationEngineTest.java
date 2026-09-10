@@ -30,7 +30,7 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze returns home win recommendation for dominant home team")
+    @DisplayName("analyze returns home win recommendation for clear home favorite")
     void analyze_withDominantHomeTeam_returnsHomeWin() {
         FixtureContext context = createDominantHomeTeamContext();
 
@@ -40,6 +40,15 @@ class MatchResultRecommendationEngineTest {
         assertThat(result.get().getType()).isEqualTo(RecommendationType.MATCH_RESULT);
         assertThat(result.get().getMarket()).isEqualTo("Home Team");
         assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.STRONG);
+        assertThat(result.get().getScore()).isLessThan(65.0);
+    }
+
+    @Test
+    @DisplayName("analyze withholds overconfident home tips at or above the soft ceiling")
+    void analyze_overconfidentHomeProbability_isWithheld() {
+        Optional<Recommendation> result = engine.analyze(createOverconfidentHomeTeamContext());
+
+        assertThat(result).isEmpty();
     }
 
     @Test
@@ -93,7 +102,7 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze can be STRONG without odds when probability is high")
+    @DisplayName("analyze can be STRONG without odds when probability clears the strong floor")
     void analyze_strongWithoutOdds_whenProbabilityHigh() {
         FixtureContext context = createDominantHomeTeamContextWithoutOdds();
 
@@ -102,6 +111,7 @@ class MatchResultRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
         assertThat(result.get().getOdds()).isNull();
+        assertThat(result.get().getScore()).isLessThan(65.0);
     }
 
     @Test
@@ -328,9 +338,9 @@ class MatchResultRecommendationEngineTest {
         return dominantHomeBuilder(101L)
                 .odds(FixtureOdds.builder()
                         .fixtureId(101L)
-                        .oddsFt1(1.45)
-                        .oddsFtX(4.50)
-                        .oddsFt2(7.00)
+                        .oddsFt1(1.70)
+                        .oddsFtX(3.60)
+                        .oddsFt2(5.00)
                         .build())
                 .build();
     }
@@ -340,18 +350,149 @@ class MatchResultRecommendationEngineTest {
     }
 
     private FixtureContext createDominantHomeTeamContextWithShortOdds() {
-        // Odds so short that model probability has no +5% value edge
-        return dominantHomeBuilder(122L)
+        // Milder edge so the tip stays MODERATE and short odds leave no +5% value.
+        return moderateHomeBuilder(122L)
                 .odds(FixtureOdds.builder()
                         .fixtureId(122L)
-                        .oddsFt1(1.20)
-                        .oddsFtX(6.00)
-                        .oddsFt2(12.00)
+                        .oddsFt1(1.35)
+                        .oddsFtX(5.00)
+                        .oddsFt2(8.00)
                         .build())
                 .build();
     }
 
+    private FixtureContext createOverconfidentHomeTeamContext() {
+        return overconfidentHomeBuilder(199L)
+                .odds(FixtureOdds.builder()
+                        .fixtureId(199L)
+                        .oddsFt1(1.45)
+                        .oddsFtX(4.50)
+                        .oddsFt2(7.00)
+                        .build())
+                .build();
+    }
+
+    /** Home edge that clears Moderate but stays below Strong — used for no-value odds cases. */
+    private FixtureContext.FixtureContextBuilder moderateHomeBuilder(long fixtureId) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .seasonWinsHome(9)
+                .seasonDrawsHome(6)
+                .seasonLossesHome(5)
+                .seasonGoalsHome(24)
+                .seasonConcededHome(18)
+                .seasonGoalDifference(6)
+                .ppgHome(1.60)
+                .position(8)
+                .xgForAvgHome(1.35)
+                .xgAgainstAvgHome(1.15)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .seasonWinsAway(6)
+                .seasonDrawsAway(6)
+                .seasonLossesAway(8)
+                .seasonGoalsAway(20)
+                .seasonConcededAway(22)
+                .seasonGoalDifference(-2)
+                .ppgAway(1.25)
+                .position(11)
+                .xgForAvgAway(1.15)
+                .xgAgainstAvgAway(1.30)
+                .build();
+
+        TeamRecentForm homeForm = TeamRecentForm.builder()
+                .teamId(1L)
+                .winsHome(2)
+                .drawsHome(2)
+                .lossesHome(1)
+                .build();
+
+        TeamRecentForm awayForm = TeamRecentForm.builder()
+                .teamId(2L)
+                .winsAway(2)
+                .drawsAway(1)
+                .lossesAway(2)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture(fixtureId))
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .homeTeamForm(homeForm)
+                .awayTeamForm(awayForm);
+    }
+
+    /**
+     * Clear home edge that stays under the soft publish ceiling (&lt;65) while still clearing
+     * the Strong floor (≥62) after form and home-advantage adjustments.
+     */
     private FixtureContext.FixtureContextBuilder dominantHomeBuilder(long fixtureId) {
+        TeamSeasonStats homeStats = TeamSeasonStats.builder()
+                .teamId(1L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .seasonWinsHome(9)
+                .seasonDrawsHome(6)
+                .seasonLossesHome(5)
+                .seasonGoalsHome(24)
+                .seasonConcededHome(18)
+                .seasonGoalDifference(6)
+                .ppgHome(1.70)
+                .position(6)
+                .xgForAvgHome(1.45)
+                .xgAgainstAvgHome(1.05)
+                .build();
+
+        TeamSeasonStats awayStats = TeamSeasonStats.builder()
+                .teamId(2L)
+                .seasonId(1L)
+                .matchesPlayed(20)
+                .seasonWinsAway(6)
+                .seasonDrawsAway(6)
+                .seasonLossesAway(8)
+                .seasonGoalsAway(20)
+                .seasonConcededAway(22)
+                .seasonGoalDifference(-2)
+                .ppgAway(1.05)
+                .position(13)
+                .xgForAvgAway(1.15)
+                .xgAgainstAvgAway(1.40)
+                .build();
+
+        TeamRecentForm homeForm = TeamRecentForm.builder()
+                .teamId(1L)
+                .winsHome(3)
+                .drawsHome(1)
+                .lossesHome(1)
+                .build();
+
+        TeamRecentForm awayForm = TeamRecentForm.builder()
+                .teamId(2L)
+                .winsAway(1)
+                .drawsAway(2)
+                .lossesAway(2)
+                .build();
+
+        return FixtureContext.builder()
+                .fixture(createFixture(fixtureId))
+                .homeTeam(createTeam(1L, "Home Team"))
+                .awayTeam(createTeam(2L, "Away Team"))
+                .homeTeamStats(homeStats)
+                .awayTeamStats(awayStats)
+                .homeTeamForm(homeForm)
+                .awayTeamForm(awayForm);
+    }
+
+    /** Extreme mismatch that historically inflated into the overconfident 70%+ band. */
+    private FixtureContext.FixtureContextBuilder overconfidentHomeBuilder(long fixtureId) {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
                 .teamId(1L)
                 .seasonId(1L)
@@ -409,57 +550,19 @@ class MatchResultRecommendationEngineTest {
     }
 
     private FixtureContext createThinFormSampleHotStreakContext() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsHome(12)
-                .seasonDrawsHome(5)
-                .seasonLossesHome(3)
-                .seasonGoalsHome(30)
-                .seasonConcededHome(14)
-                .seasonGoalDifference(16)
-                .ppgHome(2.05)
-                .position(5)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsAway(6)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(8)
-                .seasonGoalsAway(20)
-                .seasonConcededAway(24)
-                .seasonGoalDifference(-4)
-                .ppgAway(1.2)
-                .position(12)
-                .build();
-
-        // Only 3 venue form games — all wins. Full hot streak needs 5; should dampen.
-        TeamRecentForm homeForm = TeamRecentForm.builder()
-                .teamId(1L)
-                .winsHome(3)
-                .drawsHome(0)
-                .lossesHome(0)
-                .build();
-
-        TeamRecentForm awayForm = TeamRecentForm.builder()
-                .teamId(2L)
-                .winsAway(2)
-                .drawsAway(1)
-                .lossesAway(2)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(123L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .homeTeamForm(homeForm)
-                .awayTeamForm(awayForm)
+        return moderateHomeBuilder(123L)
+                .homeTeamForm(TeamRecentForm.builder()
+                        .teamId(1L)
+                        .winsHome(3)
+                        .drawsHome(0)
+                        .lossesHome(0)
+                        .build())
+                .awayTeamForm(TeamRecentForm.builder()
+                        .teamId(2L)
+                        .winsAway(2)
+                        .drawsAway(1)
+                        .lossesAway(2)
+                        .build())
                 .build();
     }
 
@@ -572,36 +675,37 @@ class MatchResultRecommendationEngineTest {
     }
 
     private FixtureContext createContextWithStrongXgDominance() {
+        // Mild win rates with a large xG mismatch — keeps the tip under the soft ceiling.
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsHome(12)
-                .seasonDrawsHome(5)
-                .seasonLossesHome(3)
-                .seasonGoalsHome(32)
-                .seasonConcededHome(15)
-                .seasonGoalDifference(17)
-                .ppgHome(2.05)
-                .position(4)
-                .xgForAvgHome(2.2)  // Very high xG
-                .xgAgainstAvgHome(0.9)
+                .seasonWinsHome(9)
+                .seasonDrawsHome(6)
+                .seasonLossesHome(5)
+                .seasonGoalsHome(24)
+                .seasonConcededHome(18)
+                .seasonGoalDifference(6)
+                .ppgHome(1.60)
+                .position(8)
+                .xgForAvgHome(2.0)
+                .xgAgainstAvgHome(1.0)
                 .build();
 
         TeamSeasonStats awayStats = TeamSeasonStats.builder()
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsAway(5)
+                .seasonWinsAway(6)
                 .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(28)
-                .seasonGoalDifference(-10)
-                .ppgAway(1.05)
-                .position(14)
+                .seasonLossesAway(8)
+                .seasonGoalsAway(20)
+                .seasonConcededAway(22)
+                .seasonGoalDifference(-2)
+                .ppgAway(1.25)
+                .position(11)
                 .xgForAvgAway(1.0)
-                .xgAgainstAvgAway(1.8)  // Very leaky xGA
+                .xgAgainstAvgAway(1.7)
                 .build();
 
         return FixtureContext.builder()
@@ -614,56 +718,19 @@ class MatchResultRecommendationEngineTest {
     }
 
     private FixtureContext createHotStreakContext() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsHome(12)
-                .seasonDrawsHome(5)
-                .seasonLossesHome(3)
-                .seasonGoalsHome(30)
-                .seasonConcededHome(14)
-                .seasonGoalDifference(16)
-                .ppgHome(2.05)
-                .position(5)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsAway(6)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(8)
-                .seasonGoalsAway(20)
-                .seasonConcededAway(24)
-                .seasonGoalDifference(-4)
-                .ppgAway(1.2)
-                .position(12)
-                .build();
-
-        TeamRecentForm homeForm = TeamRecentForm.builder()
-                .teamId(1L)
-                .winsHome(5)  // 5 wins = hot streak
-                .drawsHome(0)
-                .lossesHome(0)
-                .build();
-
-        TeamRecentForm awayForm = TeamRecentForm.builder()
-                .teamId(2L)
-                .winsAway(2)
-                .drawsAway(1)
-                .lossesAway(2)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(105L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .homeTeamForm(homeForm)
-                .awayTeamForm(awayForm)
+        return moderateHomeBuilder(105L)
+                .homeTeamForm(TeamRecentForm.builder()
+                        .teamId(1L)
+                        .winsHome(5)
+                        .drawsHome(0)
+                        .lossesHome(0)
+                        .build())
+                .awayTeamForm(TeamRecentForm.builder()
+                        .teamId(2L)
+                        .winsAway(2)
+                        .drawsAway(1)
+                        .lossesAway(2)
+                        .build())
                 .build();
     }
 
@@ -722,58 +789,7 @@ class MatchResultRecommendationEngineTest {
     }
 
     private FixtureContext createBalancedContext() {
-        // Mild home edge so the tip clears the Moderate floor (≥55%) while draw residual stays meaningful
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsHome(11)
-                .seasonDrawsHome(5)
-                .seasonLossesHome(4)
-                .seasonGoalsHome(28)
-                .seasonConcededHome(16)
-                .seasonGoalDifference(12)
-                .ppgHome(1.90)
-                .position(8)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsAway(5)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(9)
-                .seasonGoalsAway(18)
-                .seasonConcededAway(26)
-                .seasonGoalDifference(-8)
-                .ppgAway(1.05)
-                .position(14)
-                .build();
-
-        TeamRecentForm homeForm = TeamRecentForm.builder()
-                .teamId(1L)
-                .winsHome(3)
-                .drawsHome(1)
-                .lossesHome(1)
-                .build();
-
-        TeamRecentForm awayForm = TeamRecentForm.builder()
-                .teamId(2L)
-                .winsAway(1)
-                .drawsAway(2)
-                .lossesAway(2)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(107L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .homeTeamForm(homeForm)
-                .awayTeamForm(awayForm)
-                .build();
+        return moderateHomeBuilder(107L).build();
     }
 
     private FixtureContext createLargePositionGapContext() {
@@ -781,28 +797,28 @@ class MatchResultRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsHome(13)
-                .seasonDrawsHome(4)
-                .seasonLossesHome(3)
-                .seasonGoalsHome(35)
-                .seasonConcededHome(14)
-                .seasonGoalDifference(21)
-                .ppgHome(2.15)
-                .position(1)  // Top of table
+                .seasonWinsHome(9)
+                .seasonDrawsHome(6)
+                .seasonLossesHome(5)
+                .seasonGoalsHome(24)
+                .seasonConcededHome(18)
+                .seasonGoalDifference(6)
+                .ppgHome(1.60)
+                .position(1)
                 .build();
 
         TeamSeasonStats awayStats = TeamSeasonStats.builder()
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsAway(2)
-                .seasonDrawsAway(5)
-                .seasonLossesAway(13)
-                .seasonGoalsAway(12)
-                .seasonConcededAway(35)
-                .seasonGoalDifference(-23)
-                .ppgAway(0.55)
-                .position(20)  // Bottom of table
+                .seasonWinsAway(6)
+                .seasonDrawsAway(6)
+                .seasonLossesAway(8)
+                .seasonGoalsAway(20)
+                .seasonConcededAway(22)
+                .seasonGoalDifference(-2)
+                .ppgAway(1.25)
+                .position(15)
                 .build();
 
         return FixtureContext.builder()
@@ -819,14 +835,14 @@ class MatchResultRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsHome(14)
-                .seasonDrawsHome(4)
-                .seasonLossesHome(2)
-                .seasonGoalsHome(38)
-                .seasonConcededHome(12)
-                .seasonGoalDifference(26)
-                .ppgHome(2.3)
-                .position(1)  // Title race
+                .seasonWinsHome(9)
+                .seasonDrawsHome(6)
+                .seasonLossesHome(5)
+                .seasonGoalsHome(24)
+                .seasonConcededHome(18)
+                .seasonGoalDifference(6)
+                .ppgHome(1.60)
+                .position(1)
                 .build();
 
         TeamSeasonStats awayStats = TeamSeasonStats.builder()
@@ -837,9 +853,9 @@ class MatchResultRecommendationEngineTest {
                 .seasonDrawsAway(6)
                 .seasonLossesAway(8)
                 .seasonGoalsAway(20)
-                .seasonConcededAway(24)
-                .seasonGoalDifference(-4)
-                .ppgAway(1.2)
+                .seasonConcededAway(22)
+                .seasonGoalDifference(-2)
+                .ppgAway(1.25)
                 .position(12)
                 .build();
 
