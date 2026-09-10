@@ -27,7 +27,8 @@ export function ElitePicksSection({ recommendations }: Props) {
         </span>
       </h2>
       <p className={styles.eliteBlurb}>
-        Top Strong selections across markets (one per fixture · max 3 BTTS)
+        Top Strong selections across markets for the selected kickoff window
+        (one per fixture · max 3 BTTS)
       </p>
       <div className={styles.tableHeader}>
         <span></span>

@@ -165,16 +165,13 @@ export default function Recommendations() {
     queryFn: () => recommendationService.getGrouped(daysAhead),
   });
 
-  // Elite Picks (UC-036) always use the horizon window, not kickoff/league filters.
-  const { data: horizonGrouped } = useQuery({
-    queryKey: ['recommendations-grouped', horizon],
-    queryFn: () => recommendationService.getGrouped(horizon),
-  });
-
-  const elitePicks = useMemo(
-    () => selectElitePicks(flattenGroupedRecommendations(horizonGrouped)),
-    [horizonGrouped]
-  );
+  // Elite uses the same fetch window as the boards, then the active kickoff chip.
+  const elitePicks = useMemo(() => {
+    const pool = flattenGroupedRecommendations(groupedRecommendations).filter((rec) =>
+      matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, Date.now())
+    );
+    return selectElitePicks(pool);
+  }, [groupedRecommendations, kickoffWindow]);
   const eliteKeys = useMemo(() => toEliteKeySet(elitePicks), [elitePicks]);
   const availableLeagues = useMemo(() => {
     if (!groupedRecommendations) return [];
