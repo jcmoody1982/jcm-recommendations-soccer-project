@@ -1,85 +1,97 @@
 package com.jcm.recommendations.soccer.core.recommendation.engine;
 
+import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
 import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
+import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
-import com.jcm.recommendations.soccer.domain.TeamRecentForm;
-import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
+import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.calculateCleanSheetPercentageOverall;
-import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.calculateFailedToScorePercentageOverall;
-import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.safeInt;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 /**
- * UC-042: dedicated Over 0.5 Goals board. Full-match only, and only when the price is
- * genuinely backable — short 1.01–1.25 quotes are the league-average outcome dressed as a pick.
+ * UC-042: Over 0.5 Goals board.
+ *
+ * <p>Full-match Over 0.5 quotes are almost always 1.01–1.12 on FootyStats, so this board does not
+ * use the Over 0.5 price. Instead it mirrors {@link MatchResultRecommendationEngine} tips whose
+ * win price is longer than 6/4 ({@code > 1.50}), publishes them as Over 0.5 Goals with no price,
+ * and keeps the Match Result win-likelihood score for ordering.
  */
 @Component
-public class Over05GoalsRecommendationEngine extends TotalGoalsOverRecommendationEngine {
+@Slf4j
+@RequiredArgsConstructor
+public class Over05GoalsRecommendationEngine implements RecommendationEngine {
 
-    /** Shortest Over 0.5 quote the board will carry (inclusive). */
-    static final double MIN_PRICE = 1.30;
+    /** Exclusive floor on the Match Result win quote (6/4 = 1.50). */
+    static final double MIN_MATCH_WIN_PRICE_EXCLUSIVE = 1.50;
 
-    /**
-     * Over 0.5 clears in around 90% of matches, so the thresholds sit high and the price gate
-     * does most of the thinning. A 1.30+ quote already implies the market is less sure than
-     * the typical lock, which is the only Over 0.5 worth putting on a board.
-     */
-    private static final LineSpec SPEC = new LineSpec(
-            RecommendationType.OVER_05_GOALS,
-            "Over 0.5 Goals",
-            "over05Pct",
-            "apiO05Potential",
-            1.0,
-            82.0,
-            75.0,
-            0.5
-    );
+    private static final String MARKET = "Over 0.5 Goals";
+
+    private final MatchResultRecommendationEngine matchResultEngine;
 
     @Override
-    protected LineSpec spec() {
-        return SPEC;
+    public RecommendationType getType() {
+        return RecommendationType.OVER_05_GOALS;
     }
 
-    /**
-     * P(the match has a goal) ≈ 1 − P(0-0). A team's 0-0 rate is approximated as
-     * failed-to-score × clean-sheet, treating those as independent.
-     */
     @Override
-    protected Double seasonOverPercentage(TeamSeasonStats stats) {
-        if (stats == null) {
-            return null;
+    public Optional<Recommendation> analyze(FixtureContext context) {
+        Optional<Recommendation> matchResult = matchResultEngine.analyze(context);
+        if (matchResult.isEmpty()) {
+            return Optional.empty();
         }
-        double failedToScore = calculateFailedToScorePercentageOverall(stats) / 100.0;
-        double cleanSheet = calculateCleanSheetPercentageOverall(stats) / 100.0;
-        return 100.0 * (1.0 - (failedToScore * cleanSheet));
-    }
 
-    @Override
-    protected Double formOverPercentage(TeamRecentForm form) {
-        if (form == null || form.getFailedToScoreOverall() == null || form.getCleanSheetsOverall() == null) {
-            return null;
+        Recommendation source = matchResult.get();
+        Double winOdds = source.getOdds();
+        if (winOdds == null || winOdds <= MIN_MATCH_WIN_PRICE_EXCLUSIVE) {
+            log.debug(
+                    "Skipping Over 0.5 from Match Result: fixtureId={}, winOdds={} (need > {})",
+                    context.getFixture().getId(),
+                    winOdds,
+                    MIN_MATCH_WIN_PRICE_EXCLUSIVE);
+            return Optional.empty();
         }
-        double failedToScore = safeInt(form.getFailedToScoreOverall()) / 5.0;
-        double cleanSheet = safeInt(form.getCleanSheetsOverall()) / 5.0;
-        return 100.0 * (1.0 - (failedToScore * cleanSheet));
-    }
 
-    @Override
-    protected Double apiPotential(FixtureContext context) {
-        return null;
-    }
-
-    @Override
-    protected Double oddsForMarket(FixtureContext context) {
-        if (!context.hasOdds()) {
-            return null;
+        Map<String, Object> factors = new HashMap<>();
+        if (source.getFactors() != null) {
+            factors.putAll(source.getFactors());
         }
-        return context.getOdds().getOddsFtOver05();
+        factors.put("derivedFromMatchResult", true);
+        factors.put("matchWinSelection", source.getMarket());
+        factors.put("matchWinOdds", winOdds);
+
+        Recommendation recommendation = RecommendationFactory.fromContext(context)
+                .type(RecommendationType.OVER_05_GOALS)
+                .confidence(source.getConfidence())
+                .score(source.getScore())
+                .market(MARKET)
+                .odds(null)
+                .description(buildDescription(source, winOdds))
+                .factors(factors)
+                .build();
+
+        log.info(
+                "Over 0.5 from Match Result: fixtureId={}, selection={}, winOdds={}, winLikelihood={}",
+                context.getFixture().getId(),
+                source.getMarket(),
+                winOdds,
+                String.format("%.1f", source.getScore()));
+
+        return Optional.of(recommendation);
     }
 
-    @Override
-    protected boolean passesOddsGate(Double odds) {
-        return odds != null && odds >= MIN_PRICE;
+    private static String buildDescription(Recommendation source, double winOdds) {
+        String confidenceLabel = source.getConfidence().name().charAt(0)
+                + source.getConfidence().name().substring(1).toLowerCase();
+        return String.format(
+                "%s Over 0.5 Goals — sourced from Match Result (%s @ %.2f, win likelihood %.0f%%). Price N/A.",
+                confidenceLabel,
+                source.getMarket(),
+                winOdds,
+                source.getScore());
     }
 }

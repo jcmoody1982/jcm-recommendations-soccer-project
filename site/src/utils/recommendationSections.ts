@@ -116,9 +116,9 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
   },
   OVER_05_GOALS: {
     title: 'Over 0.5 Goals',
-    scoreLabel: 'Probability',
+    scoreLabel: 'Win likelihood',
     scoreUnit: '%',
-    showPrice: true,
+    showPrice: false,
   },
   OVER_GOALS: {
     title: 'Over 2.5 Goals',
@@ -188,19 +188,13 @@ export function sectionDomId(type: RecommendationType): string {
 export const MIN_BACKABLE_PRICE = 1.2;
 
 /**
- * Full-match Over 0.5: shortest quote the board will show. Kept above the generic 1.20 Elite
- * floor so the section is not a list of near-locks.
- */
-export const OVER_05_MIN_PRICE = 1.3;
-
-/**
- * Line filters for the goals and double-chance boards. Over 0.5 only shows full-match Over 0.5
- * at or above 1.30; Double Chance drops anything priced under 1.20. Other sections pass through.
+ * Line filters for goals / double-chance boards. Over 0.5 is unpriced (sourced from longer
+ * Match Result tips); Double Chance drops anything under 1.20. Other sections pass through.
  */
 export function includeInMarketSection(rec: Recommendation): boolean {
   if (rec.type === 'OVER_05_GOALS') {
     const market = rec.market?.toLowerCase() ?? '';
-    return market.includes('over 0.5') && rec.odds != null && rec.odds >= OVER_05_MIN_PRICE;
+    return market.includes('over 0.5');
   }
   if (rec.type === 'DOUBLE_CHANCE') {
     return rec.odds != null && rec.odds >= MIN_BACKABLE_PRICE;
