@@ -34,9 +34,9 @@ class Over05GoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze publishes unpriced Over 0.5 from Match Result tips longer than 6/4")
-    void analyze_matchResultLongerThanSixFour_publishesUnpricedOver05() {
-        FixtureContext context = dominantHome(1.70);
+    @DisplayName("analyze publishes unpriced Over 0.5 from Match Result tips longer than 2.00")
+    void analyze_matchResultLongerThanEvens_publishesUnpricedOver05() {
+        FixtureContext context = dominantHome(2.10);
         Optional<Recommendation> matchResult = matchResultEngine.analyze(context);
         assertThat(matchResult).isPresent();
 
@@ -50,17 +50,17 @@ class Over05GoalsRecommendationEngineTest {
         assertThat(result.get().getConfidence()).isEqualTo(matchResult.get().getConfidence());
         assertThat(result.get().getFactors().get("derivedFromMatchResult")).isEqualTo(true);
         assertThat(result.get().getFactors().get("matchWinSelection")).isEqualTo("Home Team");
-        assertThat(result.get().getFactors().get("matchWinOdds")).isEqualTo(1.70);
+        assertThat(result.get().getFactors().get("matchWinOdds")).isEqualTo(2.10);
     }
 
     @Test
-    @DisplayName("analyze drops Match Result tips at or shorter than 6/4")
-    void analyze_matchResultAtOrShorterThanSixFour_isEmpty() {
-        assertThat(matchResultEngine.analyze(dominantHome(1.50))).isPresent();
-        assertThat(engine.analyze(dominantHome(1.50))).isEmpty();
+    @DisplayName("analyze drops Match Result tips at or shorter than 2.00")
+    void analyze_matchResultAtOrShorterThanEvens_isEmpty() {
+        assertThat(matchResultEngine.analyze(dominantHome(2.00))).isPresent();
+        assertThat(engine.analyze(dominantHome(2.00))).isEmpty();
 
-        assertThat(matchResultEngine.analyze(dominantHome(1.40))).isPresent();
-        assertThat(engine.analyze(dominantHome(1.40))).isEmpty();
+        assertThat(matchResultEngine.analyze(dominantHome(1.70))).isPresent();
+        assertThat(engine.analyze(dominantHome(1.70))).isEmpty();
     }
 
     @Test
@@ -74,32 +74,32 @@ class Over05GoalsRecommendationEngineTest {
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsHome(9)
-                .seasonDrawsHome(6)
-                .seasonLossesHome(5)
-                .seasonGoalsHome(24)
-                .seasonConcededHome(18)
-                .seasonGoalDifference(6)
-                .ppgHome(1.70)
-                .position(6)
-                .xgForAvgHome(1.45)
-                .xgAgainstAvgHome(1.05)
+                .seasonWinsHome(14)
+                .seasonDrawsHome(4)
+                .seasonLossesHome(2)
+                .seasonGoalsHome(35)
+                .seasonConcededHome(12)
+                .seasonGoalDifference(23)
+                .ppgHome(2.3)
+                .position(2)
+                .xgForAvgHome(2.0)
+                .xgAgainstAvgHome(0.8)
                 .build();
 
         TeamSeasonStats awayStats = TeamSeasonStats.builder()
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsAway(4)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(10)
-                .seasonGoalsAway(16)
-                .seasonConcededAway(26)
-                .seasonGoalDifference(-10)
-                .ppgAway(0.90)
+                .seasonWinsAway(3)
+                .seasonDrawsAway(5)
+                .seasonLossesAway(12)
+                .seasonGoalsAway(15)
+                .seasonConcededAway(30)
+                .seasonGoalDifference(-15)
+                .ppgAway(0.7)
                 .position(16)
-                .xgForAvgAway(0.95)
-                .xgAgainstAvgAway(1.50)
+                .xgForAvgAway(0.9)
+                .xgAgainstAvgAway(1.5)
                 .build();
 
         return FixtureContext.builder()
@@ -119,9 +119,9 @@ class Over05GoalsRecommendationEngineTest {
                 .awayTeamStats(awayStats)
                 .homeTeamForm(TeamRecentForm.builder()
                         .teamId(1L)
-                        .winsHome(3)
+                        .winsHome(4)
                         .drawsHome(1)
-                        .lossesHome(1)
+                        .lossesHome(0)
                         .build())
                 .awayTeamForm(TeamRecentForm.builder()
                         .teamId(2L)

@@ -18,7 +18,7 @@ import java.util.Optional;
  *
  * <p>Full-match Over 0.5 quotes are almost always 1.01–1.12 on FootyStats, so this board does not
  * use the Over 0.5 price. Instead it mirrors {@link MatchResultRecommendationEngine} tips whose
- * win price is longer than 6/4 ({@code > 1.50}), publishes them as
+ * win price is longer than 2.00 ({@code > 2.00}), publishes them as
  * {@code "{team} Over 0.5 Goals"} with no price, and keeps the Match Result win-likelihood score
  * for ordering. The team name is the longer-priced Match Result side that selected the fixture;
  * settlement remains full-match Over 0.5.
@@ -28,8 +28,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class Over05GoalsRecommendationEngine implements RecommendationEngine {
 
-    /** Exclusive floor on the Match Result win quote (6/4 = 1.50). */
-    static final double MIN_MATCH_WIN_PRICE_EXCLUSIVE = 1.50;
+    /** Exclusive floor on the Match Result win quote (evens = 2.00). */
+    static final double MIN_MATCH_WIN_PRICE_EXCLUSIVE = 2.00;
 
     private static final String MARKET_SUFFIX = "Over 0.5 Goals";
 
