@@ -26,11 +26,18 @@ class UnderGoalsRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze is paused and publishes nothing")
+    void analyze_whenPaused_returnsEmpty() {
+        assertThat(UnderGoalsRecommendationEngine.PAUSED).isTrue();
+        assertThat(engine.analyze(createLowScoringContext())).isEmpty();
+    }
+
+    @Test
     @DisplayName("analyze returns recommendation for low scoring context")
     void analyze_withLowScoringTeams_returnsRecommendation() {
         FixtureContext context = createLowScoringContext();
         
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
         
         if (result.isPresent()) {
             assertThat(result.get().getType()).isEqualTo(RecommendationType.UNDER_GOALS);
@@ -43,7 +50,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_withHighScoringTeams_returnsEmpty() {
         FixtureContext context = createHighScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }
@@ -53,7 +60,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_includesExpectedGoalsInFactors() {
         FixtureContext context = createLowScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         if (result.isPresent()) {
             assertThat(result.get().getFactors()).containsKey("expectedGoals");
@@ -68,8 +75,8 @@ class UnderGoalsRecommendationEngineTest {
         FixtureContext contextWithForm = createLowScoringContextWithForm();
         FixtureContext contextWithoutForm = createLowScoringContext();
 
-        Optional<Recommendation> resultWithForm = engine.analyze(contextWithForm);
-        Optional<Recommendation> resultWithoutForm = engine.analyze(contextWithoutForm);
+        Optional<Recommendation> resultWithForm = engine.analyzeLive(contextWithForm);
+        Optional<Recommendation> resultWithoutForm = engine.analyzeLive(contextWithoutForm);
 
         if (resultWithForm.isPresent()) {
             assertThat(resultWithForm.get().getFactors().get("formDataAvailable")).isEqualTo(true);
@@ -84,7 +91,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_withVeryLowCombinedGoals_appliesLowScoringBoost() {
         FixtureContext context = createVeryLowScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("lowScoringBoostApplied")).isEqualTo(true);
@@ -96,7 +103,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_withHighCleanSheetRates_appliesDefensiveBoost() {
         FixtureContext context = createDefensiveContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("defensiveStrengthBoostApplied")).isEqualTo(true);
@@ -108,7 +115,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_withLowXgData_appliesXgBoost() {
         FixtureContext context = createContextWithLowXgData(0.9, 1.0);
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(true);
@@ -121,7 +128,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_withoutXgData_noXgBoost() {
         FixtureContext context = createLowScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(false);
@@ -133,7 +140,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_tracksCleanSheetPercentages() {
         FixtureContext context = createLowScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         if (result.isPresent()) {
             assertThat(result.get().getFactors()).containsKey("homeCleanSheetPct");
@@ -146,7 +153,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_tracksFailedToScorePercentages() {
         FixtureContext context = createLowScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         if (result.isPresent()) {
             assertThat(result.get().getFactors()).containsKey("homeFailedToScorePct");
@@ -159,7 +166,7 @@ class UnderGoalsRecommendationEngineTest {
     void analyze_tracksUnderPercentages() {
         FixtureContext context = createLowScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         if (result.isPresent()) {
             assertThat(result.get().getFactors()).containsKey("homeUnder15Pct");
@@ -178,7 +185,7 @@ class UnderGoalsRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away"))
                 .build();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }

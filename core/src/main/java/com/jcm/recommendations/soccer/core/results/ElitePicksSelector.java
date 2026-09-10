@@ -48,7 +48,6 @@ public final class ElitePicksSelector {
             "OVER_GOALS",
             "OVER_15_GOALS",
             "OVER_25_GOALS",
-            "UNDER_GOALS",
             "RESULT_BTTS",
             "TOP_VS_BOTTOM",
             "FIRST_HALF_GOALS",

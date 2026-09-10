@@ -26,7 +26,6 @@ export const SECTION_ORDER: RecommendationType[] = [
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
   'VALUE_BET',
-  'UNDER_GOALS',
   'BOOKING_POINTS',
   'OVER_CORNERS',
   'UNDER_CORNERS',
