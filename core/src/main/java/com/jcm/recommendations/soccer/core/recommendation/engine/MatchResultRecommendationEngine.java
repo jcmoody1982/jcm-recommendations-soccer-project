@@ -34,9 +34,10 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.SquadValue
  * - Home advantage factor
  * - Motivation factor (title race, relegation battle)
  *
- * Odds are used only for value vs market and confidence — not as a base-model input.
- * Raw home-win probabilities at or above {@code MAX_PUBLISH_PROBABILITY} are withheld:
- * that overconfident tail underperformed the moderate band on recent graded boards.
+ * <p>The published score is not the raw model probability. When home-win odds exist it is a
+ * market blend ({@code 0.4·model + 0.6·implied}); without odds the raw model is lightly dampened
+ * and capped below 65. Post-hoc form/position/home multipliers are kept mild so the raw model
+ * less often invents a 70%+ home win that the market (and graded boards) reject.
  */
 @Component
 @Slf4j
@@ -69,41 +70,47 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     private static final double XG_DISADVANTAGE_THRESHOLD = -0.2;
     private static final double XG_DISADVANTAGE_MULTIPLIER = 0.85;
 
-    // Form Momentum thresholds and multipliers
-    private static final double FORM_HOT_STREAK_MULTIPLIER = 1.20;      // W-W-W-W-W or W-W-W-W-D
-    private static final double FORM_GOOD_MULTIPLIER = 1.10;            // 3+ wins in last 5
-    private static final double FORM_POOR_MULTIPLIER = 0.85;            // 3+ losses in last 5
-    private static final double FORM_CRISIS_MULTIPLIER = 0.70;          // L-L-L-L-L
+    // Form momentum — softened so hot streaks cannot mint fake 70%+ homes alone
+    private static final double FORM_HOT_STREAK_MULTIPLIER = 1.10;
+    private static final double FORM_GOOD_MULTIPLIER = 1.05;
+    private static final double FORM_POOR_MULTIPLIER = 0.90;
+    private static final double FORM_CRISIS_MULTIPLIER = 0.85;
     private static final int FORM_FULL_SAMPLE = 5;
     private static final int FORM_MIN_SAMPLE = 3;
 
-    // Home advantage factor
-    private static final double HOME_ADVANTAGE_BOOST = 0.08;            // 8% probability boost for home team
+    /** Home advantage as a probability fraction (4pp after ×100). Was 8pp. */
+    private static final double HOME_ADVANTAGE_BOOST = 0.04;
 
-    // Position gap factors
-    private static final double POSITION_GAP_LARGE_MULTIPLIER = 1.20;   // Gap >= 10
-    private static final double POSITION_GAP_MEDIUM_MULTIPLIER = 1.10;  // Gap 6-9
-    private static final double POSITION_GAP_SMALL_MULTIPLIER = 1.05;   // Gap 3-5
+    // Position gap — mild bumps only
+    private static final double POSITION_GAP_LARGE_MULTIPLIER = 1.10;
+    private static final double POSITION_GAP_MEDIUM_MULTIPLIER = 1.05;
+    private static final double POSITION_GAP_SMALL_MULTIPLIER = 1.02;
 
-    // Motivation factors
-    private static final double MOTIVATION_TITLE_MULTIPLIER = 1.15;     // Position 1-2
-    private static final double MOTIVATION_EUROPE_MULTIPLIER = 1.10;    // Position 3-5
-    private static final double MOTIVATION_RELEGATION_MULTIPLIER = 1.15; // Position >= 17
+    // Motivation — mild bumps only
+    private static final double MOTIVATION_TITLE_MULTIPLIER = 1.08;
+    private static final double MOTIVATION_EUROPE_MULTIPLIER = 1.04;
+    private static final double MOTIVATION_RELEGATION_MULTIPLIER = 1.08;
 
     // Draw probability bounds (informational only — draws deferred to UC-019)
     private static final double DRAW_MIN_PROBABILITY = 15.0;
     private static final double DRAW_MAX_PROBABILITY = 35.0;
 
-    // Thresholds — raised after ~34% hit rate; Away tips paused until recalibrated
+    // Thresholds apply to the *published* (blended / dampened) score
     private static final double THRESHOLD_STRONG = 62.0;
     private static final double THRESHOLD_MODERATE = 55.0;
+
+    /** Weight on the raw model when blending with market-implied home-win %. */
+    private static final double PUBLISH_MODEL_WEIGHT = 0.40;
+    private static final double PUBLISH_MARKET_WEIGHT = 0.60;
+
     /**
-     * Soft ceiling: on the 2026-09-04..10 board, raw home-win scores in the mid/high 60s–70s
-     * were badly overconfident (65–70 band ~35% hit / −44% ROI) while 55–62 was the only
-     * profitable slice. Do not publish at or above this raw model probability.
+     * Without odds, pull high raw model scores toward the profitable mid band and never publish
+     * a no-odds tip at or above this cap.
      */
-    private static final double MAX_PUBLISH_PROBABILITY = 65.0;
-    private static final double VALUE_THRESHOLD = 5.0;
+    private static final double NO_ODDS_DAMP_FLOOR = 55.0;
+    private static final double NO_ODDS_DAMP_FACTOR = 0.50;
+    private static final double NO_ODDS_PUBLISH_CAP = 64.9;
+
     /** STRONG also requires outcome odds not longer than this when odds are present. */
     private static final double STRONG_MAX_ODDS = 2.50;
 
@@ -175,30 +182,24 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
 
         final String outcomeType = "HOME";
         final String recommendedOutcome = context.getHomeTeam().getName();
-        final double bestProb = homeWinProb;
+        final double rawModelProb = homeWinProb;
 
-        if (bestProb >= MAX_PUBLISH_PROBABILITY) {
-            log.debug("Skipping overconfident Match Result tip: fixtureId={}, homeProb={}, max={}",
-                    context.getFixture().getId(),
-                    String.format("%.1f", bestProb),
-                    MAX_PUBLISH_PROBABILITY);
-            return Optional.empty();
-        }
-
-        double valueVsOdds = 0.0;
         Double odds = null;
+        Double impliedHomePct = null;
         boolean hasOutcomeOdds = false;
 
         if (context.hasOdds()
                 && context.getOdds().getOddsFt1() != null
                 && context.getOdds().getOddsFt1() > 0) {
             odds = context.getOdds().getOddsFt1();
-            double implied = (1.0 / odds) * 100;
-            valueVsOdds = bestProb - implied;
+            impliedHomePct = (1.0 / odds) * 100;
             hasOutcomeOdds = true;
         }
 
-        ConfidenceLevel confidence = determineConfidence(bestProb, valueVsOdds, hasOutcomeOdds, odds);
+        double publishedScore = publishScore(rawModelProb, impliedHomePct);
+        double valueVsOdds = impliedHomePct != null ? rawModelProb - impliedHomePct : 0.0;
+
+        ConfidenceLevel confidence = determineConfidence(publishedScore, hasOutcomeOdds, odds);
 
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
@@ -206,23 +207,49 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(context, homeWinProb, drawProb, awayWinProb,
                 valueVsOdds, hasXgData, homeFormMomentum, awayFormMomentum);
+        factors.put("rawModelProbability", rawModelProb);
+        factors.put("publishedScore", publishedScore);
+        factors.put("marketBlendApplied", hasOutcomeOdds);
+        if (impliedHomePct != null) {
+            factors.put("publishModelWeight", PUBLISH_MODEL_WEIGHT);
+            factors.put("publishMarketWeight", PUBLISH_MARKET_WEIGHT);
+        } else {
+            factors.put("noOddsDampApplied", rawModelProb > NO_ODDS_DAMP_FLOOR);
+            factors.put("noOddsPublishCap", NO_ODDS_PUBLISH_CAP);
+        }
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.MATCH_RESULT)
                 .confidence(confidence)
-                .score(bestProb)
+                .score(publishedScore)
                 .market(recommendedOutcome)
                 .odds(odds)
-                .description(buildDescription(context, recommendedOutcome, bestProb, confidence,
+                .description(buildDescription(context, recommendedOutcome, publishedScore, confidence,
                         valueVsOdds, outcomeType, homeFormMomentum, awayFormMomentum, hasOutcomeOdds))
                 .factors(factors)
                 .build();
 
-        log.info("Match Result recommendation generated: fixtureId={}, outcome={}, probability={}, value={}, confidence={}",
+        log.info("Match Result recommendation generated: fixtureId={}, outcome={}, published={}, rawModel={}, value={}, confidence={}",
                 context.getFixture().getId(), recommendedOutcome,
-                String.format("%.1f", bestProb), String.format("%.1f", valueVsOdds), confidence);
+                String.format("%.1f", publishedScore), String.format("%.1f", rawModelProb),
+                String.format("%.1f", valueVsOdds), confidence);
 
         return Optional.of(recommendation);
+    }
+
+    /**
+     * Published probability shown on the board. With odds: lean on the market so a raw 75% model
+     * cannot outrun a ~50% price. Without odds: dampen the high tail and cap below 65.
+     */
+    static double publishScore(double rawModelProb, Double impliedHomePct) {
+        if (impliedHomePct != null && impliedHomePct > 0) {
+            return (PUBLISH_MODEL_WEIGHT * rawModelProb) + (PUBLISH_MARKET_WEIGHT * impliedHomePct);
+        }
+        if (rawModelProb <= NO_ODDS_DAMP_FLOOR) {
+            return rawModelProb;
+        }
+        double dampened = NO_ODDS_DAMP_FLOOR + NO_ODDS_DAMP_FACTOR * (rawModelProb - NO_ODDS_DAMP_FLOOR);
+        return Math.min(NO_ODDS_PUBLISH_CAP, dampened);
     }
 
     private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
@@ -529,20 +556,21 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     }
 
     /**
-     * STRONG when probability is high, odds are short enough (≤ {@link #STRONG_MAX_ODDS} when present),
-     * and either odds are missing or the pick shows value vs market.
+     * STRONG / MODERATE from the published score. When odds are present, STRONG also needs a
+     * short-enough price; the old "+5% value vs market" gate is dropped because positive model
+     * edge was anti-selected on graded boards once scores were already overconfident.
      */
     private ConfidenceLevel determineConfidence(
-            double probability, double valueVsOdds, boolean hasOutcomeOdds, Double odds) {
-        if (probability >= THRESHOLD_STRONG) {
+            double publishedProbability, boolean hasOutcomeOdds, Double odds) {
+        if (publishedProbability >= THRESHOLD_STRONG) {
             boolean oddsOkForStrong = !hasOutcomeOdds
-                    || (odds != null && odds <= STRONG_MAX_ODDS && valueVsOdds >= VALUE_THRESHOLD);
+                    || (odds != null && odds <= STRONG_MAX_ODDS);
             if (oddsOkForStrong) {
                 return ConfidenceLevel.STRONG;
             }
             return ConfidenceLevel.MODERATE;
         }
-        if (probability >= THRESHOLD_MODERATE) {
+        if (publishedProbability >= THRESHOLD_MODERATE) {
             return ConfidenceLevel.MODERATE;
         }
         return ConfidenceLevel.WEAK;
@@ -672,7 +700,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
             }
         }
 
-        if (valueVsOdds >= VALUE_THRESHOLD) {
+        if (valueVsOdds >= 5.0) {
             positiveIndicators.add("Value vs market odds");
         }
 

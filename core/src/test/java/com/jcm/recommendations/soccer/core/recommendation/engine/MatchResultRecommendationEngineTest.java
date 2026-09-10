@@ -44,11 +44,55 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze withholds overconfident home tips at or above the soft ceiling")
-    void analyze_overconfidentHomeProbability_isWithheld() {
+    @DisplayName("analyze publishes former overconfident homes via market blend instead of withholding")
+    void analyze_overconfidentHomeWithOdds_blendsTowardMarket() {
         Optional<Recommendation> result = engine.analyze(createOverconfidentHomeTeamContext());
 
-        assertThat(result).isEmpty();
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Home Team");
+        assertThat(result.get().getFactors().get("marketBlendApplied")).isEqualTo(true);
+
+        Double rawModel = (Double) result.get().getFactors().get("rawModelProbability");
+        Double published = (Double) result.get().getFactors().get("publishedScore");
+        assertThat(rawModel).isGreaterThanOrEqualTo(65.0);
+        assertThat(published).isEqualTo(result.get().getScore());
+        assertThat(published).isLessThan(rawModel);
+        // 1.45 home → ~69% implied; blend should sit between model and market, not at raw 70%+
+        assertThat(published).isCloseTo(
+                0.4 * rawModel + 0.6 * (100.0 / 1.45),
+                org.assertj.core.data.Offset.offset(0.05));
+    }
+
+    @Test
+    @DisplayName("analyze dampens and caps no-odds overconfident homes below 65")
+    void analyze_overconfidentHomeWithoutOdds_isDampenedUnder65() {
+        FixtureContext context = overconfidentHomeBuilder(198L).build();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        Double rawModel = (Double) result.get().getFactors().get("rawModelProbability");
+        assertThat(rawModel).isGreaterThan(65.0);
+        assertThat(result.get().getScore()).isLessThan(65.0);
+        assertThat(result.get().getFactors().get("noOddsDampApplied")).isEqualTo(true);
+        assertThat(result.get().getScore()).isEqualTo(
+                MatchResultRecommendationEngine.publishScore(rawModel, null));
+    }
+
+    @Test
+    @DisplayName("publishScore blends model with market when odds-implied % is present")
+    void publishScore_withMarket_blendsFortySixty() {
+        assertThat(MatchResultRecommendationEngine.publishScore(75.0, 50.0))
+                .isCloseTo(60.0, org.assertj.core.data.Offset.offset(0.001));
+    }
+
+    @Test
+    @DisplayName("publishScore dampens the high no-odds tail under 65")
+    void publishScore_withoutMarket_dampsHighTail() {
+        assertThat(MatchResultRecommendationEngine.publishScore(55.0, null)).isEqualTo(55.0);
+        // 55 + 0.5*(75-55) = 65 → capped at 64.9
+        assertThat(MatchResultRecommendationEngine.publishScore(75.0, null)).isEqualTo(64.9);
+        assertThat(MatchResultRecommendationEngine.publishScore(90.0, null)).isEqualTo(64.9);
     }
 
     @Test
@@ -102,9 +146,9 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze can be STRONG without odds when probability clears the strong floor")
+    @DisplayName("analyze can be STRONG without odds when dampened publish score clears the strong floor")
     void analyze_strongWithoutOdds_whenProbabilityHigh() {
-        FixtureContext context = createDominantHomeTeamContextWithoutOdds();
+        FixtureContext context = overconfidentHomeBuilder(121L).build();
 
         Optional<Recommendation> result = engine.analyze(context);
 
@@ -112,6 +156,7 @@ class MatchResultRecommendationEngineTest {
         assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
         assertThat(result.get().getOdds()).isNull();
         assertThat(result.get().getScore()).isLessThan(65.0);
+        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(62.0);
     }
 
     @Test
@@ -123,9 +168,9 @@ class MatchResultRecommendationEngineTest {
 
         assertThat(result).isPresent();
         Double formMultiplier = (Double) result.get().getFactors().get("homeFormMomentumMultiplier");
-        // 3-game perfect sample → hot-streak raw then dampened (1.0 + 0.20 * 3/5 = 1.12)
-        assertThat(formMultiplier).isLessThan(1.20);
-        assertThat(formMultiplier).isCloseTo(1.12, org.assertj.core.data.Offset.offset(0.001));
+        // 3-game perfect sample → hot-streak raw 1.10 then dampened (1.0 + 0.10 * 3/5 = 1.06)
+        assertThat(formMultiplier).isLessThan(1.10);
+        assertThat(formMultiplier).isCloseTo(1.06, org.assertj.core.data.Offset.offset(0.001));
         assertThat(result.get().getFactors().get("homeFormSampleSize")).isEqualTo(3);
     }
 
@@ -139,7 +184,7 @@ class MatchResultRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("homeFormStatus")).isEqualTo("Hot streak");
         Double formMultiplier = (Double) result.get().getFactors().get("homeFormMomentumMultiplier");
-        assertThat(formMultiplier).isEqualTo(1.20);
+        assertThat(formMultiplier).isEqualTo(1.10);
     }
 
     @Test
@@ -152,7 +197,7 @@ class MatchResultRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("homeFormStatus")).isEqualTo("Poor form");
         Double formMultiplier = (Double) result.get().getFactors().get("homeFormMomentumMultiplier");
-        assertThat(formMultiplier).isEqualTo(0.85);
+        assertThat(formMultiplier).isEqualTo(0.90);
     }
 
     @Test
@@ -282,15 +327,14 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze with odds but no value stays MODERATE even at high probability")
-    void analyze_highProbabilityWithoutValue_isModerate() {
-        FixtureContext context = createDominantHomeTeamContextWithShortOdds();
+    @DisplayName("analyze drops long-priced homes when market blend pulls published score under Moderate")
+    void analyze_longOddsDisagreeingWithModel_isWithheld() {
+        FixtureContext context = createDominantHomeTeamContextWithLongOdds();
 
         Optional<Recommendation> result = engine.analyze(context);
 
-        assertThat(result).isPresent();
-        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(55.0);
-        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        // 2.80 home (~36% implied) vs a 70%+ raw model → blend lands below 55
+        assertThat(result).isEmpty();
     }
 
     @Test
@@ -349,14 +393,14 @@ class MatchResultRecommendationEngineTest {
         return dominantHomeBuilder(121L).build();
     }
 
-    private FixtureContext createDominantHomeTeamContextWithShortOdds() {
-        // Milder edge so the tip stays MODERATE and short odds leave no +5% value.
-        return moderateHomeBuilder(122L)
+    private FixtureContext createDominantHomeTeamContextWithLongOdds() {
+        // Long home price (>2.50) so STRONG is blocked even if the blended score clears 62.
+        return overconfidentHomeBuilder(122L)
                 .odds(FixtureOdds.builder()
                         .fixtureId(122L)
-                        .oddsFt1(1.35)
-                        .oddsFtX(5.00)
-                        .oddsFt2(8.00)
+                        .oddsFt1(2.80)
+                        .oddsFtX(3.40)
+                        .oddsFt2(2.50)
                         .build())
                 .build();
     }
@@ -372,51 +416,51 @@ class MatchResultRecommendationEngineTest {
                 .build();
     }
 
-    /** Home edge that clears Moderate but stays below Strong — used for no-value odds cases. */
+    /** Home edge that clears Moderate after softened post-hoc multipliers. */
     private FixtureContext.FixtureContextBuilder moderateHomeBuilder(long fixtureId) {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
                 .teamId(1L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsHome(9)
-                .seasonDrawsHome(6)
-                .seasonLossesHome(5)
-                .seasonGoalsHome(24)
-                .seasonConcededHome(18)
-                .seasonGoalDifference(6)
-                .ppgHome(1.60)
-                .position(8)
-                .xgForAvgHome(1.35)
-                .xgAgainstAvgHome(1.15)
+                .seasonWinsHome(11)
+                .seasonDrawsHome(5)
+                .seasonLossesHome(4)
+                .seasonGoalsHome(28)
+                .seasonConcededHome(16)
+                .seasonGoalDifference(12)
+                .ppgHome(1.90)
+                .position(5)
+                .xgForAvgHome(1.55)
+                .xgAgainstAvgHome(1.00)
                 .build();
 
         TeamSeasonStats awayStats = TeamSeasonStats.builder()
                 .teamId(2L)
                 .seasonId(1L)
                 .matchesPlayed(20)
-                .seasonWinsAway(6)
+                .seasonWinsAway(5)
                 .seasonDrawsAway(6)
-                .seasonLossesAway(8)
-                .seasonGoalsAway(20)
-                .seasonConcededAway(22)
-                .seasonGoalDifference(-2)
-                .ppgAway(1.25)
-                .position(11)
-                .xgForAvgAway(1.15)
-                .xgAgainstAvgAway(1.30)
+                .seasonLossesAway(9)
+                .seasonGoalsAway(18)
+                .seasonConcededAway(24)
+                .seasonGoalDifference(-6)
+                .ppgAway(1.05)
+                .position(14)
+                .xgForAvgAway(1.05)
+                .xgAgainstAvgAway(1.40)
                 .build();
 
         TeamRecentForm homeForm = TeamRecentForm.builder()
                 .teamId(1L)
-                .winsHome(2)
-                .drawsHome(2)
+                .winsHome(3)
+                .drawsHome(1)
                 .lossesHome(1)
                 .build();
 
         TeamRecentForm awayForm = TeamRecentForm.builder()
                 .teamId(2L)
-                .winsAway(2)
-                .drawsAway(1)
+                .winsAway(1)
+                .drawsAway(2)
                 .lossesAway(2)
                 .build();
 
@@ -629,91 +673,42 @@ class MatchResultRecommendationEngineTest {
     }
 
     private FixtureContext createContextWithXgData() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsHome(10)
-                .seasonDrawsHome(5)
-                .seasonLossesHome(5)
-                .seasonGoalsHome(28)
-                .seasonConcededHome(18)
-                .seasonGoalDifference(10)
-                .ppgHome(1.75)
-                .position(6)
-                .xgForAvgHome(1.6)
-                .xgForAvgAway(1.4)
-                .xgAgainstAvgHome(1.0)
-                .xgAgainstAvgAway(1.2)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsAway(7)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(7)
-                .seasonGoalsAway(22)
-                .seasonConcededAway(24)
-                .seasonGoalDifference(-2)
-                .ppgAway(1.35)
-                .position(10)
-                .xgForAvgHome(1.3)
-                .xgForAvgAway(1.2)
-                .xgAgainstAvgHome(1.3)
-                .xgAgainstAvgAway(1.4)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(103L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
-                .build();
+        return dominantHomeBuilder(103L).build();
     }
 
     private FixtureContext createContextWithStrongXgDominance() {
-        // Mild win rates with a large xG mismatch — keeps the tip under the soft ceiling.
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsHome(9)
-                .seasonDrawsHome(6)
-                .seasonLossesHome(5)
-                .seasonGoalsHome(24)
-                .seasonConcededHome(18)
-                .seasonGoalDifference(6)
-                .ppgHome(1.60)
-                .position(8)
-                .xgForAvgHome(2.0)
-                .xgAgainstAvgHome(1.0)
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsAway(6)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(8)
-                .seasonGoalsAway(20)
-                .seasonConcededAway(22)
-                .seasonGoalDifference(-2)
-                .ppgAway(1.25)
-                .position(11)
-                .xgForAvgAway(1.0)
-                .xgAgainstAvgAway(1.7)
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(104L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
+        // Milder win rates with a large xG mismatch so dominance factors still fire.
+        return moderateHomeBuilder(104L)
+                .homeTeamStats(TeamSeasonStats.builder()
+                        .teamId(1L)
+                        .seasonId(1L)
+                        .matchesPlayed(20)
+                        .seasonWinsHome(11)
+                        .seasonDrawsHome(5)
+                        .seasonLossesHome(4)
+                        .seasonGoalsHome(28)
+                        .seasonConcededHome(16)
+                        .seasonGoalDifference(12)
+                        .ppgHome(1.90)
+                        .position(5)
+                        .xgForAvgHome(2.0)
+                        .xgAgainstAvgHome(1.0)
+                        .build())
+                .awayTeamStats(TeamSeasonStats.builder()
+                        .teamId(2L)
+                        .seasonId(1L)
+                        .matchesPlayed(20)
+                        .seasonWinsAway(5)
+                        .seasonDrawsAway(6)
+                        .seasonLossesAway(9)
+                        .seasonGoalsAway(18)
+                        .seasonConcededAway(24)
+                        .seasonGoalDifference(-6)
+                        .ppgAway(1.05)
+                        .position(14)
+                        .xgForAvgAway(1.0)
+                        .xgAgainstAvgAway(1.7)
+                        .build())
                 .build();
     }
 
@@ -961,42 +956,33 @@ class MatchResultRecommendationEngineTest {
     }
 
     private FixtureContext createContextWithoutXgData() {
-        TeamSeasonStats homeStats = TeamSeasonStats.builder()
-                .teamId(1L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsHome(10)
-                .seasonDrawsHome(5)
-                .seasonLossesHome(5)
-                .seasonGoalsHome(28)
-                .seasonConcededHome(18)
-                .seasonGoalDifference(10)
-                .ppgHome(1.75)
-                .position(6)
-                // No xG data
-                .build();
-
-        TeamSeasonStats awayStats = TeamSeasonStats.builder()
-                .teamId(2L)
-                .seasonId(1L)
-                .matchesPlayed(20)
-                .seasonWinsAway(7)
-                .seasonDrawsAway(6)
-                .seasonLossesAway(7)
-                .seasonGoalsAway(22)
-                .seasonConcededAway(24)
-                .seasonGoalDifference(-2)
-                .ppgAway(1.35)
-                .position(10)
-                // No xG data
-                .build();
-
-        return FixtureContext.builder()
-                .fixture(createFixture(113L))
-                .homeTeam(createTeam(1L, "Home Team"))
-                .awayTeam(createTeam(2L, "Away Team"))
-                .homeTeamStats(homeStats)
-                .awayTeamStats(awayStats)
+        return moderateHomeBuilder(113L)
+                .homeTeamStats(TeamSeasonStats.builder()
+                        .teamId(1L)
+                        .seasonId(1L)
+                        .matchesPlayed(20)
+                        .seasonWinsHome(11)
+                        .seasonDrawsHome(5)
+                        .seasonLossesHome(4)
+                        .seasonGoalsHome(28)
+                        .seasonConcededHome(16)
+                        .seasonGoalDifference(12)
+                        .ppgHome(1.90)
+                        .position(5)
+                        .build())
+                .awayTeamStats(TeamSeasonStats.builder()
+                        .teamId(2L)
+                        .seasonId(1L)
+                        .matchesPlayed(20)
+                        .seasonWinsAway(5)
+                        .seasonDrawsAway(6)
+                        .seasonLossesAway(9)
+                        .seasonGoalsAway(18)
+                        .seasonConcededAway(24)
+                        .seasonGoalDifference(-6)
+                        .ppgAway(1.05)
+                        .position(14)
+                        .build())
                 .build();
     }
 
