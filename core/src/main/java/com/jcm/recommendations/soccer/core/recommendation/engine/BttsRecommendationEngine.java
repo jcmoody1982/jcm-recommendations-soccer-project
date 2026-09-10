@@ -77,9 +77,18 @@ public class BttsRecommendationEngine implements RecommendationEngine {
 
     private static final double MAX_COMBINED_BOOST = 8.0;
 
-    // Rebased onto the shrunk, ceiling-capped scale (previously 80/65 on an inflated scale)
-    private static final double THRESHOLD_STRONG = 72.0;
+    /**
+     * STRONG sits at the band that cleared break-even on the 2026-09-04..10 board (≥75 → ~67%
+     * hit / +7% ROI). MODERATE stays at 62 for volume; long prices are cut separately.
+     */
+    private static final double THRESHOLD_STRONG = 75.0;
     private static final double THRESHOLD_MODERATE = 62.0;
+
+    /**
+     * BTTS Yes longer than this lost heavily (~25% hit / −53% ROI at 1.80+). Require a short
+     * enough price when odds are present; missing odds still publish on score alone.
+     */
+    private static final double MAX_PUBLISH_ODDS = 1.70;
 
     private static final double FILTER_MIN_SCORED_PERCENTAGE = 50.0;
     private static final double FILTER_MAX_FTS_PERCENTAGE = 40.0;
@@ -121,6 +130,11 @@ public class BttsRecommendationEngine implements RecommendationEngine {
 
         Map<String, Object> factors = buildFactors(context, breakdown);
         Double odds = context.hasOdds() ? context.getOdds().getOddsBttsYes() : null;
+        if (odds != null && odds > MAX_PUBLISH_ODDS) {
+            log.debug("Skipping BTTS tip above max odds: fixtureId={}, odds={}, max={}",
+                    context.getFixture().getId(), odds, MAX_PUBLISH_ODDS);
+            return Optional.empty();
+        }
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.BTTS)
