@@ -35,6 +35,8 @@ public class PlayerMapper {
                 .clubTeam2Id(positiveId(dto.getClubTeam2Id()))
                 .knownAs(dto.getKnownAs())
                 .fullName(dto.getFullName())
+                .firstName(dto.getFirstName())
+                .lastName(dto.getLastName())
                 .position(dto.getPosition())
                 .minutesPlayedOverall(dto.getMinutesPlayedOverall())
                 .minutesPlayedHome(dto.getMinutesPlayedHome())

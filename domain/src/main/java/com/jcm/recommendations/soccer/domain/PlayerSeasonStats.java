@@ -33,6 +33,8 @@ public class PlayerSeasonStats {
 
     private String knownAs;
     private String fullName;
+    private String firstName;
+    private String lastName;
     private String position;
 
     private Integer minutesPlayedOverall;

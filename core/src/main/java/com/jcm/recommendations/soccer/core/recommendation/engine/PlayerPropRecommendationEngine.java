@@ -109,9 +109,12 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         }
 
         Candidate best = candidates.stream()
+                .filter(c -> displayName(c.player) != null)
                 .max(Comparator.comparingDouble(Candidate::score))
                 .orElse(null);
         if (best == null) {
+            log.debug("Skipping {} tip: no named candidates for fixtureId={}",
+                    spec.marketVerb(), context.getFixture().getId());
             return Optional.empty();
         }
 
@@ -285,14 +288,40 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         return position != null && position.toLowerCase().contains("goal");
     }
 
+    /**
+     * Prefer FootyStats display names, then legal name parts. Returns null when nothing usable
+     * is present so the engine can withhold a nameless "Player to score" tip.
+     */
     static String displayName(PlayerSeasonStats player) {
+        if (player == null) {
+            return null;
+        }
         if (player.getKnownAs() != null && !player.getKnownAs().isBlank()) {
             return player.getKnownAs().trim();
         }
         if (player.getFullName() != null && !player.getFullName().isBlank()) {
             return player.getFullName().trim();
         }
-        return "Player";
+        String fromParts = joinNameParts(player.getFirstName(), player.getLastName());
+        if (fromParts != null) {
+            return fromParts;
+        }
+        return null;
+    }
+
+    private static String joinNameParts(String firstName, String lastName) {
+        String first = firstName != null ? firstName.trim() : "";
+        String last = lastName != null ? lastName.trim() : "";
+        if (first.isEmpty() && last.isEmpty()) {
+            return null;
+        }
+        if (first.isEmpty()) {
+            return last;
+        }
+        if (last.isEmpty()) {
+            return first;
+        }
+        return first + " " + last;
     }
 
     private record Candidate(

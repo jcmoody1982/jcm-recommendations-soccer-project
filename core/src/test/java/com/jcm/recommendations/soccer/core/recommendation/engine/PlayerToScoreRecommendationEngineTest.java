@@ -117,6 +117,66 @@ class PlayerToScoreRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze builds the market from first and last name when known-as is missing")
+    void analyze_usesFirstAndLastNameWhenKnownAsMissing() {
+        PlayerSeasonStats namedByParts = scorer(10L, null, 0.85, 18, 1500, 1);
+        namedByParts.setFirstName("Mohamed");
+        namedByParts.setLastName("Salah");
+
+        Optional<Recommendation> result = engine.analyze(contextWithPlayers(
+                namedByParts,
+                scorer(11L, "Squad Forward", 0.28, 10, 700, 3)));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Mohamed Salah to score");
+        assertThat(result.get().getFactors()).containsEntry("playerName", "Mohamed Salah");
+    }
+
+    @Test
+    @DisplayName("analyze skips a tip when no candidate has a usable name")
+    void analyze_namelessCandidates_areSkipped() {
+        PlayerSeasonStats nameless = scorer(10L, null, 0.85, 18, 1500, 1);
+
+        Optional<Recommendation> result = engine.analyze(
+                contextWithOpponentConceded(nameless, LEAKY_DEFENCE_CONCEDED));
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("analyze prefers the best named scorer over a nameless higher-rated candidate")
+    void analyze_prefersNamedCandidateOverNamelessLeader() {
+        PlayerSeasonStats namelessLeader = scorer(10L, null, 0.90, 20, 1600, 1);
+        PlayerSeasonStats namedRunnerUp = scorer(11L, "Named Forward", 0.80, 18, 1500, 2);
+        namedRunnerUp.setClubTeamId(1L);
+
+        Optional<Recommendation> result = engine.analyze(baseContextBuilder(LEAKY_DEFENCE_CONCEDED)
+                .homePlayers(List.of(namelessLeader, namedRunnerUp))
+                .awayPlayers(List.of())
+                .build());
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getMarket()).isEqualTo("Named Forward to score");
+    }
+
+    @Test
+    @DisplayName("displayName prefers known-as, then full name, then first/last parts")
+    void displayName_fallsBackThroughNameFields() {
+        assertThat(PlayerPropRecommendationEngine.displayName(
+                PlayerSeasonStats.builder().knownAs("Salah").fullName("Mohamed Salah").build()))
+                .isEqualTo("Salah");
+        assertThat(PlayerPropRecommendationEngine.displayName(
+                PlayerSeasonStats.builder().fullName("Mohamed Salah").firstName("Mo").build()))
+                .isEqualTo("Mohamed Salah");
+        assertThat(PlayerPropRecommendationEngine.displayName(
+                PlayerSeasonStats.builder().firstName("Mohamed").lastName("Salah").build()))
+                .isEqualTo("Mohamed Salah");
+        assertThat(PlayerPropRecommendationEngine.displayName(
+                PlayerSeasonStats.builder().playerId(1L).build()))
+                .isNull();
+    }
+
+    @Test
     @DisplayName("analyze returns empty when player lists are missing")
     void analyze_withoutPlayers_returnsEmpty() {
         Optional<Recommendation> result = engine.analyze(baseContextBuilder(NEUTRAL_DEFENCE_CONCEDED).build());

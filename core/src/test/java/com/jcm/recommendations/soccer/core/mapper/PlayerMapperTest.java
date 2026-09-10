@@ -17,6 +17,8 @@ class PlayerMapperTest {
         dto.setId(55L);
         dto.setKnownAs("Salah");
         dto.setFullName("Mohamed Salah");
+        dto.setFirstName("Mohamed");
+        dto.setLastName("Salah");
         dto.setPosition("Forward");
         dto.setClubTeamId(10L);
         dto.setClubTeam2Id(-1L);
@@ -29,10 +31,14 @@ class PlayerMapperTest {
 
         assertThat(player.getId()).isEqualTo(55L);
         assertThat(player.getKnownAs()).isEqualTo("Salah");
+        assertThat(player.getFirstName()).isEqualTo("Mohamed");
+        assertThat(player.getLastName()).isEqualTo("Salah");
         assertThat(player.getSeasonId()).isEqualTo(100L);
         assertThat(stats.getPlayerId()).isEqualTo(55L);
         assertThat(stats.getClubTeamId()).isEqualTo(10L);
         assertThat(stats.getClubTeam2Id()).isNull();
+        assertThat(stats.getFirstName()).isEqualTo("Mohamed");
+        assertThat(stats.getLastName()).isEqualTo("Salah");
         assertThat(stats.getRankInClubTopScorer()).isNull();
         assertThat(stats.getGoalsPer90Overall()).isEqualTo(0.71);
     }
