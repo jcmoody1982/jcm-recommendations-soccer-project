@@ -63,6 +63,26 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
     private static final double WEIGHT_API_POTENTIAL = 0.35;
 
     /**
+     * Provider HT potentials are one noisy read. Blend toward a line-typical prior so a 100%
+     * potential cannot mint a certainty tip (same pattern as plain BTTS).
+     */
+    private static final double SHRINKAGE_PSEUDO_MATCHES = 6.0;
+    private static final double API_POTENTIAL_EVIDENCE_MATCHES = 4.0;
+    /** League-typical share of first halves with at least one goal. */
+    private static final double PRIOR_O05_HT = 72.0;
+    /** League-typical share of first halves with at least two goals. */
+    private static final double PRIOR_O15_HT = 40.0;
+
+    /**
+     * Soft-cap the published probability. Over 0.5 HT honestly sits high; Over 1.5 HT must not
+     * approach certainty. Ranking within each line is preserved.
+     */
+    private static final double O05_CEILING_SQUASH_START = 82.0;
+    private static final double O05_MAX_REALISTIC = 88.0;
+    private static final double O15_CEILING_SQUASH_START = 58.0;
+    private static final double O15_MAX_REALISTIC = 65.0;
+
+    /**
      * Bounds on the combined expected-goals adjustment. The individual signals below are all
      * variations on "this looks like a lively game", so left unbounded they compound rather than
      * corroborate.
@@ -220,7 +240,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
      * expectation no first half sustains.
      */
     private static Double providerExpected1HGoals(FixtureContext context) {
-        Double o05HtPotential = apiPotentialFor(Line.OVER_05, context);
+        Double o05HtPotential = shrunkApiPotentialFor(Line.OVER_05, context);
         if (o05HtPotential == null) {
             return null;
         }
@@ -254,12 +274,14 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
     private double calculateScore(double expectedGoals1H, Line line, FixtureContext context) {
         double poisson = poissonAtLeast(expectedGoals1H, line.goalsNeeded);
 
-        Double apiPotential = apiPotentialFor(line, context);
-        if (apiPotential == null) {
-            return clampScore(poisson);
+        Double shrunkApi = shrunkApiPotentialFor(line, context);
+        double blended;
+        if (shrunkApi == null) {
+            blended = clampScore(poisson);
+        } else {
+            blended = clampScore((poisson * WEIGHT_POISSON) + (safePercentage(shrunkApi) * WEIGHT_API_POTENTIAL));
         }
-
-        return clampScore((poisson * WEIGHT_POISSON) + (safePercentage(apiPotential) * WEIGHT_API_POTENTIAL));
+        return applyRealisticCeiling(blended, line);
     }
 
     private Line selectLine(double expectedGoals1H, FixtureContext context) {
@@ -267,7 +289,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
             return Line.OVER_05;
         }
 
-        Double o15HtPotential = apiPotentialFor(Line.OVER_15, context);
+        Double o15HtPotential = shrunkApiPotentialFor(Line.OVER_15, context);
         if (o15HtPotential != null && o15HtPotential < OVER_15_MIN_API_POTENTIAL) {
             return Line.OVER_05;
         }
@@ -282,6 +304,47 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         return line == Line.OVER_15
                 ? context.getPotentials().getO15HtPotential()
                 : context.getPotentials().getO05HtPotential();
+    }
+
+    private static Double shrunkApiPotentialFor(Line line, FixtureContext context) {
+        Double raw = apiPotentialFor(line, context);
+        if (raw == null) {
+            return null;
+        }
+        return shrinkApiPotential(raw, line);
+    }
+
+    /**
+     * Provider potential is one noisy read. Blend toward the line's league prior
+     * (O0.5 HT 100% → ~83%; O1.5 HT 100% → ~64%).
+     */
+    static double shrinkApiPotential(double apiPotential, boolean over15) {
+        double prior = over15 ? PRIOR_O15_HT : PRIOR_O05_HT;
+        return ((apiPotential * API_POTENTIAL_EVIDENCE_MATCHES)
+                + (prior * SHRINKAGE_PSEUDO_MATCHES))
+                / (API_POTENTIAL_EVIDENCE_MATCHES + SHRINKAGE_PSEUDO_MATCHES);
+    }
+
+    private static double shrinkApiPotential(double apiPotential, Line line) {
+        return shrinkApiPotential(apiPotential, line == Line.OVER_15);
+    }
+
+    /**
+     * Compresses the overconfident publish tail into the gap below the line's realistic max.
+     */
+    static double applyRealisticCeiling(double rawScore, boolean over15) {
+        double squashStart = over15 ? O15_CEILING_SQUASH_START : O05_CEILING_SQUASH_START;
+        double maxRealistic = over15 ? O15_MAX_REALISTIC : O05_MAX_REALISTIC;
+        if (rawScore <= squashStart) {
+            return rawScore;
+        }
+        double headroom = maxRealistic - squashStart;
+        double excess = rawScore - squashStart;
+        return squashStart + headroom * (1.0 - Math.exp(-excess / headroom));
+    }
+
+    private static double applyRealisticCeiling(double rawScore, Line line) {
+        return applyRealisticCeiling(rawScore, line == Line.OVER_15);
     }
 
     /**
@@ -404,10 +467,21 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         factors.put("line", line.market);
         factors.put("goalsNeeded", line.goalsNeeded);
         factors.put("poissonProbability", poissonAtLeast(expected1HGoals, line.goalsNeeded));
-        Double linePotential = apiPotentialFor(line, context);
-        if (linePotential != null) {
-            factors.put("apiPotentialForLine", safePercentage(linePotential));
+        Double linePotentialRaw = apiPotentialFor(line, context);
+        double squashStart = line == Line.OVER_15 ? O15_CEILING_SQUASH_START : O05_CEILING_SQUASH_START;
+        double preCeiling;
+        if (linePotentialRaw != null) {
+            double raw = safePercentage(linePotentialRaw);
+            double shrunk = shrinkApiPotential(raw, line);
+            factors.put("apiPotentialForLineRaw", raw);
+            factors.put("apiPotentialForLine", shrunk);
+            preCeiling = clampScore((poissonAtLeast(expected1HGoals, line.goalsNeeded) * WEIGHT_POISSON)
+                    + (shrunk * WEIGHT_API_POTENTIAL));
+        } else {
+            preCeiling = clampScore(poissonAtLeast(expected1HGoals, line.goalsNeeded));
         }
+        factors.put("publishedScore", estimate.score());
+        factors.put("ceilingApplied", preCeiling > squashStart);
         Double providerExpected = providerExpected1HGoals(context);
         if (providerExpected != null) {
             factors.put("providerExpected1HGoals", providerExpected);

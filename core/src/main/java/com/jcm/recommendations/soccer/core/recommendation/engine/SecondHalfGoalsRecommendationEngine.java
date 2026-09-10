@@ -64,6 +64,15 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
     private static final double ADJUST_MAX = 1.20;
 
     /**
+     * Soft-cap the published probability. Over 0.5 2H honestly sits high; Over 1.5 2H must not
+     * approach certainty.
+     */
+    private static final double O05_CEILING_SQUASH_START = 84.0;
+    private static final double O05_MAX_REALISTIC = 90.0;
+    private static final double O15_CEILING_SQUASH_START = 58.0;
+    private static final double O15_MAX_REALISTIC = 65.0;
+
+    /**
      * Over 1.5 2H needs a clear volume outlier. The provider publishes no second-half potentials,
      * so unlike the first-half engine there is no independent read to corroborate the line and the
      * expectation has to carry the decision alone.
@@ -139,7 +148,8 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         double expectedGoals2H = baseExpectedGoals2H * adjustment;
 
         Line line = selectLine(expectedGoals2H);
-        double score = clampScore(poissonAtLeast(expectedGoals2H, line.goalsNeeded));
+        double poisson = poissonAtLeast(expectedGoals2H, line.goalsNeeded);
+        double score = applyRealisticCeiling(clampScore(poisson), line);
 
         ConfidenceLevel confidence = determineConfidence(score, line);
 
@@ -190,6 +200,24 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
 
     private Line selectLine(double expectedGoals2H) {
         return expectedGoals2H >= OVER_15_MIN_EXPECTED_GOALS ? Line.OVER_15 : Line.OVER_05;
+    }
+
+    /**
+     * Compresses the overconfident publish tail into the gap below the line's realistic max.
+     */
+    static double applyRealisticCeiling(double rawScore, boolean over15) {
+        double squashStart = over15 ? O15_CEILING_SQUASH_START : O05_CEILING_SQUASH_START;
+        double maxRealistic = over15 ? O15_MAX_REALISTIC : O05_MAX_REALISTIC;
+        if (rawScore <= squashStart) {
+            return rawScore;
+        }
+        double headroom = maxRealistic - squashStart;
+        double excess = rawScore - squashStart;
+        return squashStart + headroom * (1.0 - Math.exp(-excess / headroom));
+    }
+
+    private static double applyRealisticCeiling(double rawScore, Line line) {
+        return applyRealisticCeiling(rawScore, line == Line.OVER_15);
     }
 
     /**
@@ -330,7 +358,11 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         // How the published probability was arrived at
         factors.put("line", line.market);
         factors.put("goalsNeeded", line.goalsNeeded);
-        factors.put("poissonProbability", poissonAtLeast(expected2HGoals, line.goalsNeeded));
+        double poisson = poissonAtLeast(expected2HGoals, line.goalsNeeded);
+        double squashStart = line == Line.OVER_15 ? O15_CEILING_SQUASH_START : O05_CEILING_SQUASH_START;
+        factors.put("poissonProbability", poisson);
+        factors.put("publishedScore", estimate.score());
+        factors.put("ceilingApplied", poisson > squashStart);
 
         // Full-time expected for reference
         factors.put("expectedFullTimeGoals", expected2HGoals / SECOND_HALF_RATIO);

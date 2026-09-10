@@ -163,14 +163,14 @@ class SecondHalfGoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze score never exceeds 100% even with stacked multipliers")
+    @DisplayName("analyze score is soft-capped well below 100")
     void analyze_score_neverExceeds100() {
         FixtureContext context = createVeryHighScoringContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getScore()).isLessThanOrEqualTo(100.0);
+        assertThat(result.get().getScore()).isLessThanOrEqualTo(90.0);
     }
 
     @Test
@@ -182,10 +182,12 @@ class SecondHalfGoalsRecommendationEngineTest {
 
         double expected2HGoals = (Double) result.getFactors().get("expected2HGoals");
         double poisson = (Double) result.getFactors().get("poissonProbability");
+        boolean over15 = "Over 1.5 2H Goals".equals(result.getMarket());
 
         assertThat(poisson).isEqualTo(poissonAtLeast(expected2HGoals, 2), within(0.01));
-        assertThat(result.getScore()).isEqualTo(poisson, within(0.01));
-        // The same fixture reached the high nineties before the score meant P(2+ goals).
+        assertThat(result.getScore()).isEqualTo(
+                SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(poisson, over15),
+                within(0.01));
         assertThat(result.getScore()).isLessThan(80.0);
     }
 
@@ -203,7 +205,16 @@ class SecondHalfGoalsRecommendationEngineTest {
         Recommendation result = engine.analyze(context).orElseThrow();
 
         assertThat(result.getMarket()).isEqualTo("Over 1.5 2H Goals");
-        assertThat(result.getScore()).isLessThan(97.0);
+        assertThat(result.getScore()).isLessThan(65.0);
+    }
+
+    @Test
+    @DisplayName("applyRealisticCeiling soft-caps the Over 0.5 2H high tail under 90")
+    void applyRealisticCeiling_capsOver05Tail() {
+        assertThat(SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(80.0, false)).isEqualTo(80.0);
+        assertThat(SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(97.0, false))
+                .isLessThan(90.0)
+                .isGreaterThan(84.0);
     }
 
     @Test

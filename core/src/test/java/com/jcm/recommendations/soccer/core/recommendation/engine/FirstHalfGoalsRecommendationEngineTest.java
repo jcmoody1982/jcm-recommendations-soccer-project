@@ -185,6 +185,14 @@ class FirstHalfGoalsRecommendationEngineTest {
         // A first half of this expectation delivers two goals well under half the time. The old
         // engine published this fixture in the high eighties.
         assertThat(poisson).isEqualTo(poissonAtLeast(expected1HGoals, 2), within(0.01));
+        boolean over15 = "Over 1.5 HT Goals".equals(result.getMarket());
+        double potential = factors.containsKey("apiPotentialForLine")
+                ? (Double) factors.get("apiPotentialForLine") : Double.NaN;
+        double expectedScore = Double.isNaN(potential)
+                ? FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(poisson, over15)
+                : FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(
+                        (poisson * 0.65) + (potential * 0.35), over15);
+        assertThat(result.getScore()).isEqualTo(expectedScore, within(0.01));
         assertThat(result.getScore()).isLessThan(65.0);
     }
 
@@ -207,18 +215,18 @@ class FirstHalfGoalsRecommendationEngineTest {
         Recommendation result = engine.analyze(context).orElseThrow();
 
         assertThat(result.getMarket()).isEqualTo("Over 1.5 HT Goals");
-        assertThat(result.getScore()).isLessThan(95.0);
+        assertThat(result.getScore()).isLessThan(65.0);
     }
 
     @Test
-    @DisplayName("Over 0.5 HT stays inside the band a first half can actually reach")
+    @DisplayName("Over 0.5 HT stays inside the soft-capped band")
     void over05Ht_staysWithinRealisticBand() {
         FixtureContext context = createHighScoringContext();
 
         Recommendation result = engine.analyze(context).orElseThrow();
 
         assertThat(result.getMarket()).isEqualTo("Over 0.5 HT Goals");
-        assertThat(result.getScore()).isBetween(60.0, 90.0);
+        assertThat(result.getScore()).isBetween(60.0, 88.0);
     }
 
     @Test
@@ -271,7 +279,7 @@ class FirstHalfGoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("the published score is the blend of the Poisson tail and the provider potential")
+    @DisplayName("the published score blends Poisson with the shrunk provider potential, then soft-caps")
     void score_isBlendOfPoissonAndProviderPotential() {
         FixtureContext context = createHighScoringContext();
 
@@ -280,9 +288,35 @@ class FirstHalfGoalsRecommendationEngineTest {
 
         double poisson = (Double) factors.get("poissonProbability");
         double potential = (Double) factors.get("apiPotentialForLine");
+        double rawPotential = (Double) factors.get("apiPotentialForLineRaw");
+        boolean over15 = "Over 1.5 HT Goals".equals(result.getMarket());
 
-        assertThat(result.getScore()).isEqualTo((poisson * 0.65) + (potential * 0.35), within(0.01));
-        assertThat(result.getScore()).isBetween(Math.min(poisson, potential), Math.max(poisson, potential));
+        assertThat(potential).isLessThan(rawPotential);
+        double blended = (poisson * 0.65) + (potential * 0.35);
+        assertThat(result.getScore()).isEqualTo(
+                FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(blended, over15),
+                within(0.01));
+    }
+
+    @Test
+    @DisplayName("shrinkApiPotential pulls a 100% HT potential toward the line prior")
+    void shrinkApiPotential_pullsCertaintyTowardPrior() {
+        assertThat(FirstHalfGoalsRecommendationEngine.shrinkApiPotential(100.0, false))
+                .isCloseTo(83.2, within(0.05));
+        assertThat(FirstHalfGoalsRecommendationEngine.shrinkApiPotential(100.0, true))
+                .isCloseTo(64.0, within(0.05));
+    }
+
+    @Test
+    @DisplayName("applyRealisticCeiling soft-caps the Over 0.5 HT high tail under 88")
+    void applyRealisticCeiling_capsOver05Tail() {
+        assertThat(FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(80.0, false)).isEqualTo(80.0);
+        assertThat(FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(95.0, false))
+                .isLessThan(88.0)
+                .isGreaterThan(82.0);
+        assertThat(FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(90.0, true))
+                .isLessThan(65.0)
+                .isGreaterThan(58.0);
     }
 
     @Test
@@ -654,7 +688,7 @@ class FirstHalfGoalsRecommendationEngineTest {
         FixturePotentials potentials = FixturePotentials.builder()
                 .fixtureId(108L)
                 .o05HtPotential(85.0)
-                .o15HtPotential(60.0)  // High O1.5 HT potential
+                .o15HtPotential(75.0)  // High enough that shrink still clears the O1.5 corroboration floor
                 .o25Potential(80.0)
                 .build();
 
