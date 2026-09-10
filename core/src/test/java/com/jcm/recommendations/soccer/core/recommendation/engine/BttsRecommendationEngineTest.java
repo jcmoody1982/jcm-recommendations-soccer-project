@@ -191,8 +191,17 @@ class BttsRecommendationEngineTest {
 
         assertThat(result).isPresent();
         // Every input says 100%; the score must still read as a probability, not a certainty.
-        assertThat(result.get().getScore()).isLessThan(85.0);
+        assertThat(result.get().getScore()).isLessThan(78.0);
         assertThat(result.get().getFactors().get("ceilingApplied")).isEqualTo(true);
+        assertThat((Double) result.get().getFactors().get("homeBttsSeasonPct")).isLessThan(100.0);
+        assertThat((Double) result.get().getFactors().get("apiPotential")).isLessThan(80.0);
+    }
+
+    @Test
+    void shrinkApiPotential_pullsProviderHundredTowardPrior() {
+        // (100*4 + 50*6) / 10 = 70
+        assertThat(BttsRecommendationEngine.shrinkApiPotential(100.0)).isCloseTo(70.0, within(0.01));
+        assertThat(BttsRecommendationEngine.shrinkApiPotential(50.0)).isCloseTo(50.0, within(0.01));
     }
 
     @Test

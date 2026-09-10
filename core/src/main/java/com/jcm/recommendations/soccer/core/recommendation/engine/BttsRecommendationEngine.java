@@ -26,9 +26,10 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
  * - Boosts are graded, include xGA matchup, and capped in combination
  *
  * Calibration: every observed rate is shrunk toward a league prior by its sample
- * size, the two one-sided scoring rates are combined multiplicatively (BTTS needs
- * both, so averaging them overstated it), and the total is squashed below
- * {@link #MAX_REALISTIC_PROBABILITY} instead of being clamped at 100.
+ * size (including provider BTTS potential), the two one-sided scoring rates are
+ * combined multiplicatively (BTTS needs both, so averaging them overstated it),
+ * and the total is squashed below {@link #MAX_REALISTIC_PROBABILITY} instead of
+ * being clamped at 100. Factors expose the shrunk inputs the model used.
  */
 @Component
 @Slf4j
@@ -53,12 +54,18 @@ public class BttsRecommendationEngine implements RecommendationEngine {
     private static final double PRIOR_TEAM_SCORES_RATE = 74.0;
 
     /**
-     * BTTS needs two independent things to happen, so even the most lopsided
-     * fixture tops out well short of certainty. Scores approach this
-     * asymptotically instead of being clamped at 100.
+     * Provider BTTS potential is one noisy read, not a season sample. Blend it with the
+     * league prior using this many pseudo-matches of evidence at the observed potential.
      */
-    private static final double MAX_REALISTIC_PROBABILITY = 85.0;
-    private static final double CEILING_SQUASH_START = 75.0;
+    private static final double API_POTENTIAL_EVIDENCE_MATCHES = 4.0;
+
+    /**
+     * BTTS needs two independent things to happen, so even the most lopsided fixture tops
+     * out well short of certainty. Scores approach this asymptotically instead of clamping
+     * at 100. Lowered from 85 after the 70–79 band claimed ~75% and hit ~52%.
+     */
+    private static final double MAX_REALISTIC_PROBABILITY = 78.0;
+    private static final double CEILING_SQUASH_START = 65.0;
 
     // Goals context boost (graded, max amount)
     private static final double GOALS_BOOST_HOME_THRESHOLD = 1.5;
@@ -200,13 +207,15 @@ public class BttsRecommendationEngine implements RecommendationEngine {
 
         Double homeBttsSeason = homeStats.getSeasonBttsPercentageHome();
         Double awayBttsSeason = awayStats.getSeasonBttsPercentageAway();
+        Double homeBttsSeasonUsed = null;
+        Double awayBttsSeasonUsed = null;
         if (homeBttsSeason != null) {
-            double shrunk = shrink(homeBttsSeason, venueOrOverallSample(homeStats, true), PRIOR_BTTS_RATE);
-            signals.add(new WeightedSignal("homeBttsSeason", shrunk, WEIGHT_HOME_BTTS_SEASON));
+            homeBttsSeasonUsed = shrink(homeBttsSeason, venueOrOverallSample(homeStats, true), PRIOR_BTTS_RATE);
+            signals.add(new WeightedSignal("homeBttsSeason", homeBttsSeasonUsed, WEIGHT_HOME_BTTS_SEASON));
         }
         if (awayBttsSeason != null) {
-            double shrunk = shrink(awayBttsSeason, venueOrOverallSample(awayStats, false), PRIOR_BTTS_RATE);
-            signals.add(new WeightedSignal("awayBttsSeason", shrunk, WEIGHT_AWAY_BTTS_SEASON));
+            awayBttsSeasonUsed = shrink(awayBttsSeason, venueOrOverallSample(awayStats, false), PRIOR_BTTS_RATE);
+            signals.add(new WeightedSignal("awayBttsSeason", awayBttsSeasonUsed, WEIGHT_AWAY_BTTS_SEASON));
         }
 
         // Both teams scoring is a conjunction, so combine the two one-sided rates
@@ -247,10 +256,10 @@ public class BttsRecommendationEngine implements RecommendationEngine {
             }
         }
 
-        Double apiPotential = null;
+        Double apiPotentialUsed = null;
         if (context.hasPotentials() && context.getPotentials().getBttsPotential() != null) {
-            apiPotential = context.getPotentials().getBttsPotential();
-            signals.add(new WeightedSignal("apiPotential", apiPotential, WEIGHT_API_POTENTIAL));
+            apiPotentialUsed = shrinkApiPotential(context.getPotentials().getBttsPotential());
+            signals.add(new WeightedSignal("apiPotential", apiPotentialUsed, WEIGHT_API_POTENTIAL));
         }
 
         double baseScore = renormalizedAverage(signals);
@@ -274,9 +283,11 @@ public class BttsRecommendationEngine implements RecommendationEngine {
                 rawCombinedBoost > MAX_COMBINED_BOOST,
                 homeFormSample,
                 awayFormSample,
+                homeBttsSeasonUsed,
+                awayBttsSeasonUsed,
                 homeBttsFormUsed,
                 awayBttsFormUsed,
-                apiPotential,
+                apiPotentialUsed,
                 signals.size(),
                 bothScoreEstimate,
                 rawScore);
@@ -292,6 +303,13 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         }
         return ((observedPct * sampleSize) + (priorPct * SHRINKAGE_PSEUDO_MATCHES))
                 / (sampleSize + SHRINKAGE_PSEUDO_MATCHES);
+    }
+
+    /** Provider potential: light evidence weight, same prior as season BTTS rates. */
+    static double shrinkApiPotential(double apiPotential) {
+        return ((apiPotential * API_POTENTIAL_EVIDENCE_MATCHES)
+                + (PRIOR_BTTS_RATE * SHRINKAGE_PSEUDO_MATCHES))
+                / (API_POTENTIAL_EVIDENCE_MATCHES + SHRINKAGE_PSEUDO_MATCHES);
     }
 
     /** Recent form is shrunk toward the season rate when known, else the league prior. */
@@ -454,17 +472,25 @@ public class BttsRecommendationEngine implements RecommendationEngine {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
 
+        // Surface the shrunk rates the model used — raw season 100%s were misleading in Info.
+        if (breakdown.homeBttsSeasonUsed() != null) {
+            factors.put("homeBttsSeasonPct", breakdown.homeBttsSeasonUsed());
+        }
+        if (breakdown.awayBttsSeasonUsed() != null) {
+            factors.put("awayBttsSeasonPct", breakdown.awayBttsSeasonUsed());
+        }
         if (homeStats.getSeasonBttsPercentageHome() != null) {
-            factors.put("homeBttsSeasonPct", homeStats.getSeasonBttsPercentageHome());
+            factors.put("homeBttsSeasonPctRaw", homeStats.getSeasonBttsPercentageHome());
         }
         if (awayStats.getSeasonBttsPercentageAway() != null) {
-            factors.put("awayBttsSeasonPct", awayStats.getSeasonBttsPercentageAway());
+            factors.put("awayBttsSeasonPctRaw", awayStats.getSeasonBttsPercentageAway());
         }
 
         factors.put("homeFailedToScorePct", venueOrOverallFts(homeStats, true));
         factors.put("awayFailedToScorePct", venueOrOverallFts(awayStats, false));
         factors.put("homeVenueMatches", calculateMatchesAtVenue(homeStats, true));
         factors.put("awayVenueMatches", calculateMatchesAtVenue(awayStats, false));
+        // Venue scored % is filter-only and often a literal 100 — keep raw off the customer panel.
         factors.put("homeVenueScoredPct", calculateVenueScoredPercentage(homeStats, true));
         factors.put("awayVenueScoredPct", calculateVenueScoredPercentage(awayStats, false));
         factors.put("filtersVenueAware", true);
@@ -481,6 +507,9 @@ public class BttsRecommendationEngine implements RecommendationEngine {
 
         if (breakdown.apiPotential() != null) {
             factors.put("apiPotential", breakdown.apiPotential());
+        }
+        if (context.hasPotentials() && context.getPotentials().getBttsPotential() != null) {
+            factors.put("apiPotentialRaw", context.getPotentials().getBttsPotential());
         }
         factors.put("signalsUsed", breakdown.signalsUsed());
         factors.put("missingDataRenormalized", true);
@@ -569,6 +598,8 @@ public class BttsRecommendationEngine implements RecommendationEngine {
             boolean boostCapped,
             int homeFormSample,
             int awayFormSample,
+            Double homeBttsSeasonUsed,
+            Double awayBttsSeasonUsed,
             Double homeBttsFormUsed,
             Double awayBttsFormUsed,
             Double apiPotential,
