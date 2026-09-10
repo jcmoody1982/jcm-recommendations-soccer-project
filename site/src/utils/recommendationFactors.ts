@@ -25,6 +25,7 @@ const SKIP_KEYS = new Set([
   'homeBttsSeasonPctRaw',
   'awayBttsSeasonPctRaw',
   'apiPotentialRaw',
+  'apiBttsPotentialRaw',
   'homeVenueScoredPct',
   'awayVenueScoredPct',
   // Value Bets: noisy / bankroll-advice fields for the customer panel

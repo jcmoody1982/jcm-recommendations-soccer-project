@@ -26,6 +26,11 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
  * win with BTTS if it both scores and concedes at a high enough rate, and the
  * market is excluded outright when the winner keeps too many clean sheets or the
  * opponent fails to score too often (both point to a win-to-nil instead).
+ *
+ * <p>Published scores are soft-capped well below 100: a Result + BTTS combo is
+ * typically a 20–40% market, and raw win% × BTTS% (plus stacked bonuses) was
+ * minting fake certainty. Provider BTTS potential is shrunk toward a league
+ * prior the same way as plain BTTS.
  */
 @Component
 @Slf4j
@@ -58,13 +63,23 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
     private static final double FAILED_TO_SCORE_PENALTY_THRESHOLD = 30.0;
     private static final double FORM_BTTS_BONUS_THRESHOLD = 60.0;
 
-    // Confidence adjustment multipliers
-    private static final double MULTIPLIER_FORM_BTTS_BONUS = 1.10;
-    private static final double MULTIPLIER_H2H_BTTS_BONUS = 1.08;
-    private static final double MULTIPLIER_BOTH_CONCEDE_BONUS = 1.05;
+    // Mild confidence bumps only — stacked +10/+8/+5 was a path to clamped 100s
+    private static final double MULTIPLIER_FORM_BTTS_BONUS = 1.05;
+    private static final double MULTIPLIER_BOTH_CONCEDE_BONUS = 1.03;
     private static final double MULTIPLIER_CLEAN_SHEET_PENALTY = 0.90;
     private static final double MULTIPLIER_FAILED_TO_SCORE_PENALTY = 0.95;
-    private static final int H2H_MIN_MEETINGS = 3;
+
+    /** Same shrinkage as {@link BttsRecommendationEngine} for provider potential. */
+    private static final double SHRINKAGE_PSEUDO_MATCHES = 6.0;
+    private static final double PRIOR_BTTS_RATE = 50.0;
+    private static final double API_POTENTIAL_EVIDENCE_MATCHES = 4.0;
+
+    /**
+     * Combo bets rarely clear ~45% in a real book. Compress the overconfident tail
+     * into the gap below this ceiling instead of clamping at 100.
+     */
+    private static final double MAX_REALISTIC_PROBABILITY = 52.0;
+    private static final double CEILING_SQUASH_START = 42.0;
 
     @Override
     public RecommendationType getType() {
@@ -102,11 +117,11 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         ResultBttsCandidate best = findBestCandidate(context, homeWinProb, drawProb, awayWinProb,
                 bttsProb, adjustment.multiplier());
 
-        if (best == null || best.adjustedProb < THRESHOLD_MODERATE) {
+        if (best == null || best.publishedProb < THRESHOLD_MODERATE) {
             return Optional.empty();
         }
 
-        ConfidenceLevel confidence = best.adjustedProb >= THRESHOLD_STRONG
+        ConfidenceLevel confidence = best.publishedProb >= THRESHOLD_STRONG
                 ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
 
         Map<String, Object> factors = buildFactors(context, homeWinProb, drawProb, awayWinProb,
@@ -115,17 +130,18 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.RESULT_BTTS)
                 .confidence(confidence)
-                .score(best.adjustedProb)
+                .score(best.publishedProb)
                 .market(best.market)
                 .odds(null)
                 .description(buildDescription(context, best, confidence, adjustment))
                 .factors(factors)
                 .build();
 
-        log.info("Result + BTTS recommendation: fixtureId={}, market={}, combined={}, adjusted={}, confidence={}",
+        log.info("Result + BTTS recommendation: fixtureId={}, market={}, combined={}, adjusted={}, published={}, confidence={}",
                 context.getFixture().getId(), best.market,
                 String.format("%.1f", best.combinedProb),
-                String.format("%.1f", best.adjustedProb), confidence);
+                String.format("%.1f", best.adjustedProb),
+                String.format("%.1f", best.publishedProb), confidence);
 
         return Optional.of(recommendation);
     }
@@ -146,13 +162,13 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
                 && context.getPotentials().getBttsPotential() != null;
 
         if (hasApiPotential && hasXgData) {
-            double apiPotential = context.getPotentials().getBttsPotential();
+            double apiPotential = shrinkApiPotential(context.getPotentials().getBttsPotential());
             double xgBtts = calculateXgBttsIndicator(homeStats, awayStats);
             return (homeBtts * 0.28) + (awayBtts * 0.28) + (apiPotential * 0.24) + (xgBtts * 0.20);
         }
 
         if (hasApiPotential) {
-            double apiPotential = context.getPotentials().getBttsPotential();
+            double apiPotential = shrinkApiPotential(context.getPotentials().getBttsPotential());
             return (homeBtts * 0.35) + (awayBtts * 0.35) + (apiPotential * 0.30);
         }
 
@@ -162,6 +178,16 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         }
 
         return (homeBtts + awayBtts) / 2;
+    }
+
+    /**
+     * Provider potential is one noisy read, not a season sample. Blend toward the league
+     * prior (100% → 70%) so a certainty input cannot mint a 100% combo tip.
+     */
+    static double shrinkApiPotential(double apiPotential) {
+        return ((apiPotential * API_POTENTIAL_EVIDENCE_MATCHES)
+                + (PRIOR_BTTS_RATE * SHRINKAGE_PSEUDO_MATCHES))
+                / (API_POTENTIAL_EVIDENCE_MATCHES + SHRINKAGE_PSEUDO_MATCHES);
     }
 
     /**
@@ -252,20 +278,13 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
 
             if (homeFormBtts >= FORM_BTTS_BONUS_THRESHOLD && awayFormBtts >= FORM_BTTS_BONUS_THRESHOLD) {
                 multiplier *= MULTIPLIER_FORM_BTTS_BONUS;
-                applied.add("Both teams BTTS-heavy in recent form (+10%)");
+                applied.add("Both teams BTTS-heavy in recent form (+5%)");
             }
-        }
-
-        if (context.hasHeadToHead()
-                && context.getHeadToHead().getPreviousMeetings() >= H2H_MIN_MEETINGS) {
-            multiplier *= MULTIPLIER_H2H_BTTS_BONUS;
-            applied.add(String.format("H2H sample of %d meetings (+8%%)",
-                    context.getHeadToHead().getPreviousMeetings()));
         }
 
         if (homeCleanSheetPct < CLEAN_SHEET_BONUS_THRESHOLD && awayCleanSheetPct < CLEAN_SHEET_BONUS_THRESHOLD) {
             multiplier *= MULTIPLIER_BOTH_CONCEDE_BONUS;
-            applied.add("Both teams concede regularly (+5%)");
+            applied.add("Both teams concede regularly (+3%)");
         }
 
         if (homeCleanSheetPct > CLEAN_SHEET_PENALTY_THRESHOLD || awayCleanSheetPct > CLEAN_SHEET_PENALTY_THRESHOLD) {
@@ -291,7 +310,7 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         buildDrawCandidate(context, drawProb, bttsProb, adjustmentMultiplier).ifPresent(candidates::add);
 
         return candidates.stream()
-                .max(Comparator.comparingDouble(ResultBttsCandidate::adjustedProb))
+                .max(Comparator.comparingDouble(ResultBttsCandidate::publishedProb))
                 .orElse(null);
     }
 
@@ -377,9 +396,23 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
     private ResultBttsCandidate createCandidate(String market, String resultType, double resultProb,
             double bttsProb, double adjustmentMultiplier, double scoredAvg, double concededAvg) {
         double combined = (resultProb / 100.0) * bttsProb;
-        double adjusted = clampScore(combined * adjustmentMultiplier);
+        double adjusted = combined * adjustmentMultiplier;
+        double published = applyRealisticCeiling(adjusted);
         return new ResultBttsCandidate(market, resultType, resultProb, bttsProb,
-                combined, adjusted, scoredAvg, concededAvg);
+                combined, adjusted, published, scoredAvg, concededAvg);
+    }
+
+    /**
+     * Compresses everything above {@link #CEILING_SQUASH_START} into the gap below
+     * {@link #MAX_REALISTIC_PROBABILITY}. Ranking is preserved; certainty is not.
+     */
+    static double applyRealisticCeiling(double rawScore) {
+        if (rawScore <= CEILING_SQUASH_START) {
+            return rawScore;
+        }
+        double headroom = MAX_REALISTIC_PROBABILITY - CEILING_SQUASH_START;
+        double excess = rawScore - CEILING_SQUASH_START;
+        return CEILING_SQUASH_START + headroom * (1.0 - Math.exp(-excess / headroom));
     }
 
     private Map<String, Object> buildFactors(FixtureContext context, double homeWinProb, double drawProb,
@@ -398,6 +431,8 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         factors.put("resultProbability", best.resultProb);
         factors.put("combinedProbability", best.combinedProb);
         factors.put("adjustedProbability", best.adjustedProb);
+        factors.put("publishedScore", best.publishedProb);
+        factors.put("ceilingApplied", best.adjustedProb > CEILING_SQUASH_START);
         factors.put("selectedResultType", best.resultType);
 
         // Goals data backing the market requirements
@@ -422,7 +457,9 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
         factors.put("homeBttsPctSeason", safeDouble(homeStats.getSeasonBttsPercentageHome()));
         factors.put("awayBttsPctSeason", safeDouble(awayStats.getSeasonBttsPercentageAway()));
         if (context.hasPotentials() && context.getPotentials().getBttsPotential() != null) {
-            factors.put("apiBttsPotential", context.getPotentials().getBttsPotential());
+            double rawApi = context.getPotentials().getBttsPotential();
+            factors.put("apiBttsPotentialRaw", rawApi);
+            factors.put("apiBttsPotential", shrinkApiPotential(rawApi));
         }
         if (context.hasRecentForm()) {
             factors.put("homeBttsPctForm", safeDouble(context.getHomeTeamForm().getBttsPercentageHome()));
@@ -496,8 +533,8 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
             ConfidenceLevel confidence, ConfidenceAdjustment adjustment) {
         StringBuilder colour = new StringBuilder();
         colour.append(String.format("Result %.1f%% x BTTS %.1f%%", best.resultProb, best.bttsProb));
-        if (Math.abs(adjustment.multiplier() - 1.0) > 0.001) {
-            colour.append(String.format(" — adjusted to %.1f%%", best.adjustedProb));
+        if (Math.abs(best.publishedProb - best.combinedProb) > 0.05) {
+            colour.append(String.format(" — published %.1f%%", best.publishedProb));
         }
         if (!adjustment.applied().isEmpty()) {
             colour.append(". ").append(String.join("; ", adjustment.applied()));
@@ -507,14 +544,14 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
                 .confidence(confidence)
                 .selection(best.market)
                 .context(context)
-                .probabilityPct(best.combinedProb)
+                .probabilityPct(best.publishedProb)
                 .colourNote(colour.toString())
                 .build());
     }
 
     private record ResultBttsCandidate(String market, String resultType, double resultProb,
                                        double bttsProb, double combinedProb, double adjustedProb,
-                                       double scoredAvg, double concededAvg) {}
+                                       double publishedProb, double scoredAvg, double concededAvg) {}
 
     private record ConfidenceAdjustment(double multiplier, List<String> applied) {}
 }

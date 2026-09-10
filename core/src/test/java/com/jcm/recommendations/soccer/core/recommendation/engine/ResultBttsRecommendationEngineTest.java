@@ -158,8 +158,8 @@ class ResultBttsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze applies H2H sample bonus when previous meetings >= 3")
-    void analyze_appliesH2hSampleBonus() {
+    @DisplayName("analyze does not bonus merely for having an H2H sample")
+    void analyze_doesNotBonusForH2hSampleAlone() {
         FixtureContext base = createHomeWinBttsContext();
         FixtureContext context = FixtureContext.builder()
                 .fixture(base.getFixture())
@@ -182,7 +182,7 @@ class ResultBttsRecommendationEngineTest {
         assertThat(result.get().getFactors().get("h2hPreviousMeetings")).isEqualTo(5);
         @SuppressWarnings("unchecked")
         List<String> applied = (List<String>) result.get().getFactors().get("adjustmentsApplied");
-        assertThat(applied).anyMatch(s -> s.contains("H2H sample"));
+        assertThat(applied).noneMatch(s -> s.contains("H2H"));
     }
 
     @Test
@@ -240,7 +240,7 @@ class ResultBttsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze uses API BTTS potential when available")
+    @DisplayName("analyze uses shrunk API BTTS potential when available")
     void analyze_usesApiBttsPotential() {
         FixtureContext context = createContextWithApiPotential();
 
@@ -248,10 +248,52 @@ class ResultBttsRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("apiBttsPotential");
+        assertThat(result.get().getFactors().get("apiBttsPotentialRaw")).isEqualTo(78.0);
+        assertThat((Double) result.get().getFactors().get("apiBttsPotential"))
+                .isLessThan(78.0)
+                .isCloseTo(ResultBttsRecommendationEngine.shrinkApiPotential(78.0),
+                        org.assertj.core.data.Offset.offset(0.001));
     }
 
     @Test
-    @DisplayName("analyze tracks combined and adjusted probabilities")
+    @DisplayName("analyze shrinks a 100% API potential toward the league prior")
+    void analyze_shrinksCertaintyApiPotential() {
+        assertThat(ResultBttsRecommendationEngine.shrinkApiPotential(100.0))
+                .isCloseTo(70.0, org.assertj.core.data.Offset.offset(0.001));
+    }
+
+    @Test
+    @DisplayName("analyze soft-caps published score below 52 and never reaches 100")
+    void analyze_softCapsPublishedScore() {
+        FixtureContext context = createHomeWinBttsContext();
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getScore()).isLessThan(52.0);
+        Double adjusted = (Double) result.get().getFactors().get("adjustedProbability");
+        Double published = (Double) result.get().getFactors().get("publishedScore");
+        assertThat(published).isEqualTo(result.get().getScore());
+        if (adjusted > 42.0) {
+            assertThat(result.get().getFactors().get("ceilingApplied")).isEqualTo(true);
+            assertThat(published).isLessThan(adjusted);
+        }
+    }
+
+    @Test
+    @DisplayName("applyRealisticCeiling compresses the overconfident tail")
+    void applyRealisticCeiling_compressesHighTail() {
+        assertThat(ResultBttsRecommendationEngine.applyRealisticCeiling(40.0)).isEqualTo(40.0);
+        assertThat(ResultBttsRecommendationEngine.applyRealisticCeiling(42.0)).isEqualTo(42.0);
+        assertThat(ResultBttsRecommendationEngine.applyRealisticCeiling(80.0))
+                .isLessThan(52.0)
+                .isGreaterThan(42.0);
+        assertThat(ResultBttsRecommendationEngine.applyRealisticCeiling(100.0))
+                .isLessThan(52.0);
+    }
+
+    @Test
+    @DisplayName("analyze tracks combined, adjusted, and published probabilities")
     void analyze_tracksCombinedAndAdjustedProbabilities() {
         FixtureContext context = createHomeWinBttsContext();
 
@@ -260,11 +302,11 @@ class ResultBttsRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("combinedProbability");
         assertThat(result.get().getFactors()).containsKey("adjustedProbability");
+        assertThat(result.get().getFactors()).containsKey("publishedScore");
         assertThat(result.get().getFactors()).containsKey("resultProbability");
         assertThat(result.get().getFactors()).containsKey("bttsProbability");
-        // Score should be the adjusted probability
         assertThat(result.get().getScore())
-                .isEqualTo((Double) result.get().getFactors().get("adjustedProbability"));
+                .isEqualTo((Double) result.get().getFactors().get("publishedScore"));
     }
 
     @Test
