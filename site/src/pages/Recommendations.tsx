@@ -634,7 +634,7 @@ export default function Recommendations() {
                 {kickoffWindow !== 'all'
                   ? 'No recommendations in that kickoff window.'
                   : confidenceFilter === 'strong'
-                    ? 'No Strong recommendations match these filters. Over 1.5 and Over 2.5 often grade Moderate — try Strong + Moderate.'
+                    ? 'No Strong recommendations match these filters. Total Over 1.5 and Total Over 2.5 often grade Moderate — try Strong + Moderate.'
                     : 'No recommendations found.'}
               </p>
               {hasActiveFilters && (

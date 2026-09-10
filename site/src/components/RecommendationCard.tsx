@@ -7,10 +7,10 @@ interface Props {
 
 const typeLabels: Record<string, string> = {
   BTTS: 'BTTS',
-  OVER_GOALS: 'Over 2.5',
-  OVER_05_GOALS: 'Over 0.5',
-  OVER_15_GOALS: 'Over 1.5',
-  OVER_25_GOALS: 'Over 2.5',
+  OVER_GOALS: 'Total Over 2.5',
+  OVER_05_GOALS: 'Team Over 0.5',
+  OVER_15_GOALS: 'Total Over 1.5',
+  OVER_25_GOALS: 'Total Over 2.5',
   PLAYER_TO_SCORE: 'To Score',
   PLAYER_TO_ASSIST: 'To Assist',
   UNDER_GOALS: 'Under Goals',

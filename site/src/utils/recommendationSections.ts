@@ -67,13 +67,13 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
     showPositionGap: true,
   },
   OVER_15_GOALS: {
-    title: 'Over 1.5 Goals',
+    title: 'Total Over 1.5 Goals',
     scoreLabel: 'Probability',
     scoreUnit: '%',
     showPrice: true,
   },
   OVER_25_GOALS: {
-    title: 'Over 2.5 Goals',
+    title: 'Total Over 2.5 Goals',
     scoreLabel: 'Probability',
     scoreUnit: '%',
     showPrice: true,
@@ -115,13 +115,13 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
     showPrice: true,
   },
   OVER_05_GOALS: {
-    title: 'Over 0.5 Goals',
+    title: 'Team Over 0.5 Goals',
     scoreLabel: 'Win likelihood',
     scoreUnit: '%',
     showPrice: false,
   },
   OVER_GOALS: {
-    title: 'Over 2.5 Goals',
+    title: 'Total Over 2.5 Goals',
     scoreLabel: 'Probability',
     scoreUnit: '%',
     showPrice: true,
