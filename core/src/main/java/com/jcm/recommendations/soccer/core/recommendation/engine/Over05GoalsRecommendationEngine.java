@@ -18,8 +18,10 @@ import java.util.Optional;
  *
  * <p>Full-match Over 0.5 quotes are almost always 1.01–1.12 on FootyStats, so this board does not
  * use the Over 0.5 price. Instead it mirrors {@link MatchResultRecommendationEngine} tips whose
- * win price is longer than 6/4 ({@code > 1.50}), publishes them as Over 0.5 Goals with no price,
- * and keeps the Match Result win-likelihood score for ordering.
+ * win price is longer than 6/4 ({@code > 1.50}), publishes them as
+ * {@code "{team} Over 0.5 Goals"} with no price, and keeps the Match Result win-likelihood score
+ * for ordering. The team name is the longer-priced Match Result side that selected the fixture;
+ * settlement remains full-match Over 0.5.
  */
 @Component
 @Slf4j
@@ -29,7 +31,7 @@ public class Over05GoalsRecommendationEngine implements RecommendationEngine {
     /** Exclusive floor on the Match Result win quote (6/4 = 1.50). */
     static final double MIN_MATCH_WIN_PRICE_EXCLUSIVE = 1.50;
 
-    private static final String MARKET = "Over 0.5 Goals";
+    private static final String MARKET_SUFFIX = "Over 0.5 Goals";
 
     private final MatchResultRecommendationEngine matchResultEngine;
 
@@ -60,38 +62,43 @@ public class Over05GoalsRecommendationEngine implements RecommendationEngine {
         if (source.getFactors() != null) {
             factors.putAll(source.getFactors());
         }
+        String teamName = source.getMarket();
+        String market = teamName + " " + MARKET_SUFFIX;
+
         factors.put("derivedFromMatchResult", true);
-        factors.put("matchWinSelection", source.getMarket());
+        factors.put("matchWinSelection", teamName);
         factors.put("matchWinOdds", winOdds);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.OVER_05_GOALS)
                 .confidence(source.getConfidence())
                 .score(source.getScore())
-                .market(MARKET)
+                .market(market)
                 .odds(null)
-                .description(buildDescription(source, winOdds))
+                .description(buildDescription(market, teamName, winOdds, source.getScore(),
+                        source.getConfidence().name()))
                 .factors(factors)
                 .build();
 
         log.info(
-                "Over 0.5 from Match Result: fixtureId={}, selection={}, winOdds={}, winLikelihood={}",
+                "Over 0.5 from Match Result: fixtureId={}, market={}, winOdds={}, winLikelihood={}",
                 context.getFixture().getId(),
-                source.getMarket(),
+                market,
                 winOdds,
                 String.format("%.1f", source.getScore()));
 
         return Optional.of(recommendation);
     }
 
-    private static String buildDescription(Recommendation source, double winOdds) {
-        String confidenceLabel = source.getConfidence().name().charAt(0)
-                + source.getConfidence().name().substring(1).toLowerCase();
+    private static String buildDescription(
+            String market, String teamName, double winOdds, double score, String confidenceName) {
+        String confidenceLabel = confidenceName.charAt(0) + confidenceName.substring(1).toLowerCase();
         return String.format(
-                "%s Over 0.5 Goals — sourced from Match Result (%s @ %.2f, win likelihood %.0f%%). Price N/A.",
+                "%s %s — sourced from Match Result (%s @ %.2f, win likelihood %.0f%%). Price N/A.",
                 confidenceLabel,
-                source.getMarket(),
+                market,
+                teamName,
                 winOdds,
-                source.getScore());
+                score);
     }
 }

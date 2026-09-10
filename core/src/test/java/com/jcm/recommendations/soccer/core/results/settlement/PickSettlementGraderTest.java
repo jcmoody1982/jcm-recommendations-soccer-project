@@ -44,6 +44,14 @@ class PickSettlementGraderTest {
     }
 
     @Test
+    void over05WithTeamPrefixStillGradesMatchTotal() {
+        assertThat(grader.grade(snapshot("OVER_05_GOALS", "Barnet FC Over 0.5 Goals"), complete(1, 0)).outcome())
+                .isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(snapshot("OVER_05_GOALS", "Barnet FC Over 0.5 Goals"), complete(0, 0)).outcome())
+                .isEqualTo(PickOutcome.LOSS);
+    }
+
+    @Test
     void over15DedicatedTypeWinsOnTwoGoals() {
         assertThat(grader.grade(snapshot("OVER_15_GOALS", "Over 1.5 Goals"), complete(1, 1)).outcome())
                 .isEqualTo(PickOutcome.WIN);

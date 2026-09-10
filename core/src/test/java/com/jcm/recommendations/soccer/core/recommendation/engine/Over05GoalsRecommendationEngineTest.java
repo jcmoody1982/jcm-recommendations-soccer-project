@@ -44,7 +44,7 @@ class Over05GoalsRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.OVER_05_GOALS);
-        assertThat(result.get().getMarket()).isEqualTo("Over 0.5 Goals");
+        assertThat(result.get().getMarket()).isEqualTo("Home Team Over 0.5 Goals");
         assertThat(result.get().getOdds()).isNull();
         assertThat(result.get().getScore()).isEqualTo(matchResult.get().getScore());
         assertThat(result.get().getConfidence()).isEqualTo(matchResult.get().getConfidence());
