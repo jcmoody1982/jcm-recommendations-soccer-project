@@ -12,16 +12,17 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 
 /**
  * UC-042: dedicated Over 0.5 Goals board. Full-match only, and only when the price is
- * genuinely backable — short 1.01–1.10 quotes are the league-average outcome dressed as a pick.
+ * genuinely backable — short 1.01–1.25 quotes are the league-average outcome dressed as a pick.
  */
 @Component
 public class Over05GoalsRecommendationEngine extends TotalGoalsOverRecommendationEngine {
 
-    static final double MIN_PRICE_EXCLUSIVE = 1.20;
+    /** Shortest Over 0.5 quote the board will carry (inclusive). */
+    static final double MIN_PRICE = 1.30;
 
     /**
      * Over 0.5 clears in around 90% of matches, so the thresholds sit high and the price gate
-     * does most of the thinning. A 1.20+ quote already implies the market is less sure than
+     * does most of the thinning. A 1.30+ quote already implies the market is less sure than
      * the typical lock, which is the only Over 0.5 worth putting on a board.
      */
     private static final LineSpec SPEC = new LineSpec(
@@ -30,8 +31,8 @@ public class Over05GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             "over05Pct",
             "apiO05Potential",
             1.0,
-            80.0,
-            72.0,
+            82.0,
+            75.0,
             0.5
     );
 
@@ -79,6 +80,6 @@ public class Over05GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
 
     @Override
     protected boolean passesOddsGate(Double odds) {
-        return odds != null && odds > MIN_PRICE_EXCLUSIVE;
+        return odds != null && odds >= MIN_PRICE;
     }
 }

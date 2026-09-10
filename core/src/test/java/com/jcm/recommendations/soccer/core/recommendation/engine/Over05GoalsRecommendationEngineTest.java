@@ -31,22 +31,26 @@ class Over05GoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze publishes Over 0.5 when the price is above 1.20")
+    @DisplayName("analyze publishes Over 0.5 when the price clears 1.30 and the score clears Moderate")
     void analyze_withBackablePrice_returnsOver05() {
         Optional<Recommendation> result = engine.analyze(context(1.45));
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Over 0.5 Goals");
         assertThat(result.get().getOdds()).isEqualTo(1.45);
-        assertThat(result.get().getScore()).isGreaterThan(70.0).isLessThan(97.0);
+        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(75.0).isLessThan(97.0);
+        assertThat(result.get().getConfidence()).isIn(
+                com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel.MODERATE,
+                com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel.STRONG);
     }
 
     @Test
-    @DisplayName("analyze drops an unpriced or 1.20-or-shorter Over 0.5")
-    void analyze_requiresPriceAbove120() {
+    @DisplayName("analyze drops Over 0.5 priced under 1.30")
+    void analyze_requiresPriceAtLeast130() {
         assertThat(engine.analyze(context(null))).isEmpty();
         assertThat(engine.analyze(context(1.20))).isEmpty();
-        assertThat(engine.analyze(context(1.01))).isEmpty();
+        assertThat(engine.analyze(context(1.29))).isEmpty();
+        assertThat(engine.analyze(context(1.30))).isPresent();
     }
 
     private FixtureContext context(Double over05Odds) {
