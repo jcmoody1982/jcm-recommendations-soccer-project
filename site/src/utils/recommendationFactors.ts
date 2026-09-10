@@ -21,6 +21,12 @@ const SKIP_KEYS = new Set([
   'awayXgDominanceMultiplier',
   // BTTS: boost amount is internal; applied flag alone is enough if shown
   'leakyDefenseBoostAmount',
+  // BTTS: raw 100% season / venue rates — customer panel shows the shrunk model inputs instead
+  'homeBttsSeasonPctRaw',
+  'awayBttsSeasonPctRaw',
+  'apiPotentialRaw',
+  'homeVenueScoredPct',
+  'awayVenueScoredPct',
   // Value Bets: noisy / bankroll-advice fields for the customer panel
   'allOpportunities',
   'kellyStake',
