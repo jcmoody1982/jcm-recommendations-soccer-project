@@ -27,13 +27,10 @@ public class ResultsPerformanceService {
     public static final int MIN_SAMPLE = 10;
 
     /**
-     * Types paused from boards/metrics. Empty since CLEAN_SHEET was recalibrated and re-enabled;
-     * kept as the mechanism for pausing a type without deleting its engine.
-     *
-     * <p>Note that CLEAN_SHEET history predating the pause was produced by the old weighted index,
-     * so its early hit rate is not comparable to what the Poisson model publishes now.
+     * Types paused from boards/metrics. UNDER_GOALS is held until a Poisson rebuild replaces the
+     * additive index that ran ~−24% ROI on the 2026-09-04..10 window.
      */
-    private static final Set<String> EXCLUDED_TYPES = Set.of();
+    private static final Set<String> EXCLUDED_TYPES = Set.of("UNDER_GOALS");
 
     /**
      * Types whose score is published as a probability percentage. Only these can be checked for

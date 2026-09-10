@@ -13,9 +13,19 @@ import java.util.Optional;
 
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.*;
 
+/**
+ * UC-007: Under Goals recommendations.
+ *
+ * <p>Paused from boards, Elite, and Results — the additive index ran ~−24% ROI on the
+ * 2026-09-04..10 window. Bean kept so {@link ValueBetRecommendationEngine} still wires;
+ * {@link #analyze} is a no-op until a Poisson rebuild lands.
+ */
 @Component
 @Slf4j
 public class UnderGoalsRecommendationEngine implements RecommendationEngine {
+
+    /** Flip when the Poisson under-goals model is ready to publish again. */
+    static final boolean PAUSED = true;
 
     // Base weights when form data IS available (total = 1.0)
     private static final double WEIGHT_HOME_SCORED_INVERSE = 0.07;
@@ -63,6 +73,17 @@ public class UnderGoalsRecommendationEngine implements RecommendationEngine {
 
     @Override
     public Optional<Recommendation> analyze(FixtureContext context) {
+        if (PAUSED) {
+            return Optional.empty();
+        }
+        return analyzeLive(context);
+    }
+
+    /**
+     * Live scoring path. Used by unit tests while {@link #PAUSED}; production {@link #analyze}
+     * short-circuits until the engine is rebuilt.
+     */
+    Optional<Recommendation> analyzeLive(FixtureContext context) {
         if (!isApplicable(context)) {
             return Optional.empty();
         }

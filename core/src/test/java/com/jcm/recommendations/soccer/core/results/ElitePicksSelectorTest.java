@@ -33,13 +33,14 @@ class ElitePicksSelectorTest {
 
         List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
 
-        assertThat(elite).hasSize(9);
+        assertThat(elite).hasSize(8);
         assertThat(elite.getFirst().getFixtureId()).isEqualTo(100L);
         assertThat(elite.getFirst().getType()).isEqualTo("MATCH_RESULT");
-        assertThat(elite.stream().map(RecommendationSnapshot::getFixtureId).distinct().count()).isEqualTo(9);
+        assertThat(elite.stream().map(RecommendationSnapshot::getFixtureId).distinct().count()).isEqualTo(8);
         assertThat(elite).noneMatch(r -> "BOOKING_POINTS".equals(r.getType()));
         assertThat(elite).noneMatch(r -> "PLAYER_TO_SCORE".equals(r.getType()));
         assertThat(elite).noneMatch(r -> "CLEAN_SHEET".equals(r.getType()));
+        assertThat(elite).noneMatch(r -> "UNDER_GOALS".equals(r.getType()));
         assertThat(elite).noneMatch(r -> "MODERATE".equalsIgnoreCase(r.getConfidence()));
         assertThat(elite.getLast().getFixtureId()).isEqualTo(1200L);
     }
@@ -109,16 +110,17 @@ class ElitePicksSelectorTest {
     void excludesUnder15FromEveryTypeThatCanEmitIt() {
         LocalDate date = LocalDate.of(2026, 8, 15);
         // Under 1.5 lands ~20% of the time but is only ever labelled above the engine's STRONG line,
-        // so it arrives Elite-eligible by construction. Under 2.5 is the line we still carry.
+        // so it arrives Elite-eligible by construction. Under 2.5 via Value Bet is still eligible.
         List<RecommendationSnapshot> day = List.of(
                 snapWithMarket(1L, date, 100L, "UNDER_GOALS", "Under 1.5 Goals", "STRONG", 86.0, 3.4, 1000L),
                 snapWithMarket(2L, date, 200L, "VALUE_BET", "Under 1.5 Goals", "STRONG", 84.0, 3.6, 2000L),
-                snapWithMarket(3L, date, 300L, "UNDER_GOALS", "Under 2.5 Goals", "STRONG", 72.0, 1.9, 3000L)
+                snapWithMarket(3L, date, 300L, "VALUE_BET", "Under 2.5 Goals", "STRONG", 72.0, 1.9, 3000L)
         );
 
         List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
 
         assertThat(elite).extracting(RecommendationSnapshot::getFixtureId).containsExactly(300L);
+        assertThat(elite).noneMatch(r -> "UNDER_GOALS".equals(r.getType()));
     }
 
     @Test

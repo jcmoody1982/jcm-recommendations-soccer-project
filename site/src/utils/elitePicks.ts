@@ -9,7 +9,6 @@ export const ELITE_ELIGIBLE_TYPES: readonly RecommendationType[] = [
   'OVER_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
-  'UNDER_GOALS',
   'RESULT_BTTS',
   'TOP_VS_BOTTOM',
   'FIRST_HALF_GOALS',
