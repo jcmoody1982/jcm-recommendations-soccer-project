@@ -90,8 +90,17 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
         MarketPick pick = marketPick.get();
         boolean hasReferee = context.hasRefereeStats();
         ConfidenceLevel confidence = determineConfidence(pick.edge(), hasReferee);
+        // Unpriced booking tips cannot be checked for EV — keep them off the Strong board.
+        boolean unpricedDemotion = false;
+        if (confidence == ConfidenceLevel.STRONG) {
+            confidence = ConfidenceLevel.MODERATE;
+            unpricedDemotion = true;
+        }
 
         Map<String, Object> factors = buildFactors(context, breakdown, pick);
+        if (unpricedDemotion) {
+            factors.put("unpricedDemotion", true);
+        }
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.BOOKING_POINTS)

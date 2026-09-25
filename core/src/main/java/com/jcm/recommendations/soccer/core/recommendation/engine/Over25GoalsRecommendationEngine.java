@@ -8,6 +8,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * UC-039: dedicated Over 2.5 Goals board (never steps up to Over 3.5).
+ *
+ * <p>Published scores are soft-capped below 80 after the 2026-09-11..23 window: the 80–89 band
+ * hit ~40% at an average claimed score of 86 (−46 gap). Ranking is preserved; certainty is not.
  */
 @Component
 public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendationEngine {
@@ -28,9 +31,23 @@ public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             2.5
     );
 
+    /** Soft-cap the overconfident 80+ publish band (Sep 2026 calibration). */
+    static final double CEILING_SQUASH_START = 68.0;
+    static final double MAX_REALISTIC_PROBABILITY = 78.0;
+
     @Override
     protected LineSpec spec() {
         return SPEC;
+    }
+
+    @Override
+    protected double applyPublishCeiling(double rawScore) {
+        if (rawScore <= CEILING_SQUASH_START) {
+            return rawScore;
+        }
+        double headroom = MAX_REALISTIC_PROBABILITY - CEILING_SQUASH_START;
+        double excess = rawScore - CEILING_SQUASH_START;
+        return CEILING_SQUASH_START + headroom * (1.0 - Math.exp(-excess / headroom));
     }
 
     @Override

@@ -49,6 +49,10 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
     
     private static final double FILTER_MIN_COMBINED_GOALS = 2.5;
 
+    /** Soft-cap the overconfident 80+ publish band (aligned with {@link Over25GoalsRecommendationEngine}). */
+    private static final double CEILING_SQUASH_START = Over25GoalsRecommendationEngine.CEILING_SQUASH_START;
+    private static final double MAX_REALISTIC_PROBABILITY = Over25GoalsRecommendationEngine.MAX_REALISTIC_PROBABILITY;
+
     @Override
     public RecommendationType getType() {
         return RecommendationType.OVER_GOALS;
@@ -76,7 +80,8 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        double score = calculateScore(context);
+        double rawScore = calculateScore(context);
+        double score = applyOver25PublishCeiling(rawScore);
         ConfidenceLevel confidence = determineConfidence(score);
 
         if (confidence == ConfidenceLevel.WEAK) {
@@ -86,6 +91,8 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
         String market = "Over 2.5 Goals";
         Double odds = getOddsForMarket(context, market);
         Map<String, Object> factors = buildFactors(context, score, expectedGoals);
+        factors.put("rawScore", rawScore);
+        factors.put("ceilingApplied", score < rawScore - 0.01);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.OVER_GOALS)
@@ -197,6 +204,20 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
         score += xgBoost;
 
         return clampScore(score);
+    }
+
+    /**
+     * Compresses everything above {@link #CEILING_SQUASH_START} into the gap below
+     * {@link #MAX_REALISTIC_PROBABILITY}. With {@link #THRESHOLD_STRONG} at 80, this also means
+     * the old 80+ STRONG band is demoted to Moderate.
+     */
+    static double applyOver25PublishCeiling(double rawScore) {
+        if (rawScore <= CEILING_SQUASH_START) {
+            return rawScore;
+        }
+        double headroom = MAX_REALISTIC_PROBABILITY - CEILING_SQUASH_START;
+        double excess = rawScore - CEILING_SQUASH_START;
+        return CEILING_SQUASH_START + headroom * (1.0 - Math.exp(-excess / headroom));
     }
 
     private double calculateHighScoringBoost(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {

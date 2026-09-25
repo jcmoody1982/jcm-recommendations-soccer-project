@@ -111,14 +111,16 @@ class BookingPointsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze with referee and large edge can be STRONG")
-    void analyze_withRefereeAndLargeEdge_canBeStrong() {
+    @DisplayName("analyze with referee and large edge stays Moderate while unpriced")
+    void analyze_withRefereeAndLargeEdge_demotesUnpricedToModerate() {
         FixtureContext context = createExtremeHighCardsContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(result.get().getOdds()).isNull();
+        assertThat(result.get().getFactors().get("unpricedDemotion")).isEqualTo(true);
         assertThat(result.get().getFactors().get("refereeDataAvailable")).isEqualTo(true);
         assertThat((Double) result.get().getFactors().get("refereeReliability")).isEqualTo(1.0);
     }

@@ -35,7 +35,8 @@ class CornersRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.OVER_CORNERS);
         assertThat(result.get().getMarket()).contains("Over");
-        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(result.get().getFactors().get("unpricedDemotion")).isEqualTo(true);
     }
 
     @Test
@@ -241,8 +242,9 @@ class CornersRecommendationEngineTest {
         assertThat(expected).isLessThanOrEqualTo(9.5);
         assertThat(rec.getMarket()).isEqualTo("Under 9.5 Corners");
         assertThat(rec.getMarket()).doesNotContain("8.5");
-        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
         assertThat(rec.getFactors().get("apiConfidenceBoostApplied")).isEqualTo(true);
+        assertThat(rec.getFactors().get("unpricedDemotion")).isEqualTo(true);
     }
 
     @Test
@@ -258,7 +260,8 @@ class CornersRecommendationEngineTest {
         double expected = (Double) rec.getFactors().get("expectedCorners");
         assertThat(expected).isLessThanOrEqualTo(8.0);
         assertThat(rec.getMarket()).isEqualTo("Under 8.5 Corners");
-        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(rec.getFactors().get("unpricedDemotion")).isEqualTo(true);
     }
 
     // Helper methods

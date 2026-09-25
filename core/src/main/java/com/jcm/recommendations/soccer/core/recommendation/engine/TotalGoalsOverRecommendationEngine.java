@@ -77,6 +77,14 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         return true;
     }
 
+    /**
+     * Optional soft ceiling on the published probability. Default is identity; Over 2.5 caps the
+     * 80+ band that was massively overconfident on the 2026-09 board.
+     */
+    protected double applyPublishCeiling(double rawScore) {
+        return rawScore;
+    }
+
     @Override
     public RecommendationType getType() {
         return spec().type();
@@ -108,7 +116,8 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
             return Optional.empty();
         }
 
-        double score = calculateScore(context, spec, homeOverPct, awayOverPct, expectedGoals);
+        double rawScore = calculateScore(context, spec, homeOverPct, awayOverPct, expectedGoals);
+        double score = applyPublishCeiling(rawScore);
         ConfidenceLevel confidence = determineConfidence(score, spec);
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
@@ -119,7 +128,7 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
             return Optional.empty();
         }
 
-        Map<String, Object> factors = buildFactors(context, spec, score, expectedGoals, homeOverPct, awayOverPct);
+        Map<String, Object> factors = buildFactors(context, spec, score, rawScore, expectedGoals, homeOverPct, awayOverPct);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(spec.type())
@@ -244,6 +253,7 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
             FixtureContext context,
             LineSpec spec,
             double score,
+            double rawScore,
             double expectedGoals,
             double homeOverPct,
             double awayOverPct) {
@@ -253,6 +263,8 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
 
         factors.put("expectedGoals", expectedGoals);
         factors.put("line", spec.market());
+        factors.put("rawScore", rawScore);
+        factors.put("ceilingApplied", score < rawScore - 0.01);
 
         double homeScoredAvg = calculateVenueGoalsAvg(homeStats, true, 1.0);
         double awayScoredAvg = calculateVenueGoalsAvg(awayStats, false, 1.0);

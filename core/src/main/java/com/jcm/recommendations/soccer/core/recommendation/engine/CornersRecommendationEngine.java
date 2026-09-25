@@ -122,7 +122,13 @@ double expectedCorners = calculateExpectedCorners(context);
             return Optional.empty();
         }
 
+        // Unpriced corners cannot be checked for EV — keep them off the Strong board.
+        if (confidence == ConfidenceLevel.STRONG) {
+            confidence = ConfidenceLevel.MODERATE;
+        }
+
         Map<String, Object> factors = buildFactors(context, expectedCorners, apiBoostApplied);
+        factors.put("unpricedDemotion", true);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(type)

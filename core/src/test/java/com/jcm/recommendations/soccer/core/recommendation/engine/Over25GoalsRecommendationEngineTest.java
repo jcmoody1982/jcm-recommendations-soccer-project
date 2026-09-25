@@ -40,7 +40,18 @@ class Over25GoalsRecommendationEngineTest {
         assertThat(result.get().getType()).isEqualTo(RecommendationType.OVER_25_GOALS);
         assertThat(result.get().getMarket()).isEqualTo("Over 2.5 Goals");
         assertThat(result.get().getOdds()).isEqualTo(1.60);
+        assertThat(result.get().getScore()).isLessThan(80.0);
         assertThat(result.get().getFactors()).containsKeys("expectedGoals", "over25PctHome", "over25PctAway", "apiO25Potential");
+        assertThat(result.get().getFactors().get("ceilingApplied")).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("applyPublishCeiling compresses 80+ scores below 80")
+    void applyPublishCeiling_compressesEightyPlusBand() {
+        assertThat(engine.applyPublishCeiling(86.0)).isLessThan(80.0);
+        assertThat(engine.applyPublishCeiling(68.0)).isEqualTo(68.0);
+        assertThat(engine.applyPublishCeiling(100.0))
+                .isLessThan(Over25GoalsRecommendationEngine.MAX_REALISTIC_PROBABILITY);
     }
 
     @Test
