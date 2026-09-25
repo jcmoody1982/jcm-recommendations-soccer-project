@@ -33,12 +33,13 @@ class ElitePicksSelectorTest {
 
         List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
 
-        assertThat(elite).hasSize(8);
+        assertThat(elite).hasSize(7);
         assertThat(elite.getFirst().getFixtureId()).isEqualTo(100L);
         assertThat(elite.getFirst().getType()).isEqualTo("MATCH_RESULT");
-        assertThat(elite.stream().map(RecommendationSnapshot::getFixtureId).distinct().count()).isEqualTo(8);
+        assertThat(elite.stream().map(RecommendationSnapshot::getFixtureId).distinct().count()).isEqualTo(7);
         assertThat(elite).noneMatch(r -> "BOOKING_POINTS".equals(r.getType()));
         assertThat(elite).noneMatch(r -> "PLAYER_TO_SCORE".equals(r.getType()));
+        assertThat(elite).noneMatch(r -> "RESULT_BTTS".equals(r.getType()));
         assertThat(elite).noneMatch(r -> "CLEAN_SHEET".equals(r.getType()));
         assertThat(elite).noneMatch(r -> "UNDER_GOALS".equals(r.getType()));
         assertThat(elite).noneMatch(r -> "MODERATE".equalsIgnoreCase(r.getConfidence()));

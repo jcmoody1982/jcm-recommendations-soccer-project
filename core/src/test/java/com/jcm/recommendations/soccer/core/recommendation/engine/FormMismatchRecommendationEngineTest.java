@@ -21,6 +21,14 @@ class FormMismatchRecommendationEngineTest {
         engine = new FormMismatchRecommendationEngine();
     }
 
+
+    @Test
+    @DisplayName("analyze is paused and publishes nothing")
+    void analyze_whenPaused_returnsEmpty() {
+        assertThat(FormMismatchRecommendationEngine.PAUSED).isTrue();
+        assertThat(engine.analyze(createHotTeamContext())).isEmpty();
+    }
+
     @Test
     @DisplayName("getType returns WINNING_FORM_MISMATCH")
     void getType_returnsWinningFormMismatch() {
@@ -32,7 +40,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_withNoForm_returnsEmpty() {
         FixtureContext context = createContextWithoutForm();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }
@@ -42,7 +50,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_withHotTeam_returnsWinningMismatch() {
         FixtureContext context = createHotTeamContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.WINNING_FORM_MISMATCH);
@@ -54,7 +62,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_withColdTeam_returnsLosingMismatch() {
         FixtureContext context = createColdTeamContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.LOSING_FORM_MISMATCH);
@@ -66,7 +74,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_appliesHomeAwayContextWeighting() {
         FixtureContext context = createHotTeamContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("homeAwayContextMultiplier");
@@ -78,7 +86,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_tracksConcededDelta() {
         FixtureContext context = createHotTeamContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("concededDelta");
@@ -89,7 +97,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_detectsScoringTrend() {
         FixtureContext context = createScoringTrendContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("scoringTrendUp")).isEqualTo(true);
@@ -101,7 +109,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_detectsDefensiveTrend() {
         FixtureContext context = createDefensiveTrendContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("defensiveTrendUp")).isEqualTo(true);
@@ -113,7 +121,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_flagsXgRegressionRisk() {
         FixtureContext context = createXgRegressionRiskContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("xgRegressionRisk")).isEqualTo(true);
@@ -125,7 +133,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_addsStreakBonus() {
         FixtureContext context = createWinningStreakContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("hasWinningStreak")).isEqualTo(true);
@@ -136,7 +144,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_tracksMomentumIndicators() {
         FixtureContext context = createHotTeamContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("positiveMomentumIndicators");
@@ -147,7 +155,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_tracksRiskFlags() {
         FixtureContext context = createXgRegressionRiskContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("riskFlags");
@@ -161,7 +169,7 @@ class FormMismatchRecommendationEngineTest {
     void analyze_withSmallMismatch_returnsEmpty() {
         FixtureContext context = createSmallMismatchContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }

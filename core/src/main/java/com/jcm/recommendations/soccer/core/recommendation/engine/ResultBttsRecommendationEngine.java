@@ -16,25 +16,15 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 /**
  * UC-025: Result + BTTS Combo Recommendations
  *
- * Identifies fixtures where a combined Result + Both Teams To Score bet has
- * strong probability, offering enhanced odds with good confidence.
- *
- * Combined Probability = Result Probability x BTTS Probability, then adjusted
- * for clean sheet and failed-to-score tendencies.
- *
- * Each market carries its own goals requirements: a side can only be backed to
- * win with BTTS if it both scores and concedes at a high enough rate, and the
- * market is excluded outright when the winner keeps too many clean sheets or the
- * opponent fails to score too often (both point to a win-to-nil instead).
- *
- * <p>Published scores are soft-capped well below 100: a Result + BTTS combo is
- * typically a 20–40% market, and raw win% × BTTS% (plus stacked bonuses) was
- * minting fake certainty. Provider BTTS potential is shrunk toward a league
- * prior the same way as plain BTTS.
+ * <p>Paused from boards, Elite, and Results after the 2026-09-11..23 window (~28% hit). Bean kept
+ * so wiring stays intact; {@link #analyze} is a no-op until a rebuild lands.
  */
 @Component
 @Slf4j
 public class ResultBttsRecommendationEngine implements RecommendationEngine {
+
+    /** Flip when the combo model is ready to publish again. */
+    static final boolean PAUSED = true;
 
     private static final double THRESHOLD_STRONG = 35.0;
     private static final double THRESHOLD_MODERATE = 28.0;
@@ -88,6 +78,17 @@ public class ResultBttsRecommendationEngine implements RecommendationEngine {
 
     @Override
     public Optional<Recommendation> analyze(FixtureContext context) {
+        if (PAUSED) {
+            return Optional.empty();
+        }
+        return analyzeLive(context);
+    }
+
+    /**
+     * Live scoring path. Used by unit tests while {@link #PAUSED}; production {@link #analyze}
+     * short-circuits until the engine is rebuilt.
+     */
+    Optional<Recommendation> analyzeLive(FixtureContext context) {
         if (!isApplicable(context)) {
             return Optional.empty();
         }

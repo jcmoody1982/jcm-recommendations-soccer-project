@@ -27,10 +27,16 @@ public class ResultsPerformanceService {
     public static final int MIN_SAMPLE = 10;
 
     /**
-     * Types paused from boards/metrics. UNDER_GOALS is held until a Poisson rebuild replaces the
-     * additive index that ran ~−24% ROI on the 2026-09-04..10 window.
+     * Types paused from boards/metrics. UNDER_GOALS awaits a Poisson rebuild. Form mismatch,
+     * Result+BTTS, and Player to Score are held after the 2026-09-11..23 window (~28–38% hit).
      */
-    private static final Set<String> EXCLUDED_TYPES = Set.of("UNDER_GOALS");
+    private static final Set<String> EXCLUDED_TYPES = Set.of(
+            "UNDER_GOALS",
+            "WINNING_FORM_MISMATCH",
+            "LOSING_FORM_MISMATCH",
+            "RESULT_BTTS",
+            "PLAYER_TO_SCORE"
+    );
 
     /**
      * Types whose score is published as a probability percentage. Only these can be checked for

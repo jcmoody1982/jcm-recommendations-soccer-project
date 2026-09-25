@@ -9,11 +9,11 @@ export const ELITE_ELIGIBLE_TYPES: readonly RecommendationType[] = [
   'OVER_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
-  'RESULT_BTTS',
   'TOP_VS_BOTTOM',
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
   'VALUE_BET',
+  'HOME_AWAY_SPECIALIST',
 ] as const;
 
 export const ELITE_PICKS_LIMIT = 10;

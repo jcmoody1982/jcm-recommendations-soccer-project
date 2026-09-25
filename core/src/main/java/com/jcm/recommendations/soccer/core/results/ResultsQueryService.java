@@ -24,8 +24,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ResultsQueryService {
 
-    /** Types paused from Results day board and day summaries. */
-    private static final Set<String> EXCLUDED_TYPES = Set.of("UNDER_GOALS");
+    /**
+     * Types paused from Results day board and day summaries. Keep in sync with
+     * {@link ResultsPerformanceService} exclusions (except performance may lag a rebuild).
+     */
+    private static final Set<String> EXCLUDED_TYPES = Set.of(
+            "UNDER_GOALS",
+            "WINNING_FORM_MISMATCH",
+            "LOSING_FORM_MISMATCH",
+            "RESULT_BTTS",
+            "PLAYER_TO_SCORE"
+    );
 
     private final RecommendationSnapshotRepository snapshotRepository;
     private final CompletedMatchRepository completedMatchRepository;

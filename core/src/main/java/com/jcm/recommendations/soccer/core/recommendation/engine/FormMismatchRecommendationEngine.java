@@ -17,6 +17,12 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 @Slf4j
 public class FormMismatchRecommendationEngine implements RecommendationEngine {
 
+    /**
+     * Paused after the 2026-09-11..23 window (~35–38% hit on 460 picks). Bean kept for wiring;
+     * {@link #analyze} is a no-op until a rebuild lands.
+     */
+    static final boolean PAUSED = true;
+
     // Base weights (total = 1.0)
     private static final double WEIGHT_PPG_DELTA = 0.25;
     private static final double WEIGHT_GOALS_DELTA = 0.20;
@@ -46,6 +52,17 @@ public class FormMismatchRecommendationEngine implements RecommendationEngine {
 
     @Override
     public Optional<Recommendation> analyze(FixtureContext context) {
+        if (PAUSED) {
+            return Optional.empty();
+        }
+        return analyzeLive(context);
+    }
+
+    /**
+     * Live scoring path. Used by unit tests while {@link #PAUSED}; production {@link #analyze}
+     * short-circuits until the engine is rebuilt.
+     */
+    Optional<Recommendation> analyzeLive(FixtureContext context) {
         if (!isApplicable(context)) {
             return Optional.empty();
         }

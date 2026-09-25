@@ -32,6 +32,16 @@ class PlayerToScoreRecommendationEngineTest {
         engine = new PlayerToScoreRecommendationEngine();
     }
 
+
+    @Test
+    @DisplayName("analyze is paused and publishes nothing")
+    void analyze_whenPaused_returnsEmpty() {
+        assertThat(PlayerToScoreRecommendationEngine.PAUSED).isTrue();
+        assertThat(engine.analyze(contextWithPlayers(
+                scorer(10L, "Mohamed Salah", 0.85, 18, 1500, 1),
+                scorer(11L, "Squad Forward", 0.28, 10, 700, 3)))).isEmpty();
+    }
+
     @Test
     @DisplayName("getType returns PLAYER_TO_SCORE")
     void getType_returnsPlayerToScore() {
@@ -41,7 +51,7 @@ class PlayerToScoreRecommendationEngineTest {
     @Test
     @DisplayName("analyze picks the highest per-90 regular across both squads")
     void analyze_picksBestScorer() {
-        Optional<Recommendation> result = engine.analyze(contextWithPlayers(
+        Optional<Recommendation> result = engine.analyzeLive(contextWithPlayers(
                 scorer(10L, "Mohamed Salah", 0.85, 18, 1500, 1),
                 scorer(11L, "Squad Forward", 0.28, 10, 700, 3)));
 
@@ -57,7 +67,7 @@ class PlayerToScoreRecommendationEngineTest {
     @Test
     @DisplayName("analyze publishes a calibrated probability below the raw Poisson ceiling")
     void analyze_eliteScorer_staysWithinRealisticRange() {
-        Optional<Recommendation> result = engine.analyze(contextWithOpponentConceded(
+        Optional<Recommendation> result = engine.analyzeLive(contextWithOpponentConceded(
                 scorer(10L, "Elite Striker", 0.85, 20, 1600, null),
                 LEAKY_DEFENCE_CONCEDED));
 
@@ -71,7 +81,7 @@ class PlayerToScoreRecommendationEngineTest {
     @Test
     @DisplayName("analyze prefers the proven scorer over an equal-rate small sample")
     void analyze_thinSample_isShrunkTowardPrior() {
-        Optional<Recommendation> result = engine.analyze(contextWithPlayers(
+        Optional<Recommendation> result = engine.analyzeLive(contextWithPlayers(
                 scorer(10L, "Proven Starter", 0.80, 20, 1600, null),
                 scorer(11L, "Hot Streak Sub", 0.80, 6, 400, null)));
 
@@ -101,7 +111,7 @@ class PlayerToScoreRecommendationEngineTest {
         PlayerSeasonStats sub = scorer(21L, "Impact Sub", 0.90, 2, 80, 1);
         sub.setMinPerMatch(20);
 
-        Optional<Recommendation> result = engine.analyze(contextWithPlayers(keeper, sub));
+        Optional<Recommendation> result = engine.analyzeLive(contextWithPlayers(keeper, sub));
 
         assertThat(result).isEmpty();
     }
@@ -109,7 +119,7 @@ class PlayerToScoreRecommendationEngineTest {
     @Test
     @DisplayName("analyze drops a marginal scorer below the moderate threshold")
     void analyze_marginalScorer_isNotPublished() {
-        Optional<Recommendation> result = engine.analyze(contextWithOpponentConceded(
+        Optional<Recommendation> result = engine.analyzeLive(contextWithOpponentConceded(
                 scorer(10L, "Occasional Scorer", 0.26, 8, 500, null),
                 NEUTRAL_DEFENCE_CONCEDED));
 
@@ -123,7 +133,7 @@ class PlayerToScoreRecommendationEngineTest {
         namedByParts.setFirstName("Mohamed");
         namedByParts.setLastName("Salah");
 
-        Optional<Recommendation> result = engine.analyze(contextWithPlayers(
+        Optional<Recommendation> result = engine.analyzeLive(contextWithPlayers(
                 namedByParts,
                 scorer(11L, "Squad Forward", 0.28, 10, 700, 3)));
 
@@ -137,7 +147,7 @@ class PlayerToScoreRecommendationEngineTest {
     void analyze_namelessCandidates_areSkipped() {
         PlayerSeasonStats nameless = scorer(10L, null, 0.85, 18, 1500, 1);
 
-        Optional<Recommendation> result = engine.analyze(
+        Optional<Recommendation> result = engine.analyzeLive(
                 contextWithOpponentConceded(nameless, LEAKY_DEFENCE_CONCEDED));
 
         assertThat(result).isEmpty();
@@ -150,7 +160,7 @@ class PlayerToScoreRecommendationEngineTest {
         PlayerSeasonStats namedRunnerUp = scorer(11L, "Named Forward", 0.80, 18, 1500, 2);
         namedRunnerUp.setClubTeamId(1L);
 
-        Optional<Recommendation> result = engine.analyze(baseContextBuilder(LEAKY_DEFENCE_CONCEDED)
+        Optional<Recommendation> result = engine.analyzeLive(baseContextBuilder(LEAKY_DEFENCE_CONCEDED)
                 .homePlayers(List.of(namelessLeader, namedRunnerUp))
                 .awayPlayers(List.of())
                 .build());
@@ -179,7 +189,7 @@ class PlayerToScoreRecommendationEngineTest {
     @Test
     @DisplayName("analyze returns empty when player lists are missing")
     void analyze_withoutPlayers_returnsEmpty() {
-        Optional<Recommendation> result = engine.analyze(baseContextBuilder(NEUTRAL_DEFENCE_CONCEDED).build());
+        Optional<Recommendation> result = engine.analyzeLive(baseContextBuilder(NEUTRAL_DEFENCE_CONCEDED).build());
 
         assertThat(result).isEmpty();
     }
@@ -202,7 +212,7 @@ class PlayerToScoreRecommendationEngineTest {
     }
 
     private double scoreFor(PlayerSeasonStats player, int concededAway) {
-        Optional<Recommendation> result = engine.analyze(
+        Optional<Recommendation> result = engine.analyzeLive(
                 contextWithOpponentConceded(player, concededAway));
         assertThat(result).isPresent();
         return result.get().getScore();

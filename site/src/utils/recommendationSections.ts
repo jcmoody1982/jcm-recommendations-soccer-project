@@ -15,12 +15,10 @@ export const SECTION_ORDER: RecommendationType[] = [
   'MATCH_RESULT',
   'BTTS',
   'DOUBLE_CHANCE',
-  'RESULT_BTTS',
   'TOP_VS_BOTTOM',
   'OVER_05_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
-  'PLAYER_TO_SCORE',
   'PLAYER_TO_ASSIST',
   'DRAW',
   'FIRST_HALF_GOALS',
@@ -30,8 +28,8 @@ export const SECTION_ORDER: RecommendationType[] = [
   'OVER_CORNERS',
   'UNDER_CORNERS',
   'HOME_AWAY_SPECIALIST',
-  'WINNING_FORM_MISMATCH',
-  'LOSING_FORM_MISMATCH',
+  // Paused (engines still registered for recalibration): RESULT_BTTS, PLAYER_TO_SCORE,
+  // WINNING_FORM_MISMATCH, LOSING_FORM_MISMATCH, UNDER_GOALS
 ];
 
 export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {

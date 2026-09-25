@@ -23,6 +23,14 @@ class ResultBttsRecommendationEngineTest {
         engine = new ResultBttsRecommendationEngine();
     }
 
+
+    @Test
+    @DisplayName("analyze is paused and publishes nothing")
+    void analyze_whenPaused_returnsEmpty() {
+        assertThat(ResultBttsRecommendationEngine.PAUSED).isTrue();
+        assertThat(engine.analyze(createHomeWinBttsContext())).isEmpty();
+    }
+
     @Test
     @DisplayName("getType returns RESULT_BTTS")
     void getType_returnsCorrectType() {
@@ -34,7 +42,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_recommendsHomeWinBtts() {
         FixtureContext context = createHomeWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.RESULT_BTTS);
@@ -47,7 +55,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_recommendsAwayWinBtts() {
         FixtureContext context = createAwayWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Away Team + BTTS");
@@ -59,7 +67,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_recommendsDrawBtts() {
         FixtureContext context = createDrawBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Draw + BTTS");
@@ -71,7 +79,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_withLowBtts_returnsEmpty() {
         FixtureContext context = createLowBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }
@@ -85,62 +93,62 @@ class ResultBttsRecommendationEngineTest {
     @DisplayName("analyze excludes home market when home team does not score enough")
     void analyze_excludesHomeMarketWhenScoringTooLow() {
         FixtureContext baseline = createHomeWinBttsContext();
-        assertThat(engine.analyze(baseline)).isPresent();
+        assertThat(engine.analyzeLive(baseline)).isPresent();
 
         FixtureContext context = createHomeWinBttsContext();
         context.getHomeTeamStats().setSeasonGoalsHome(20);   // 1.0/game, under the 1.3 requirement
 
-        assertThat(engine.analyze(context)).isEmpty();
+        assertThat(engine.analyzeLive(context)).isEmpty();
     }
 
     @Test
     @DisplayName("analyze excludes home market when home team concedes too rarely")
     void analyze_excludesHomeMarketWhenConcedingTooRarely() {
         FixtureContext baseline = createHomeWinBttsContext();
-        assertThat(engine.analyze(baseline)).isPresent();
+        assertThat(engine.analyzeLive(baseline)).isPresent();
 
         FixtureContext context = createHomeWinBttsContext();
         context.getHomeTeamStats().setSeasonConcededHome(12);   // 0.6/game, under the 0.8 requirement
 
-        assertThat(engine.analyze(context)).isEmpty();
+        assertThat(engine.analyzeLive(context)).isEmpty();
     }
 
     @Test
     @DisplayName("analyze excludes market when winner keeps too many clean sheets")
     void analyze_excludesWhenWinnerHasHighCleanSheetRate() {
         FixtureContext baseline = createHomeWinBttsContext();
-        assertThat(engine.analyze(baseline)).isPresent();
+        assertThat(engine.analyzeLive(baseline)).isPresent();
 
         FixtureContext context = createHomeWinBttsContext();
         context.getHomeTeamStats().setSeasonCleanSheetsHome(10);   // 50%, over the 40% exclusion
 
-        assertThat(engine.analyze(context)).isEmpty();
+        assertThat(engine.analyzeLive(context)).isEmpty();
     }
 
     @Test
     @DisplayName("analyze excludes market when opponent fails to score too often")
     void analyze_excludesWhenOpponentFailsToScoreOften() {
         FixtureContext baseline = createHomeWinBttsContext();
-        assertThat(engine.analyze(baseline)).isPresent();
+        assertThat(engine.analyzeLive(baseline)).isPresent();
 
         FixtureContext context = createHomeWinBttsContext();
         context.getAwayTeamStats().setSeasonFailedToScoreAway(9);   // 45%, over the 35% exclusion
 
-        assertThat(engine.analyze(context)).isEmpty();
+        assertThat(engine.analyzeLive(context)).isEmpty();
     }
 
     @Test
     @DisplayName("analyze excludes Draw market when teams are not evenly matched")
     void analyze_excludesDrawWhenNotEvenlyMatched() {
         FixtureContext baseline = createDrawBttsContext();
-        Optional<Recommendation> baselineResult = engine.analyze(baseline);
+        Optional<Recommendation> baselineResult = engine.analyzeLive(baseline);
         assertThat(baselineResult).isPresent();
         assertThat(baselineResult.get().getFactors().get("selectedResultType")).isEqualTo("DRAW");
 
         FixtureContext context = createDrawBttsContext();
         context.getAwayTeamStats().setPpgOverall(0.5);   // PPG gap 0.9, over the 0.4 maximum
 
-        assertThat(engine.analyze(context)).isEmpty();
+        assertThat(engine.analyzeLive(context)).isEmpty();
     }
 
     @Test
@@ -148,7 +156,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_appliesFormBttsBonus() {
         FixtureContext context = createFormBttsBonusContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         @SuppressWarnings("unchecked")
@@ -176,7 +184,7 @@ class ResultBttsRecommendationEngineTest {
                         .build())
                 .build();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("h2hPreviousMeetings")).isEqualTo(5);
@@ -190,7 +198,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_appliesCleanSheetPenalty() {
         FixtureContext context = createCleanSheetPenaltyContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         @SuppressWarnings("unchecked")
@@ -203,7 +211,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_appliesBothConcedeBonus() {
         FixtureContext context = createHomeWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         @SuppressWarnings("unchecked")
@@ -216,7 +224,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_integratesXgData() {
         FixtureContext context = createHomeWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(true);
@@ -230,7 +238,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_withNoXgData_flagsRisk() {
         FixtureContext context = createContextWithoutXgData();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(false);
@@ -244,7 +252,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_usesApiBttsPotential() {
         FixtureContext context = createContextWithApiPotential();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("apiBttsPotential");
@@ -267,7 +275,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_softCapsPublishedScore() {
         FixtureContext context = createHomeWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getScore()).isLessThan(52.0);
@@ -297,7 +305,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_tracksCombinedAndAdjustedProbabilities() {
         FixtureContext context = createHomeWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("combinedProbability");
@@ -314,7 +322,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_tracksGoalsAndExclusionRates() {
         FixtureContext context = createHomeWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("homeScoredAvg");
@@ -330,7 +338,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_tracksIndicatorsAndFlags() {
         FixtureContext context = createHomeWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("positiveIndicators");
@@ -349,7 +357,7 @@ class ResultBttsRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .build();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }
@@ -359,7 +367,7 @@ class ResultBttsRecommendationEngineTest {
     void analyze_assignsStrongConfidence() {
         FixtureContext context = createHomeWinBttsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         if (result.get().getScore() >= 35.0) {
