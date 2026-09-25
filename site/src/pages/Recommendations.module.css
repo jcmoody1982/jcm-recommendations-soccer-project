@@ -203,6 +203,12 @@
   gap: 0.35rem;
 }
 
+.scopeGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .horizonGroup {
   display: flex;
   flex-wrap: wrap;

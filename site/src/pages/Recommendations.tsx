@@ -25,6 +25,7 @@ import {
   includeInMarketSection,
   sectionTitle,
 } from '../utils/recommendationSections';
+import { isFeaturedCompetition } from '../utils/featuredCompetitions';
 import styles from './Recommendations.module.css';
 
 /** Always render these boards so a Strong-only view is not mistaken for a missing market. */
@@ -44,11 +45,19 @@ const SORT_OPTIONS: KickoffSort[] = ['score', 'kickoff'];
 /** tipped = Strong + Moderate (excludes WEAK). Default chip is Strong only. */
 type ConfidenceFilter = 'tipped' | 'strong' | 'moderate' | 'all';
 
+/** all = every competition; featured = curated watchlist in featuredCompetitions.ts */
+type CompetitionScope = 'all' | 'featured';
+
 const CONFIDENCE_OPTIONS: Array<{ value: ConfidenceFilter; label: string }> = [
   { value: 'strong', label: 'Strong' },
   { value: 'moderate', label: 'Moderate' },
   { value: 'tipped', label: 'Strong + Moderate' },
   { value: 'all', label: 'All' },
+];
+
+const COMPETITION_SCOPE_OPTIONS: Array<{ value: CompetitionScope; label: string }> = [
+  { value: 'all', label: 'All competitions' },
+  { value: 'featured', label: 'Featured' },
 ];
 
 function parseHorizon(value: string | null): number {
@@ -84,6 +93,13 @@ function parseConfidence(value: string | null): ConfidenceFilter {
   return 'strong';
 }
 
+function parseCompetitionScope(value: string | null): CompetitionScope {
+  if (value === 'featured') {
+    return 'featured';
+  }
+  return 'all';
+}
+
 function parseType(value: string | null): RecommendationType | 'ALL' {
   if (!value || value === 'ALL') return 'ALL';
   if ((SECTION_ORDER as string[]).includes(value)) {
@@ -109,6 +125,7 @@ export default function Recommendations() {
 
   const searchQuery = searchParams.get('q') || '';
   const selectedLeague = searchParams.get('league') || 'all';
+  const competitionScope = parseCompetitionScope(searchParams.get('scope'));
   const kickoffWindow = parseKickoff(searchParams.get('kickoff'));
   const sortBy = parseSort(searchParams.get('sort'));
   const confidenceFilter = parseConfidence(searchParams.get('confidence'));
@@ -128,6 +145,7 @@ export default function Recommendations() {
               (key === 'days' && (value == null || value === String(DEFAULT_HORIZON)))
               || (key === 'q' && (value == null || value === ''))
               || (key === 'league' && (value == null || value === 'all'))
+              || (key === 'scope' && (value == null || value === 'all'))
               || (key === 'kickoff' && (value == null || value === 'all'))
               || (key === 'sort' && (value == null || value === 'score'))
               || (key === 'confidence' && (value == null || value === 'strong'))
@@ -164,13 +182,19 @@ export default function Recommendations() {
     queryFn: () => recommendationService.getGrouped(daysAhead),
   });
 
-  // Elite uses the same fetch window as the boards, then the active kickoff chip.
+  // Elite uses the same fetch window as the boards, then kickoff + competition scope.
   const elitePicks = useMemo(() => {
-    const pool = flattenGroupedRecommendations(groupedRecommendations).filter((rec) =>
-      matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, Date.now())
-    );
+    const pool = flattenGroupedRecommendations(groupedRecommendations).filter((rec) => {
+      if (!matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, Date.now())) {
+        return false;
+      }
+      if (competitionScope === 'featured' && !isFeaturedCompetition(rec.leagueName)) {
+        return false;
+      }
+      return true;
+    });
     return selectElitePicks(pool);
-  }, [groupedRecommendations, kickoffWindow]);
+  }, [groupedRecommendations, kickoffWindow, competitionScope]);
   const eliteKeys = useMemo(() => toEliteKeySet(elitePicks), [elitePicks]);
   const availableLeagues = useMemo(() => {
     if (!groupedRecommendations) return [];
@@ -178,6 +202,9 @@ export default function Recommendations() {
 
     Object.values(groupedRecommendations).flat().forEach((rec: Recommendation) => {
       if (rec.leagueName && rec.leagueId) {
+        if (competitionScope === 'featured' && !isFeaturedCompetition(rec.leagueName)) {
+          return;
+        }
         leagueMap.set(String(rec.leagueId), rec.leagueName);
       }
     });
@@ -185,7 +212,7 @@ export default function Recommendations() {
     return Array.from(leagueMap.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [groupedRecommendations]);
+  }, [groupedRecommendations, competitionScope]);
 
   useEffect(() => {
     if (
@@ -262,6 +289,10 @@ export default function Recommendations() {
           return false;
         }
 
+        if (competitionScope === 'featured' && !isFeaturedCompetition(rec.leagueName)) {
+          return false;
+        }
+
         if (!matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, nowMs)) {
           return false;
         }
@@ -289,6 +320,7 @@ export default function Recommendations() {
     groupedRecommendations,
     searchQuery,
     selectedLeague,
+    competitionScope,
     kickoffWindow,
     sortBy,
     confidenceFilter,
@@ -317,6 +349,9 @@ export default function Recommendations() {
         if (selectedLeague !== 'all' && String(rec.leagueId) !== selectedLeague) {
           return false;
         }
+        if (competitionScope === 'featured' && !isFeaturedCompetition(rec.leagueName)) {
+          return false;
+        }
         if (!matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, nowMs)) {
           return false;
         }
@@ -329,6 +364,7 @@ export default function Recommendations() {
     groupedRecommendations,
     searchQuery,
     selectedLeague,
+    competitionScope,
     kickoffWindow,
     confidenceFilter,
   ]);
@@ -356,6 +392,7 @@ export default function Recommendations() {
     updateParams({
       q: null,
       league: null,
+      scope: null,
       kickoff: null,
       days: null,
       sort: null,
@@ -367,6 +404,7 @@ export default function Recommendations() {
   const hasActiveFilters =
     Boolean(searchQuery)
     || selectedLeague !== 'all'
+    || competitionScope !== 'all'
     || kickoffWindow !== 'all'
     || (kickoffWindow === 'all' && horizon !== DEFAULT_HORIZON)
     || confidenceFilter !== 'strong'
@@ -375,6 +413,7 @@ export default function Recommendations() {
   /** Filters that live inside the mobile-collapsed panel. */
   const hasCollapsedFiltersActive =
     selectedLeague !== 'all'
+    || competitionScope !== 'all'
     || kickoffWindow !== 'all'
     || (kickoffWindow === 'all' && horizon !== DEFAULT_HORIZON);
 
@@ -451,13 +490,35 @@ export default function Recommendations() {
           className={`${styles.filtersPanel} ${filtersOpen ? styles.filtersPanelOpen : ''}`}
         >
           <div className={styles.filters}>
+            <div className={styles.scopeGroup} role="group" aria-label="Competition scope">
+              {COMPETITION_SCOPE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.kickoffChip} ${
+                    competitionScope === option.value ? styles.kickoffChipActive : ''
+                  }`}
+                  onClick={() => updateParams({ scope: option.value })}
+                  title={
+                    option.value === 'featured'
+                      ? 'Show only the curated Featured competition set'
+                      : 'Show all competitions'
+                  }
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
             <select
               value={selectedLeague}
               onChange={(e) => updateParams({ league: e.target.value })}
               className={styles.select}
               aria-label="League filter"
             >
-              <option value="all">All Leagues</option>
+              <option value="all">
+                {competitionScope === 'featured' ? 'All featured leagues' : 'All Leagues'}
+              </option>
               {availableLeagues.map((league) => (
                 <option key={league.id} value={league.id}>
                   {league.name}
