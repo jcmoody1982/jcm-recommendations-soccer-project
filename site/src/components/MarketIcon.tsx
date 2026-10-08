@@ -1,7 +1,7 @@
 import type { RecommendationType } from '../types';
 import styles from './MarketIcon.module.css';
 
-type MarketIconId = RecommendationType | 'ELITE';
+type MarketIconId = RecommendationType | 'ELITE' | 'SOON';
 
 interface Props {
   type: MarketIconId;
@@ -242,6 +242,13 @@ function glyph(type: MarketIconId) {
           className={styles.fillPrimary}
           d="M22.4 8.2L13.6 20.2h6.2L17.4 31.8l10.4-13.4h-6.4L22.4 8.2z"
         />
+      );
+    case 'SOON':
+      return (
+        <g>
+          <circle cx="20" cy="20" r="8.2" className={styles.strokePrimary} strokeWidth="1.8" />
+          <path className={styles.strokeSecondary} d="M20 14.2V20.2l3.6 2.2" strokeWidth="1.8" />
+        </g>
       );
     default:
       return <circle cx="20" cy="20" r="5" className={styles.fillPrimary} />;

@@ -6,6 +6,7 @@ import {
   ElitePicksSection,
   RecommendationSection,
   RecommendationsPageSkeleton,
+  SoonPicksSection,
 } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
 import {
@@ -108,6 +109,15 @@ function parseType(value: string | null): RecommendationType | 'ALL' {
   return 'ALL';
 }
 
+function matchesSearchText(rec: Recommendation, searchLower: string): boolean {
+  if (!searchLower) return true;
+  return (
+    rec.homeTeamName.toLowerCase().includes(searchLower)
+    || rec.awayTeamName.toLowerCase().includes(searchLower)
+    || Boolean(rec.leagueName && rec.leagueName.toLowerCase().includes(searchLower))
+  );
+}
+
 function matchesConfidence(confidence: string, filter: ConfidenceFilter): boolean {
   const band = confidence?.toUpperCase();
   if (filter === 'all') return true;
@@ -182,19 +192,30 @@ export default function Recommendations() {
     queryFn: () => recommendationService.getGrouped(daysAhead),
   });
 
-  // Elite uses the same fetch window as the boards, then kickoff + competition scope.
+  // Elite follows the same filters as the boards. Moderate hides it: Elite is Strong-only.
   const elitePicks = useMemo(() => {
+    const searchLower = searchQuery.toLowerCase().trim();
+    const nowMs = Date.now();
     const pool = flattenGroupedRecommendations(groupedRecommendations).filter((rec) => {
-      if (!matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, Date.now())) {
-        return false;
-      }
-      if (competitionScope === 'featured' && !isFeaturedCompetition(rec.leagueName)) {
-        return false;
-      }
+      if (!includeInMarketSection(rec)) return false;
+      if (!matchesConfidence(rec.confidence, confidenceFilter)) return false;
+      if (typeFilter !== 'ALL' && rec.type !== typeFilter) return false;
+      if (!matchesSearchText(rec, searchLower)) return false;
+      if (selectedLeague !== 'all' && String(rec.leagueId) !== selectedLeague) return false;
+      if (competitionScope === 'featured' && !isFeaturedCompetition(rec.leagueName)) return false;
+      if (!matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, nowMs)) return false;
       return true;
     });
     return selectElitePicks(pool);
-  }, [groupedRecommendations, kickoffWindow, competitionScope]);
+  }, [
+    groupedRecommendations,
+    kickoffWindow,
+    competitionScope,
+    confidenceFilter,
+    searchQuery,
+    selectedLeague,
+    typeFilter,
+  ]);
   const eliteKeys = useMemo(() => toEliteKeySet(elitePicks), [elitePicks]);
   const availableLeagues = useMemo(() => {
     if (!groupedRecommendations) return [];
@@ -277,13 +298,7 @@ export default function Recommendations() {
           return false;
         }
 
-        if (searchLower) {
-          const matchesSearch =
-            rec.homeTeamName.toLowerCase().includes(searchLower)
-            || rec.awayTeamName.toLowerCase().includes(searchLower)
-            || (rec.leagueName && rec.leagueName.toLowerCase().includes(searchLower));
-          if (!matchesSearch) return false;
-        }
+        if (!matchesSearchText(rec, searchLower)) return false;
 
         if (selectedLeague !== 'all' && String(rec.leagueId) !== selectedLeague) {
           return false;
@@ -339,13 +354,7 @@ export default function Recommendations() {
       counts[type] = recs.filter((rec: Recommendation) => {
         if (!includeInMarketSection(rec)) return false;
         if (!matchesConfidence(rec.confidence, confidenceFilter)) return false;
-        if (searchLower) {
-          const matchesSearch =
-            rec.homeTeamName.toLowerCase().includes(searchLower)
-            || rec.awayTeamName.toLowerCase().includes(searchLower)
-            || (rec.leagueName && rec.leagueName.toLowerCase().includes(searchLower));
-          if (!matchesSearch) return false;
-        }
+        if (!matchesSearchText(rec, searchLower)) return false;
         if (selectedLeague !== 'all' && String(rec.leagueId) !== selectedLeague) {
           return false;
         }
@@ -383,6 +392,27 @@ export default function Recommendations() {
       updateParams({ type: null });
     }
   }, [typeFilter, typesWithPicks, updateParams]);
+
+  const soonPicks = useMemo(() => {
+    if (kickoffWindow !== 'all' || !filteredRecommendations) return [];
+
+    const nowMs = Date.now();
+    const picks: Recommendation[] = [];
+    for (const type of SECTION_ORDER) {
+      for (const rec of filteredRecommendations[type] || []) {
+        if (matchesKickoffWindow(rec.matchDateUnix, 'soon', nowMs)) {
+          picks.push(rec);
+        }
+      }
+    }
+
+    picks.sort((a, b) => {
+      const kickoffDiff = compareByKickoff(a.matchDateUnix, b.matchDateUnix);
+      if (kickoffDiff !== 0) return kickoffDiff;
+      return compareByScoreDesc(a.score, b.score);
+    });
+    return picks;
+  }, [filteredRecommendations, kickoffWindow]);
 
   const totalCount = filteredRecommendations
     ? Object.values(filteredRecommendations).reduce((sum, recs) => sum + recs.length, 0)
@@ -650,6 +680,21 @@ export default function Recommendations() {
         </div>
       ) : (
         <>
+          {(soonPicks.length > 0 || elitePicks.length > 0) && (
+            <div className={styles.lead}>
+              {soonPicks.length > 0 && (
+                <SoonPicksSection
+                  recommendations={soonPicks}
+                  eliteKeys={eliteKeys}
+                  onShowOnly={() => updateParams({ kickoff: 'soon', sort: 'kickoff' })}
+                />
+              )}
+              {elitePicks.length > 0 && (
+                <ElitePicksSection recommendations={elitePicks} />
+              )}
+            </div>
+          )}
+
           {filteredRecommendations && (totalCount > 0 || PINNED_EMPTY_TYPES.some((type) => typeFilter === 'ALL' || typeFilter === type)) ? (
             <div className={styles.sections}>
               {SECTION_ORDER.map((type) => {
@@ -701,28 +746,11 @@ export default function Recommendations() {
               )}
             </div>
           )}
-
-          {elitePicks.length > 0 && (
-            <div className={styles.eliteSection}>
-              <ElitePicksSection recommendations={elitePicks} />
-            </div>
-          )}
         </>
       )}
 
       <footer className={styles.footer}>
         <span className={styles.totalCount}>{totalCount} total picks</span>
-        {kickoffCounts.soon > 0 && kickoffWindow === 'all' && (
-          <button
-            type="button"
-            className={styles.soonHint}
-            onClick={() => {
-              updateParams({ kickoff: 'soon', sort: 'kickoff' });
-            }}
-          >
-            {kickoffCounts.soon} starting within 3 hours
-          </button>
-        )}
       </footer>
     </div>
   );

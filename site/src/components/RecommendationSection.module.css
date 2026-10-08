@@ -26,6 +26,33 @@
   font-weight: 400;
 }
 
+.headerAside {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.headerAside .count {
+  margin-left: 0;
+}
+
+.showOnly {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--accent-color);
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--urgency-soon-strong);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.showOnly:hover {
+  background: var(--bg-option-active);
+}
+
 .emptyHint {
   margin: 0;
   color: var(--text-muted);
@@ -207,6 +234,19 @@
     margin-left: 0;
     margin-top: 0.1rem;
     order: 3;
+  }
+
+  .headerAside {
+    width: 100%;
+    margin-left: 0;
+    order: 3;
+    justify-content: space-between;
+  }
+
+  .headerAside .count {
+    width: auto;
+    margin-top: 0;
+    order: 0;
   }
 
   /* Hide table headers on mobile - using card layout instead */

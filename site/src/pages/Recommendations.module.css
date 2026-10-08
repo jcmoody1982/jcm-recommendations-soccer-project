@@ -406,10 +406,12 @@
   flex-direction: column;
 }
 
-.eliteSection {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border-color);
+.lead {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .loading {
@@ -502,18 +504,3 @@
   transition: border-color 0.3s ease;
 }
 
-.soonHint {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--accent-color);
-  border-radius: 6px;
-  background: var(--accent-soft);
-  color: var(--urgency-soon-strong);
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.soonHint:hover {
-  background: var(--bg-option-active);
-}
