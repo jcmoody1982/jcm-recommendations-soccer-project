@@ -9,6 +9,7 @@ import {
   isEarlyKickoffUk,
 } from '../utils/kickoff';
 import { SECTION_CONFIG, SECTION_ORDER, includeInMarketSection } from '../utils/recommendationSections';
+import { SOCCER_FIXTURES, SOCCER_RECOMMENDATIONS } from '../utils/sport';
 import {
   elitePickKey,
   flattenGroupedRecommendations,
@@ -90,7 +91,7 @@ export default function FixtureDetail() {
         <div className={styles.error}>
           <h2 className={styles.errorTitle}>Invalid fixture</h2>
           <p className={styles.errorMessage}>That fixture link looks wrong.</p>
-          <Link to="/fixtures" className={styles.backLink}>
+          <Link to={SOCCER_FIXTURES} className={styles.backLink}>
             ← Back to fixtures
           </Link>
         </div>
@@ -120,7 +121,7 @@ export default function FixtureDetail() {
             <button className={styles.retryButton} onClick={() => refetchFixture()}>
               Try Again
             </button>
-            <Link to="/fixtures" className={styles.backLink}>
+            <Link to={SOCCER_FIXTURES} className={styles.backLink}>
               ← Back to fixtures
             </Link>
           </div>
@@ -144,7 +145,7 @@ export default function FixtureDetail() {
 
   return (
     <div className={styles.page}>
-      <Link to="/fixtures" className={styles.backLink}>
+      <Link to={SOCCER_FIXTURES} className={styles.backLink}>
         ← Back to fixtures
       </Link>
 
@@ -249,7 +250,7 @@ export default function FixtureDetail() {
               There are no picks for this match yet. It may not have enough data, or none of
               the engines produced a recommendation.
             </p>
-            <Link to="/" className={styles.backLink}>
+            <Link to={SOCCER_RECOMMENDATIONS} className={styles.backLink}>
               Browse all recommendations
             </Link>
           </div>

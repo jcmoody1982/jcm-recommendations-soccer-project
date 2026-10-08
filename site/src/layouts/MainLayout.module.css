@@ -27,6 +27,41 @@
   opacity: 0.7;
 }
 
+.brandCluster {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.sportSwitch {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-option);
+}
+
+.sportOption {
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sportOption:hover {
+  color: var(--text-primary);
+  background: var(--bg-option-hover);
+}
+
+.sportOptionActive {
+  color: var(--accent-color);
+  background: var(--accent-soft);
+}
+
 .logo a {
   color: var(--text-primary);
   font-size: 1.5rem;
@@ -214,6 +249,30 @@
   }
 }
 
+.mobileSport {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 1rem 0;
+}
+
+.mobileSportOption {
+  flex: 1;
+  text-align: center;
+  padding: 0.7rem 0.5rem;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: var(--bg-option);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.mobileSportOption.active {
+  border-color: var(--accent-color);
+  background: var(--bg-option-active);
+  color: var(--accent-color);
+}
+
 .mobileNav {
   display: flex;
   flex-direction: column;
@@ -319,6 +378,10 @@
 
   .logoText {
     font-size: 1rem;
+  }
+
+  .sportSwitch {
+    display: none;
   }
 
   .nav {

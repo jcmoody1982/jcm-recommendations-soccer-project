@@ -17,13 +17,20 @@ interface ShortlistContextType {
 
 const ShortlistContext = createContext<ShortlistContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'accabaccaglory-shortlist';
+const LEGACY_STORAGE_KEY = 'accabaccaglory-shortlist';
+const STORAGE_KEY = 'accabaccaglory-shortlist-soccer';
 
 function loadShortlist(): ShortlistItem[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
+    const current = localStorage.getItem(STORAGE_KEY);
+    if (current != null) {
+      return JSON.parse(current);
+    }
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy != null) {
+      localStorage.setItem(STORAGE_KEY, legacy);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      return JSON.parse(legacy);
     }
   } catch (e) {
     console.error('Failed to load shortlist from localStorage:', e);

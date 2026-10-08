@@ -6,6 +6,7 @@ import {
   isEarlyKickoffUk,
   toKickoffDate,
 } from '../utils/kickoff';
+import { soccerFixturePath } from '../utils/sport';
 import { EarlyKickoffBadge } from './EarlyKickoffWarning';
 import styles from './CompetitionCard.module.css';
 
@@ -75,7 +76,7 @@ export function CompetitionCard({ competition }: CompetitionCardProps) {
               return (
                 <Link
                   key={fixture.fixtureId}
-                  to={`/fixtures/${fixture.fixtureId}`}
+                  to={soccerFixturePath(fixture.fixtureId)}
                   className={`${styles.fixture} ${isEarlyKickoff ? styles.fixtureEarly : ''}`}
                 >
                   <span className={styles.teams}>

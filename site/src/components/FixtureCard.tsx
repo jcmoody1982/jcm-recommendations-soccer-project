@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Fixture } from '../types';
 import { EARLY_KICKOFF_WARNING, isEarlyKickoffUk } from '../utils/kickoff';
+import { soccerFixturePath } from '../utils/sport';
 import { EarlyKickoffBadge } from './EarlyKickoffWarning';
 import styles from './FixtureCard.module.css';
 
@@ -18,7 +19,7 @@ export function FixtureCard({ fixture }: Props) {
 
   return (
     <Link
-      to={`/fixtures/${fixture.id}`}
+      to={soccerFixturePath(fixture.id)}
       className={`${styles.card} ${isEarlyKickoff ? styles.cardEarly : ''}`}
     >
       <div

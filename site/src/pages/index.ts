@@ -4,3 +4,4 @@ export { default as Login } from './Login';
 export { default as Recommendations } from './Recommendations';
 export { default as Results } from './Results';
 export { default as Shortlist } from './Shortlist';
+export { default as UsFootball } from './UsFootball';

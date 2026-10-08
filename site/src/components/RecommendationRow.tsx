@@ -10,6 +10,7 @@ import {
 import { formatFactorEntries } from '../utils/recommendationFactors';
 import { SECTION_CONFIG } from '../utils/recommendationSections';
 import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
+import { soccerFixturePath } from '../utils/sport';
 import { EarlyKickoffBadge, EarlyKickoffStrip } from './EarlyKickoffWarning';
 import { EliteBolt } from './EliteBolt';
 import styles from './RecommendationRow.module.css';
@@ -90,7 +91,7 @@ export function RecommendationRow({
   const selectionLabel = topVsBottom?.selectionLabel ?? recommendation.market;
   const gapLabel = topVsBottom?.gapLabel ?? null;
 
-  const fixturePath = `/fixtures/${recommendation.fixtureId}`;
+  const fixturePath = soccerFixturePath(recommendation.fixtureId);
   const kickoff = formatKickoffDisplay(recommendation.matchDateUnix);
   const isEarlyKickoff = isEarlyKickoffUk(recommendation.matchDateUnix);
   const kickoffTitle = isEarlyKickoff

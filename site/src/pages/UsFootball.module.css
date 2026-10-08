@@ -1,0 +1,37 @@
+.page {
+  max-width: 36rem;
+  margin: 4rem auto;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.title {
+  margin: 0 0 0.75rem;
+  font-size: 2rem;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.message {
+  margin: 0 0 1.5rem;
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 1.15rem;
+  border-radius: 8px;
+  background: var(--accent-color);
+  color: var(--accent-contrast);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.link:hover {
+  background: var(--accent-hover);
+}

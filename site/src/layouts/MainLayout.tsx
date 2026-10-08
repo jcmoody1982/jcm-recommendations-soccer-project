@@ -3,13 +3,22 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useShortlist } from '../contexts/ShortlistContext';
 import { SettingsDropdown } from '../components/SettingsDropdown';
+import {
+  isNavActive,
+  SOCCER_FIXTURES,
+  SOCCER_RECOMMENDATIONS,
+  SOCCER_RESULTS,
+  SOCCER_SHORTLIST,
+  SPORTS,
+  sportFromPath,
+} from '../utils/sport';
 import styles from './MainLayout.module.css';
 
-const navItems = [
-  { path: '/recommendations', label: 'Recommendations' },
-  { path: '/fixtures', label: 'Fixtures' },
-  { path: '/results', label: 'Results' },
-  { path: '/shortlist', label: 'Shortlist', showBadge: true },
+const soccerNavItems = [
+  { path: SOCCER_RECOMMENDATIONS, label: 'Recommendations' },
+  { path: SOCCER_FIXTURES, label: 'Fixtures' },
+  { path: SOCCER_RESULTS, label: 'Results' },
+  { path: SOCCER_SHORTLIST, label: 'Shortlist', showBadge: true },
 ];
 
 type Theme = 'light' | 'dark' | 'system';
@@ -25,6 +34,8 @@ export default function MainLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { shortlistCount } = useShortlist();
+  const sport = sportFromPath(location.pathname);
+  const navItems = sport === 'soccer' ? soccerNavItems : [];
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(prev => !prev);
@@ -55,16 +66,30 @@ export default function MainLayout() {
   return (
     <div className={styles.layout}>
       <header className={styles.header}>
-        <div className={styles.logo}>
-          <Link to="/recommendations">
-            <img src="/logo.png" alt="" className={styles.logoImage} />
-            <span className={styles.wordmark}>
-              <span className={`${styles.logoText} brand-display`}>
-                AccaBacca<span className={styles.glory}>Glory</span>
+        <div className={styles.brandCluster}>
+          <div className={styles.logo}>
+            <Link to={SOCCER_RECOMMENDATIONS}>
+              <img src="/logo.png" alt="" className={styles.logoImage} />
+              <span className={styles.wordmark}>
+                <span className={`${styles.logoText} brand-display`}>
+                  AccaBacca<span className={styles.glory}>Glory</span>
+                </span>
+                <span className={styles.wordmarkRule} aria-hidden="true" />
               </span>
-              <span className={styles.wordmarkRule} aria-hidden="true" />
-            </span>
-          </Link>
+            </Link>
+          </div>
+          <div className={styles.sportSwitch} role="group" aria-label="Sport">
+            {SPORTS.map((option) => (
+              <Link
+                key={option.id}
+                to={option.path}
+                className={`${styles.sportOption} ${sport === option.id ? styles.sportOptionActive : ''}`}
+                aria-current={sport === option.id ? 'true' : undefined}
+              >
+                {option.label}
+              </Link>
+            ))}
+          </div>
         </div>
         
         <nav className={styles.nav}>
@@ -73,7 +98,7 @@ export default function MainLayout() {
               key={item.path}
               to={item.path}
               className={`${styles.navLink} ${
-                location.pathname === item.path ? styles.active : ''
+                isNavActive(location.pathname, item.path) ? styles.active : ''
               }`}
             >
               {item.label}
@@ -107,23 +132,38 @@ export default function MainLayout() {
               aria-hidden="true"
             />
             <div className={styles.mobileMenu}>
-              <nav className={styles.mobileNav}>
-                {navItems.map((item) => (
+              <div className={styles.mobileSport} role="group" aria-label="Sport">
+                {SPORTS.map((option) => (
                   <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`${styles.mobileNavLink} ${
-                      location.pathname === item.path ? styles.active : ''
-                    }`}
+                    key={option.id}
+                    to={option.path}
+                    className={`${styles.mobileSportOption} ${sport === option.id ? styles.active : ''}`}
+                    aria-current={sport === option.id ? 'true' : undefined}
                     onClick={closeMobileMenu}
                   >
-                    {item.label}
-                    {item.showBadge && shortlistCount > 0 && (
-                      <span className={styles.badge}>{shortlistCount}</span>
-                    )}
+                    {option.label}
                   </Link>
                 ))}
-              </nav>
+              </div>
+              {navItems.length > 0 && (
+                <nav className={styles.mobileNav}>
+                  {navItems.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`${styles.mobileNavLink} ${
+                        isNavActive(location.pathname, item.path) ? styles.active : ''
+                      }`}
+                      onClick={closeMobileMenu}
+                    >
+                      {item.label}
+                      {item.showBadge && shortlistCount > 0 && (
+                        <span className={styles.badge}>{shortlistCount}</span>
+                      )}
+                    </Link>
+                  ))}
+                </nav>
+              )}
               
               <div className={styles.mobileSettings}>
                 <span className={styles.mobileSettingsLabel}>Theme</span>

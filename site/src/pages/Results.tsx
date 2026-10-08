@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { resultsService } from '../services/api';
 import { EliteBolt } from '../components';
 import { SECTION_ORDER, sectionTitle } from '../utils/recommendationSections';
+import { soccerFixturePath } from '../utils/sport';
 import type {
   CalibrationBand,
   DayResults,
@@ -712,7 +713,7 @@ function CompactPickRow({
         </span>
       )}
       <div className={styles.compactMatch}>
-        <Link to={`/fixtures/${fixture.fixtureId}`} className={styles.compactMatchLink}>
+        <Link to={soccerFixturePath(fixture.fixtureId)} className={styles.compactMatchLink}>
           {fixture.homeTeamName} v {fixture.awayTeamName}
         </Link>
         {fixture.leagueName && (
@@ -811,7 +812,7 @@ function FixtureList({
         <section key={`${fixture.fixtureId}-${fixture.picks[0]?.id ?? 'x'}`} className={styles.fixtureBlock}>
           <header className={styles.fixtureHeader}>
             <div>
-              <Link to={`/fixtures/${fixture.fixtureId}`} className={styles.fixtureTitle}>
+              <Link to={soccerFixturePath(fixture.fixtureId)} className={styles.fixtureTitle}>
                 {fixture.homeTeamName} vs {fixture.awayTeamName}
               </Link>
               <div className={styles.fixtureMeta}>

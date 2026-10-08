@@ -11,10 +11,10 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const from = (location.state as { from?: string } | null)?.from || '/recommendations';
+  const from = (location.state as { from?: string } | null)?.from || '/soccer/recommendations';
 
   if (!loading && (!authEnabled || authenticated)) {
-    return <Navigate to="/recommendations" replace />;
+    return <Navigate to="/soccer/recommendations" replace />;
   }
 
   const handleSubmit = async (event: FormEvent) => {
