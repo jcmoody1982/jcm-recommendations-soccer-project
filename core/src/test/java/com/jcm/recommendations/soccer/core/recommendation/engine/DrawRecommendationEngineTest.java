@@ -154,6 +154,19 @@ class DrawRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("a thin but positive edge is published")
+    void thinPositiveEdge_isPublished() {
+        // The model reads this fixture at about 29.4%, so 3.45 is only just above break-even.
+        FixtureContext context = drawFriendlyContext(builder -> builder
+                .odds(odds(2.45, 3.45, 2.80)));
+
+        Optional<Recommendation> result = engine.analyze(context);
+
+        assertThat(result).isPresent();
+        assertThat((Double) result.get().getFactors().get("edgeAtPrice")).isBetween(0.0, 0.03);
+    }
+
+    @Test
     @DisplayName("an implausibly large edge is withheld rather than treated as the best pick")
     void oversizedEdge_isWithheld() {
         // Model says 36%+ against a market read of 27%. That gap is far more likely to mean our
@@ -293,8 +306,8 @@ class DrawRecommendationEngineTest {
     void determineConfidence_cappedAtModerate() {
         assertThat(engine.determineConfidence(55.0)).isEqualTo(ConfidenceLevel.MODERATE);
         assertThat(engine.determineConfidence(30.0)).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(engine.determineConfidence(26.0)).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(engine.determineConfidence(25.9)).isEqualTo(ConfidenceLevel.WEAK);
+        assertThat(engine.determineConfidence(24.0)).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(engine.determineConfidence(23.9)).isEqualTo(ConfidenceLevel.WEAK);
     }
 
     // ===== Helpers =====

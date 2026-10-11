@@ -50,18 +50,19 @@ public class DrawRecommendationEngine implements RecommendationEngine {
     private static final double WEIGHT_XG = 0.40;
 
     /** Publishing gates. All must pass; see {@link #evaluateGates}. */
-    private static final double MIN_MODEL_DRAW_PCT = 27.0;
-    private static final double MIN_MARKET_DRAW_PCT = 26.0;
+    private static final double MIN_MODEL_DRAW_PCT = 25.0;
+    private static final double MIN_MARKET_DRAW_PCT = 24.0;
     private static final double MAX_PPG_GAP = 0.45;
     private static final double MAX_COMBINED_EXPECTED_GOALS = 2.80;
-    private static final double MIN_EDGE_AT_PRICE = 0.03;
+    /** Break-even: the price only has to cover our own estimate, not beat it by a margin. */
+    private static final double MIN_EDGE_AT_PRICE = 0.0;
     private static final double MAX_EDGE_AT_PRICE = 0.25;
 
     /** Below this a venue record is too thin to build an expectation from. */
     private static final int MIN_VENUE_MATCHES = 4;
 
     /** Floor on the published probability. Draw stays capped at MODERATE - there is no STRONG tier. */
-    private static final double THRESHOLD_MODERATE = 26.0;
+    private static final double THRESHOLD_MODERATE = 24.0;
 
     // Descriptive thresholds — reported, not scored
     private static final double DRAW_SPECIALIST_HIGH = 35.0;
