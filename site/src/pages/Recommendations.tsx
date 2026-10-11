@@ -6,7 +6,6 @@ import {
   ElitePicksSection,
   RecommendationSection,
   RecommendationsPageSkeleton,
-  SoonPicksSection,
 } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
 import {
@@ -37,7 +36,7 @@ const PINNED_EMPTY_TYPES: RecommendationType[] = [
   'PLAYER_TO_ASSIST',
 ];
 
-/** Fetch horizon when viewing all kickoffs (Soon/Today/Tomorrow set days automatically). */
+/** How many days of picks to load. Kickoff chips filter inside this window. */
 const HORIZON_OPTIONS = [3, 7] as const;
 const DEFAULT_HORIZON = 7;
 const KICKOFF_WINDOWS: KickoffWindow[] = ['all', 'soon', 'today', 'tomorrow'];
@@ -64,13 +63,6 @@ const COMPETITION_SCOPE_OPTIONS: Array<{ value: CompetitionScope; label: string 
 function parseHorizon(value: string | null): number {
   const n = value == null ? NaN : Number(value);
   return (HORIZON_OPTIONS as readonly number[]).includes(n) ? n : DEFAULT_HORIZON;
-}
-
-/** Minimum fetch window needed for a kickoff chip. */
-function daysForKickoff(window: KickoffWindow): number {
-  if (window === 'soon' || window === 'today') return 1;
-  if (window === 'tomorrow') return 3;
-  return DEFAULT_HORIZON;
 }
 
 function parseKickoff(value: string | null): KickoffWindow {
@@ -141,9 +133,7 @@ export default function Recommendations() {
   const confidenceFilter = parseConfidence(searchParams.get('confidence'));
   const typeFilter = parseType(searchParams.get('type'));
   const horizon = parseHorizon(searchParams.get('days'));
-  // Kickoff chips own the time window; horizon only applies to "All kickoffs".
-  const daysAhead =
-    kickoffWindow === 'all' ? horizon : daysForKickoff(kickoffWindow);
+  const daysAhead = horizon;
 
   const updateParams = useCallback(
     (patch: Record<string, string | null | undefined>) => {
@@ -393,27 +383,6 @@ export default function Recommendations() {
     }
   }, [typeFilter, typesWithPicks, updateParams]);
 
-  const soonPicks = useMemo(() => {
-    if (kickoffWindow !== 'all' || !filteredRecommendations) return [];
-
-    const nowMs = Date.now();
-    const picks: Recommendation[] = [];
-    for (const type of SECTION_ORDER) {
-      for (const rec of filteredRecommendations[type] || []) {
-        if (matchesKickoffWindow(rec.matchDateUnix, 'soon', nowMs)) {
-          picks.push(rec);
-        }
-      }
-    }
-
-    picks.sort((a, b) => {
-      const kickoffDiff = compareByKickoff(a.matchDateUnix, b.matchDateUnix);
-      if (kickoffDiff !== 0) return kickoffDiff;
-      return compareByScoreDesc(a.score, b.score);
-    });
-    return picks;
-  }, [filteredRecommendations, kickoffWindow]);
-
   const totalCount = filteredRecommendations
     ? Object.values(filteredRecommendations).reduce((sum, recs) => sum + recs.length, 0)
     : 0;
@@ -436,7 +405,7 @@ export default function Recommendations() {
     || selectedLeague !== 'all'
     || competitionScope !== 'all'
     || kickoffWindow !== 'all'
-    || (kickoffWindow === 'all' && horizon !== DEFAULT_HORIZON)
+    || horizon !== DEFAULT_HORIZON
     || confidenceFilter !== 'strong'
     || typeFilter !== 'ALL';
 
@@ -445,11 +414,10 @@ export default function Recommendations() {
     selectedLeague !== 'all'
     || competitionScope !== 'all'
     || kickoffWindow !== 'all'
-    || (kickoffWindow === 'all' && horizon !== DEFAULT_HORIZON);
+    || horizon !== DEFAULT_HORIZON;
 
   const setKickoffWindow = (value: KickoffWindow) => {
     const patch: Record<string, string | null> = { kickoff: value };
-    // Keep `days` so returning to "All kickoffs" restores the chosen horizon.
     if (value !== 'all' && sortBy === 'score') {
       patch.sort = 'kickoff';
     }
@@ -590,23 +558,21 @@ export default function Recommendations() {
               ))}
             </div>
 
-            {kickoffWindow === 'all' && (
-              <div className={styles.horizonGroup} role="group" aria-label="Look-ahead horizon">
-                <span className={styles.horizonLabel}>Horizon</span>
-                {HORIZON_OPTIONS.map((days) => (
-                  <button
-                    key={days}
-                    type="button"
-                    className={`${styles.kickoffChip} ${
-                      horizon === days ? styles.kickoffChipActive : ''
-                    }`}
-                    onClick={() => updateParams({ days: String(days) })}
-                  >
-                    {days}d
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className={styles.horizonGroup} role="group" aria-label="Look-ahead horizon">
+              <span className={styles.horizonLabel}>Horizon</span>
+              {HORIZON_OPTIONS.map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  className={`${styles.kickoffChip} ${
+                    horizon === days ? styles.kickoffChipActive : ''
+                  }`}
+                  onClick={() => updateParams({ days: String(days) })}
+                >
+                  {days}d
+                </button>
+              ))}
+            </div>
 
             {hasActiveFilters && (
               <button className={styles.clearFilters} onClick={clearFilters}>
@@ -680,18 +646,9 @@ export default function Recommendations() {
         </div>
       ) : (
         <>
-          {(soonPicks.length > 0 || elitePicks.length > 0) && (
+          {elitePicks.length > 0 && (
             <div className={styles.lead}>
-              {soonPicks.length > 0 && (
-                <SoonPicksSection
-                  recommendations={soonPicks}
-                  eliteKeys={eliteKeys}
-                  onShowOnly={() => updateParams({ kickoff: 'soon', sort: 'kickoff' })}
-                />
-              )}
-              {elitePicks.length > 0 && (
-                <ElitePicksSection recommendations={elitePicks} />
-              )}
+              <ElitePicksSection recommendations={elitePicks} />
             </div>
           )}
 

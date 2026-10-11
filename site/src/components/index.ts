@@ -2,7 +2,6 @@ export { RecommendationCard } from './RecommendationCard';
 export { RecommendationRow } from './RecommendationRow';
 export { RecommendationSection } from './RecommendationSection';
 export { ElitePicksSection } from './ElitePicksSection';
-export { SoonPicksSection } from './SoonPicksSection';
 export { MarketIcon } from './MarketIcon';
 export { SummaryCard } from './SummaryCard';
 export { FixtureCard } from './FixtureCard';
