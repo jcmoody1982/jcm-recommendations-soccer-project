@@ -174,6 +174,16 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
   },
 };
 
+/**
+ * Markets shown on their own board whatever the confidence filter, without a Strong/Moderate
+ * badge, and kept out of Elite and the pick counts. Mirrors {@code StandaloneMarkets} in core.
+ */
+export const STANDALONE_TYPES: readonly string[] = ['DRAW'];
+
+export function isStandaloneType(type: string | null | undefined): boolean {
+  return type != null && STANDALONE_TYPES.includes(type.toUpperCase());
+}
+
 export function sectionTitle(type: RecommendationType | string): string {
   return SECTION_CONFIG[type as RecommendationType]?.title ?? String(type).replaceAll('_', ' ');
 }

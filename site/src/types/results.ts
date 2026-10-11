@@ -44,6 +44,8 @@ export interface DayResults {
   strongSummary: ResultsDaySummary;
   moderateSummary: ResultsDaySummary;
   eliteSummary: ResultsDaySummary;
+  /** Standalone markets (Draw), tallied apart from the confidence tiers. */
+  standaloneSummary?: ResultsDaySummary;
   fixtures: ResultsFixture[];
   eliteFixtures: ResultsFixture[];
 }
@@ -102,5 +104,7 @@ export interface ResultsPerformance {
     STRONG: PerformanceBucket;
     MODERATE: PerformanceBucket;
   };
+  /** Standalone markets (Draw), tracked apart from the confidence tiers. */
+  standalone?: PerformanceBucket;
   byType: TypePerformance[];
 }

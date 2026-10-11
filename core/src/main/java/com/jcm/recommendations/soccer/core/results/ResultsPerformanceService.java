@@ -106,6 +106,7 @@ public class ResultsPerformanceService {
             BucketStats overall,
             BucketStats elite,
             Map<String, BucketStats> byConfidence,
+            BucketStats standalone,
             List<TypePerformance> byType
     ) {}
 
@@ -117,13 +118,19 @@ public class ResultsPerformanceService {
         List<RecommendationSnapshot> rows = loadRows(fromDate, toDate).stream()
                 .filter(ResultsPerformanceService::isIncludedType)
                 .toList();
-        List<RecommendationSnapshot> eliteRows = resolveEliteRows(rows);
-        BucketStats overall = summarize(rows);
+        List<RecommendationSnapshot> tieredRows = rows.stream()
+                .filter(r -> !StandaloneMarkets.isStandalone(r.getType()))
+                .toList();
+        List<RecommendationSnapshot> eliteRows = resolveEliteRows(tieredRows);
+        BucketStats overall = summarize(tieredRows);
         BucketStats elite = summarize(eliteRows);
         Map<String, BucketStats> byConfidence = Map.of(
-                "STRONG", summarize(filterConfidence(rows, "STRONG")),
-                "MODERATE", summarize(filterConfidence(rows, "MODERATE"))
+                "STRONG", summarize(filterConfidence(tieredRows, "STRONG")),
+                "MODERATE", summarize(filterConfidence(tieredRows, "MODERATE"))
         );
+        BucketStats standalone = summarize(rows.stream()
+                .filter(r -> StandaloneMarkets.isStandalone(r.getType()))
+                .toList());
 
         Map<String, List<RecommendationSnapshot>> byType = new LinkedHashMap<>();
         for (RecommendationType type : RecommendationType.values()) {
@@ -149,13 +156,16 @@ public class ResultsPerformanceService {
         List<TypePerformance> typeRows = new ArrayList<>();
         for (Map.Entry<String, List<RecommendationSnapshot>> entry : byType.entrySet()) {
             List<RecommendationSnapshot> typePicks = entry.getValue();
+            List<RecommendationSnapshot> tieredPicks = StandaloneMarkets.isStandalone(entry.getKey())
+                    ? List.of()
+                    : typePicks;
             typeRows.add(new TypePerformance(
                     entry.getKey(),
                     summarize(typePicks),
                     Map.of(
                             "ELITE", summarize(eliteByType.getOrDefault(entry.getKey(), List.of())),
-                            "STRONG", summarize(filterConfidence(typePicks, "STRONG")),
-                            "MODERATE", summarize(filterConfidence(typePicks, "MODERATE"))
+                            "STRONG", summarize(filterConfidence(tieredPicks, "STRONG")),
+                            "MODERATE", summarize(filterConfidence(tieredPicks, "MODERATE"))
                     ),
                     calibrate(entry.getKey(), typePicks)
             ));
@@ -164,7 +174,8 @@ public class ResultsPerformanceService {
                 .comparingInt((TypePerformance t) -> t.overall().sampleSize()).reversed()
                 .thenComparing(TypePerformance::type));
 
-        return new PerformanceView(period, fromDate, toDate, MIN_SAMPLE, overall, elite, byConfidence, typeRows);
+        return new PerformanceView(
+                period, fromDate, toDate, MIN_SAMPLE, overall, elite, byConfidence, standalone, typeRows);
     }
 
     /**

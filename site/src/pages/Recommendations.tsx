@@ -23,6 +23,7 @@ import {
 import {
   SECTION_ORDER,
   includeInMarketSection,
+  isStandaloneType,
   sectionTitle,
 } from '../utils/recommendationSections';
 import { isFeaturedCompetition } from '../utils/featuredCompetitions';
@@ -246,6 +247,7 @@ export default function Recommendations() {
     const seenTomorrow = new Set<number>();
 
     for (const rec of all) {
+      if (isStandaloneType(rec.type)) continue;
       if (!matchesConfidence(rec.confidence, confidenceFilter)) continue;
       if (matchesKickoffWindow(rec.matchDateUnix, 'soon')) {
         seenSoon.add(rec.fixtureId);
@@ -284,7 +286,7 @@ export default function Recommendations() {
         if (!includeInMarketSection(rec)) {
           return false;
         }
-        if (!matchesConfidence(rec.confidence, confidenceFilter)) {
+        if (!isStandaloneType(type) && !matchesConfidence(rec.confidence, confidenceFilter)) {
           return false;
         }
 
@@ -343,7 +345,7 @@ export default function Recommendations() {
       const recs = groupedRecommendations[type] || [];
       counts[type] = recs.filter((rec: Recommendation) => {
         if (!includeInMarketSection(rec)) return false;
-        if (!matchesConfidence(rec.confidence, confidenceFilter)) return false;
+        if (!isStandaloneType(type) && !matchesConfidence(rec.confidence, confidenceFilter)) return false;
         if (!matchesSearchText(rec, searchLower)) return false;
         if (selectedLeague !== 'all' && String(rec.leagueId) !== selectedLeague) {
           return false;
@@ -384,8 +386,16 @@ export default function Recommendations() {
   }, [typeFilter, typesWithPicks, updateParams]);
 
   const totalCount = filteredRecommendations
-    ? Object.values(filteredRecommendations).reduce((sum, recs) => sum + recs.length, 0)
+    ? SECTION_ORDER
+      .filter((type) => !isStandaloneType(type))
+      .reduce((sum, type) => sum + (filteredRecommendations[type]?.length ?? 0), 0)
     : 0;
+  const hasVisiblePicks = filteredRecommendations
+    ? Object.values(filteredRecommendations).some((recs) => recs.length > 0)
+    : false;
+  const tieredMarketCount = typesWithPicks
+    .filter((type) => !isStandaloneType(type))
+    .reduce((sum, type) => sum + (typeCounts[type] || 0), 0);
 
   const clearFilters = () => {
     updateParams({
@@ -619,7 +629,7 @@ export default function Recommendations() {
               aria-label="Market filter"
             >
               <option value="ALL">
-                All markets ({typesWithPicks.reduce((sum, t) => sum + (typeCounts[t] || 0), 0)})
+                All markets ({tieredMarketCount})
               </option>
               {typesWithPicks.map((type) => (
                 <option key={type} value={type}>
@@ -652,7 +662,7 @@ export default function Recommendations() {
             </div>
           )}
 
-          {filteredRecommendations && (totalCount > 0 || PINNED_EMPTY_TYPES.some((type) => typeFilter === 'ALL' || typeFilter === type)) ? (
+          {filteredRecommendations && (hasVisiblePicks || PINNED_EMPTY_TYPES.some((type) => typeFilter === 'ALL' || typeFilter === type)) ? (
             <div className={styles.sections}>
               {SECTION_ORDER.map((type) => {
                 if (typeFilter !== 'ALL' && type !== typeFilter) {

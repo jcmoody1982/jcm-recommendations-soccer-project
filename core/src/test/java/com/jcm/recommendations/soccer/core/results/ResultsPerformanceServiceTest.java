@@ -53,7 +53,7 @@ class ResultsPerformanceServiceTest {
         assertThat(view.overall().wins()).isEqualTo(2);
         assertThat(view.overall().losses()).isEqualTo(1);
         assertThat(view.overall().voids()).isEqualTo(1);
-        assertThat(view.overall().pending()).isEqualTo(1);
+        assertThat(view.overall().pending()).isEqualTo(0);
         assertThat(view.overall().sampleSize()).isEqualTo(3);
         assertThat(view.overall().hitRate()).isEqualTo(2 * 100.0 / 3);
         assertThat(view.overall().enoughData()).isFalse();
@@ -110,6 +110,39 @@ class ResultsPerformanceServiceTest {
         assertThat(view.elite().losses()).isEqualTo(1);
         assertThat(view.elite().sampleSize()).isEqualTo(2);
         assertThat(view.elite().hitRate()).isEqualTo(50.0);
+    }
+
+    @Test
+    void keepsDrawOutOfOverallEliteAndTiersButReportsItsOwnRow() {
+        LocalDate d1 = LocalDate.of(2026, 8, 1);
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "BTTS", "STRONG", PickOutcome.WIN, null, 85.0, 1.80),
+                snap(2L, d1, 200L, "DRAW", "STRONG", PickOutcome.LOSS, 1, 99.0, 3.10),
+                snap(3L, d1, 300L, "DRAW", "MODERATE", PickOutcome.WIN, null, 30.0, 3.40)
+        ));
+
+        ResultsPerformanceService.PerformanceView view = service.getPerformance("30d");
+
+        assertThat(view.overall().sampleSize()).isEqualTo(1);
+        assertThat(view.overall().wins()).isEqualTo(1);
+        assertThat(view.elite().sampleSize()).isEqualTo(1);
+        assertThat(view.elite().wins()).isEqualTo(1);
+        assertThat(view.byConfidence().get("STRONG").sampleSize()).isEqualTo(1);
+        assertThat(view.byConfidence().get("MODERATE").sampleSize()).isEqualTo(0);
+        assertThat(view.standalone().wins()).isEqualTo(1);
+        assertThat(view.standalone().losses()).isEqualTo(1);
+        assertThat(view.standalone().sampleSize()).isEqualTo(2);
+
+        ResultsPerformanceService.TypePerformance draw = view.byType().stream()
+                .filter(t -> "DRAW".equals(t.type()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(draw.overall().wins()).isEqualTo(1);
+        assertThat(draw.overall().losses()).isEqualTo(1);
+        assertThat(draw.overall().sampleSize()).isEqualTo(2);
+        assertThat(draw.byConfidence().get("ELITE").sampleSize()).isEqualTo(0);
+        assertThat(draw.byConfidence().get("STRONG").sampleSize()).isEqualTo(0);
+        assertThat(draw.byConfidence().get("MODERATE").sampleSize()).isEqualTo(0);
     }
 
     @Test

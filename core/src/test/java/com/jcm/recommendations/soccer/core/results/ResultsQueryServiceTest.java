@@ -41,7 +41,7 @@ class ResultsQueryServiceTest {
         when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(date)).thenReturn(List.of(
                 snap(1L, date, 100L, "BTTS", "STRONG", PickOutcome.WIN, 1000L),
                 snap(2L, date, 100L, "OVER_GOALS", "MODERATE", PickOutcome.LOSS, 1000L),
-                snap(3L, date, 200L, "DRAW", "STRONG", PickOutcome.PENDING, 2000L)
+                snap(3L, date, 200L, "MATCH_RESULT", "STRONG", PickOutcome.PENDING, 2000L)
         ));
         when(completedMatchRepository.findByFixtureIdIn(org.mockito.ArgumentMatchers.anySet()))
                 .thenReturn(List.of(CompletedMatch.builder()
@@ -67,7 +67,7 @@ class ResultsQueryServiceTest {
         assertThat(view.eliteFixtures()).hasSize(2);
         assertThat(view.eliteFixtures().getFirst().picks().getFirst().eliteRank()).isEqualTo(1);
         assertThat(view.eliteFixtures().getFirst().picks().getFirst().type()).isEqualTo("BTTS");
-        assertThat(view.eliteFixtures().get(1).picks().getFirst().type()).isEqualTo("DRAW");
+        assertThat(view.eliteFixtures().get(1).picks().getFirst().type()).isEqualTo("MATCH_RESULT");
         assertThat(view.fixtures()).hasSize(2);
         assertThat(view.fixtures().getFirst().fixtureId()).isEqualTo(100L);
         assertThat(view.fixtures().getFirst().scoreline().home()).isEqualTo(2);
@@ -80,7 +80,7 @@ class ResultsQueryServiceTest {
         LocalDate date = LocalDate.of(2026, 8, 1);
         when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(date)).thenReturn(List.of(
                 snap(1L, date, 100L, "BTTS", "STRONG", PickOutcome.WIN, 1000L, 90.0, 2),
-                snap(2L, date, 200L, "DRAW", "STRONG", PickOutcome.LOSS, 2000L, 70.0, 1)
+                snap(2L, date, 200L, "MATCH_RESULT", "STRONG", PickOutcome.LOSS, 2000L, 70.0, 1)
         ));
         when(completedMatchRepository.findByFixtureIdIn(org.mockito.ArgumentMatchers.anySet()))
                 .thenReturn(List.of());
@@ -97,7 +97,7 @@ class ResultsQueryServiceTest {
         LocalDate date = LocalDate.of(2026, 8, 1);
         when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(date)).thenReturn(List.of(
                 snap(1L, date, 100L, "BTTS", "STRONG", PickOutcome.WIN, 1000L),
-                snap(2L, date, 100L, "DRAW", "MODERATE", PickOutcome.LOSS, 1000L)
+                snap(2L, date, 100L, "OVER_GOALS", "MODERATE", PickOutcome.LOSS, 1000L)
         ));
         when(completedMatchRepository.findByFixtureIdIn(org.mockito.ArgumentMatchers.anySet()))
                 .thenReturn(List.of());
@@ -110,6 +110,35 @@ class ResultsQueryServiceTest {
         // Summary is always for the full day
         assertThat(view.summary().wins()).isEqualTo(1);
         assertThat(view.summary().losses()).isEqualTo(1);
+    }
+
+    @Test
+    void listsDrawPicksButKeepsThemOutOfTierSummariesAndElite() {
+        LocalDate date = LocalDate.of(2026, 8, 1);
+        when(snapshotRepository.findBySnapshotDateOrderByMatchDateUnixAscIdAsc(date)).thenReturn(List.of(
+                snap(1L, date, 100L, "BTTS", "STRONG", PickOutcome.WIN, 1000L),
+                snap(2L, date, 200L, "DRAW", "MODERATE", PickOutcome.WIN, 2000L),
+                snap(3L, date, 300L, "DRAW", "STRONG", PickOutcome.LOSS, 3000L, 95.0, 1)
+        ));
+        when(completedMatchRepository.findByFixtureIdIn(org.mockito.ArgumentMatchers.anySet()))
+                .thenReturn(List.of());
+
+        ResultsQueryService.DayResultsView view = service.getDayResults(date, null);
+
+        assertThat(view.summary().wins()).isEqualTo(1);
+        assertThat(view.summary().losses()).isEqualTo(0);
+        assertThat(view.strongSummary().wins()).isEqualTo(1);
+        assertThat(view.strongSummary().losses()).isEqualTo(0);
+        assertThat(view.moderateSummary().wins()).isEqualTo(0);
+        assertThat(view.standaloneSummary().wins()).isEqualTo(1);
+        assertThat(view.standaloneSummary().losses()).isEqualTo(1);
+        assertThat(view.standaloneSummary().hitRate()).isEqualTo(50.0);
+        assertThat(view.eliteFixtures())
+                .flatExtracting(ResultsQueryService.FixtureResultsView::picks)
+                .extracting(ResultsQueryService.PickView::type)
+                .doesNotContain("DRAW");
+        assertThat(view.fixtures()).extracting(ResultsQueryService.FixtureResultsView::fixtureId)
+                .containsExactly(100L, 200L, 300L);
     }
 
     private static RecommendationSnapshot snap(

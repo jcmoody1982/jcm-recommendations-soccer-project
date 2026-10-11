@@ -8,7 +8,7 @@ import {
   isEarlyKickoffUk,
 } from '../utils/kickoff';
 import { formatFactorEntries } from '../utils/recommendationFactors';
-import { SECTION_CONFIG } from '../utils/recommendationSections';
+import { SECTION_CONFIG, isStandaloneType } from '../utils/recommendationSections';
 import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
 import { soccerFixturePath } from '../utils/sport';
 import { EarlyKickoffBadge, EarlyKickoffStrip } from './EarlyKickoffWarning';
@@ -69,6 +69,8 @@ export function RecommendationRow({
   const { isShortlisted, toggleShortlist } = useShortlist();
   const isInShortlist = isShortlisted(recommendation.fixtureId, recommendation.type);
   const [expanded, setExpanded] = useState(false);
+  const showConfidence = !isStandaloneType(recommendation.type);
+  const confidenceTitle = isElite ? 'Elite pick' : showConfidence ? recommendation.confidence : undefined;
 
   const handleToggleShortlist = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -134,8 +136,8 @@ export function RecommendationRow({
     <div className={`${styles.item} ${isEarlyKickoff ? styles.itemEarly : ''}`}>
       {/* Desktop row layout */}
       <div className={rowClass}>
-        <span className={styles.sentiment} title={isElite ? 'Elite pick' : recommendation.confidence}>
-          <ConfidenceIcon level={recommendation.confidence} isElite={isElite} />
+        <span className={styles.sentiment} title={confidenceTitle}>
+          {showConfidence && <ConfidenceIcon level={recommendation.confidence} isElite={isElite} />}
         </span>
         <span
           className={styles.league}
@@ -218,8 +220,8 @@ export function RecommendationRow({
       {/* Mobile card layout */}
       <div className={styles.mobileCard}>
         <div className={styles.mobileCardHeader}>
-          <span className={styles.mobileSentiment} title={isElite ? 'Elite pick' : recommendation.confidence}>
-            <ConfidenceIcon level={recommendation.confidence} isElite={isElite} />
+          <span className={styles.mobileSentiment} title={confidenceTitle}>
+            {showConfidence && <ConfidenceIcon level={recommendation.confidence} isElite={isElite} />}
           </span>
           {recommendation.leagueImage ? (
             <img

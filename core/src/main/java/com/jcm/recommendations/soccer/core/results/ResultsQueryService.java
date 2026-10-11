@@ -81,6 +81,7 @@ public class ResultsQueryService {
             DaySummary strongSummary,
             DaySummary moderateSummary,
             DaySummary eliteSummary,
+            DaySummary standaloneSummary,
             List<FixtureResultsView> fixtures,
             List<FixtureResultsView> eliteFixtures
     ) {}
@@ -93,7 +94,8 @@ public class ResultsQueryService {
         LocalDate snapshotDate = date != null ? date : resolveDefaultDate();
         if (snapshotDate == null) {
             return new DayResultsView(
-                    null, emptySummary(), emptySummary(), emptySummary(), emptySummary(), List.of(), List.of());
+                    null, emptySummary(), emptySummary(), emptySummary(), emptySummary(), emptySummary(),
+                    List.of(), List.of());
         }
 
         List<RecommendationSnapshot> allRows = snapshotRepository
@@ -101,12 +103,18 @@ public class ResultsQueryService {
                 .stream()
                 .filter(ResultsQueryService::isIncludedType)
                 .toList();
+        List<RecommendationSnapshot> tieredRows = allRows.stream()
+                .filter(r -> !StandaloneMarkets.isStandalone(r.getType()))
+                .toList();
 
-        DaySummary summary = summarize(allRows);
-        DaySummary strongSummary = summarize(filterByConfidence(allRows, "STRONG"));
-        DaySummary moderateSummary = summarize(filterByConfidence(allRows, "MODERATE"));
+        DaySummary summary = summarize(tieredRows);
+        DaySummary strongSummary = summarize(filterByConfidence(tieredRows, "STRONG"));
+        DaySummary moderateSummary = summarize(filterByConfidence(tieredRows, "MODERATE"));
+        DaySummary standaloneSummary = summarize(allRows.stream()
+                .filter(r -> StandaloneMarkets.isStandalone(r.getType()))
+                .toList());
 
-        List<RecommendationSnapshot> eliteRows = resolveEliteRows(allRows);
+        List<RecommendationSnapshot> eliteRows = resolveEliteRows(tieredRows);
         DaySummary eliteSummary = summarize(eliteRows);
 
         List<RecommendationSnapshot> rows = allRows;
@@ -125,7 +133,8 @@ public class ResultsQueryService {
                 eliteFiltered, completedMatchesFor(eliteFiltered));
 
         return new DayResultsView(
-                snapshotDate, summary, strongSummary, moderateSummary, eliteSummary, fixtures, eliteFixtures);
+                snapshotDate, summary, strongSummary, moderateSummary, eliteSummary, standaloneSummary,
+                fixtures, eliteFixtures);
     }
 
     LocalDate resolveDefaultDate() {

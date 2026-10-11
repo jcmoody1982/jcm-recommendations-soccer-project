@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { resultsService } from '../services/api';
 import { EliteBolt } from '../components';
-import { SECTION_ORDER, sectionTitle } from '../utils/recommendationSections';
+import { SECTION_ORDER, isStandaloneType, sectionTitle } from '../utils/recommendationSections';
 import { soccerFixturePath } from '../utils/sport';
 import type {
   CalibrationBand,
@@ -346,7 +346,21 @@ function fixturesForConfidence(
     .map((fixture) => ({
       ...fixture,
       picks: fixture.picks.filter((pick) => {
+        if (isStandaloneType(pick.type)) return false;
         if (pick.confidence?.toUpperCase() !== confidence) return false;
+        if (typeFilter !== 'ALL' && pick.type !== typeFilter) return false;
+        return true;
+      }),
+    }))
+    .filter((fixture) => fixture.picks.length > 0);
+}
+
+function standaloneFixtures(fixtures: ResultsFixture[], typeFilter: string): ResultsFixture[] {
+  return fixtures
+    .map((fixture) => ({
+      ...fixture,
+      picks: fixture.picks.filter((pick) => {
+        if (!isStandaloneType(pick.type)) return false;
         if (typeFilter !== 'ALL' && pick.type !== typeFilter) return false;
         return true;
       }),
@@ -855,9 +869,11 @@ function FixtureList({
                     </div>
                     <div className={styles.pickMeta}>
                       <span className={styles.pickType}>{formatType(pick.type)}</span>
-                      <span className={`${styles.confidenceBadge} ${confidenceClass(pick.confidence)}`}>
-                        {pick.confidence ? outcomeLabel(pick.confidence) : '—'}
-                      </span>
+                      {!isStandaloneType(pick.type) && (
+                        <span className={`${styles.confidenceBadge} ${confidenceClass(pick.confidence)}`}>
+                          {pick.confidence ? outcomeLabel(pick.confidence) : '—'}
+                        </span>
+                      )}
                       <span className={styles.pickScore} title="Model score">
                         {formatScore(pick.score)}
                       </span>
@@ -888,7 +904,7 @@ function ConfidenceSection({
   compact = false,
 }: {
   title: string;
-  tone: 'strong' | 'moderate';
+  tone: 'strong' | 'moderate' | 'all';
   summary: ResultsDaySummary;
   fixtures: ResultsFixture[];
   eliteKeys?: Set<string>;
@@ -930,6 +946,7 @@ function withConfidenceDefaults(data: DayResults | undefined): DayResults | unde
     strongSummary: data.strongSummary ?? emptySummary(),
     moderateSummary: data.moderateSummary ?? emptySummary(),
     eliteSummary: data.eliteSummary ?? emptySummary(),
+    standaloneSummary: data.standaloneSummary ?? emptySummary(),
     eliteFixtures: data.eliteFixtures ?? [],
   };
 }
@@ -986,7 +1003,8 @@ function CalibrationStrip({ bands }: { bands: CalibrationBand[] }) {
   );
 }
 
-function TypePerformanceList({ rows }: { rows: TypePerformance[] }) {
+function TypePerformanceList({ rows, tiered = true }: { rows: TypePerformance[]; tiered?: boolean }) {
+  const bandValue = (bucket: PerformanceBucket) => (tiered ? formatBandHit(bucket) : '—');
   return (
     <div className={styles.typePerfListWrap}>
       <div className={styles.typePerfHeader} aria-hidden="true">
@@ -1036,18 +1054,18 @@ function TypePerformanceList({ rows }: { rows: TypePerformance[] }) {
               <div className={styles.typePerfBands}>
                 <div className={styles.typePerfBand}>
                   <span className={styles.typePerfBandLabel}>Elite</span>
-                  <span className={styles.typePerfBandValue}>{formatBandHit(eliteBucket)}</span>
+                  <span className={styles.typePerfBandValue}>{bandValue(eliteBucket)}</span>
                 </div>
                 <div className={styles.typePerfBand}>
                   <span className={styles.typePerfBandLabel}>Strong</span>
                   <span className={styles.typePerfBandValue}>
-                    {formatBandHit(row.byConfidence.STRONG)}
+                    {bandValue(row.byConfidence.STRONG)}
                   </span>
                 </div>
                 <div className={styles.typePerfBand}>
                   <span className={styles.typePerfBandLabel}>Moderate</span>
                   <span className={styles.typePerfBandValue}>
-                    {formatBandHit(row.byConfidence.MODERATE)}
+                    {bandValue(row.byConfidence.MODERATE)}
                   </span>
                 </div>
               </div>
@@ -1095,6 +1113,9 @@ function PerformancePanel({
   error: Error | null;
   onRetry: () => void;
 }) {
+  const tieredTypeRows = (data?.byType ?? []).filter((row) => !isStandaloneType(row.type));
+  const standaloneTypeRows = (data?.byType ?? []).filter((row) => isStandaloneType(row.type));
+
   return (
     <>
       <div className={styles.filterRow}>
@@ -1147,13 +1168,31 @@ function PerformancePanel({
           </div>
 
           <h2 className={styles.tableTitle}>By recommendation type</h2>
-          {data.byType.length === 0 ? (
+          {tieredTypeRows.length === 0 ? (
             <div className={styles.empty}>
               <h2>No graded picks yet</h2>
               <p>Performance fills in as daily snapshots settle.</p>
             </div>
           ) : (
-            <TypePerformanceList rows={data.byType} />
+            <TypePerformanceList rows={tieredTypeRows} />
+          )}
+
+          {standaloneTypeRows.length > 0 && (
+            <>
+              <h2 className={styles.tableTitle}>Draw</h2>
+              <p className={styles.performanceMeta}>
+                Tracked on its own: Draw picks are not graded Strong or Moderate and are left out of
+                the overall, Elite and confidence figures above.
+              </p>
+              <div className={styles.performanceBands}>
+                <PerformanceSummary
+                  title="Draw"
+                  bucket={data.standalone ?? emptyPerformanceBucket()}
+                  tone="all"
+                />
+              </div>
+              <TypePerformanceList rows={standaloneTypeRows} tiered={false} />
+            </>
           )}
         </>
       )}
@@ -1265,6 +1304,14 @@ export default function Results() {
     () => (typeFilter === 'ALL' ? data?.moderateSummary : summaryFromFixtures(moderateFixtures)),
     [typeFilter, data?.moderateSummary, moderateFixtures],
   );
+  const drawFixtures = useMemo(
+    () => standaloneFixtures(data?.fixtures ?? [], typeFilter),
+    [data?.fixtures, typeFilter],
+  );
+  const drawSummary = useMemo(
+    () => (typeFilter === 'ALL' ? data?.standaloneSummary : summaryFromFixtures(drawFixtures)),
+    [typeFilter, data?.standaloneSummary, drawFixtures],
+  );
 
   const eliteFixtures = useMemo(() => {
     const fixtures = data?.eliteFixtures ?? [];
@@ -1282,6 +1329,12 @@ export default function Results() {
     if (typeFilter === 'ALL') return data.eliteSummary;
     return summaryFromFixtures(eliteFixtures);
   }, [data, typeFilter, eliteFixtures]);
+
+  const hasDayPicks =
+    strongFixtures.length > 0
+    || moderateFixtures.length > 0
+    || drawFixtures.length > 0
+    || eliteFixtures.length > 0;
 
   const eliteKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -1461,7 +1514,7 @@ export default function Results() {
             </div>
           )}
 
-          {!isLoading && !isError && data?.snapshotDate && strongFixtures.length === 0 && moderateFixtures.length === 0 && eliteFixtures.length === 0 && (
+          {!isLoading && !isError && data?.snapshotDate && !hasDayPicks && (
             <div className={styles.empty}>
               <h2>No picks for this filter</h2>
               <p>
@@ -1473,7 +1526,7 @@ export default function Results() {
             </div>
           )}
 
-          {!isLoading && !isError && data?.snapshotDate && (strongFixtures.length > 0 || moderateFixtures.length > 0 || eliteFixtures.length > 0) && (
+          {!isLoading && !isError && data?.snapshotDate && hasDayPicks && (
             <div className={styles.dashboardSections}>
               {eliteFixtures.length > 0 && eliteSummary && (
                 <ConfidenceSection
@@ -1502,6 +1555,15 @@ export default function Results() {
                   summary={moderateSummary}
                   fixtures={moderateFixtures}
                   eliteKeys={eliteKeys}
+                  compact
+                />
+              )}
+              {drawFixtures.length > 0 && drawSummary && (
+                <ConfidenceSection
+                  title="Draw"
+                  tone="all"
+                  summary={drawSummary}
+                  fixtures={drawFixtures}
                   compact
                 />
               )}

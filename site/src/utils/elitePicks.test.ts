@@ -63,6 +63,13 @@ describe('selectElitePicks', () => {
     expect(new Set(elite.map((p) => p.fixtureId)).size).toBe(elite.length);
   });
 
+  it('never carries Draw, which sits outside the confidence tiers', () => {
+    const draw = rec({ fixtureId: 900, score: 99, type: 'DRAW', market: 'Draw', odds: 3.2 });
+    const btts = rec({ fixtureId: 901, score: 80, type: 'BTTS' });
+
+    expect(selectElitePicks([draw, btts])).toEqual([btts]);
+  });
+
   it('breaks score ties on shorter price, then sooner kickoff', () => {
     const longer = rec({ score: 80, odds: 2.1, matchDateUnix: 100 });
     const shorter = rec({ score: 80, odds: 1.5, matchDateUnix: 300 });

@@ -5,6 +5,7 @@ import {
   SECTION_CONFIG,
   SECTION_ORDER,
   includeInMarketSection,
+  isStandaloneType,
   sectionDomId,
   sectionTitle,
 } from './recommendationSections';
@@ -53,6 +54,14 @@ describe('section configuration', () => {
 
   it('builds stable DOM ids', () => {
     expect(sectionDomId('DRAW')).toBe('rec-section-DRAW');
+  });
+
+  it('keeps Draw on the board as a standalone market', () => {
+    expect(SECTION_ORDER).toContain('DRAW');
+    expect(isStandaloneType('DRAW')).toBe(true);
+    expect(isStandaloneType('draw')).toBe(true);
+    expect(isStandaloneType('BTTS')).toBe(false);
+    expect(isStandaloneType(null)).toBe(false);
   });
 });
 
