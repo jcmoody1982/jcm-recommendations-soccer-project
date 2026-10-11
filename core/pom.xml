@@ -15,6 +15,11 @@
     <name>core</name>
     <description>Application and business logic for soccer recommendations</description>
 
+    <properties>
+        <jacoco.minLine>0.85</jacoco.minLine>
+        <jacoco.minBranch>0.67</jacoco.minBranch>
+    </properties>
+
     <dependencies>
         <!-- Internal modules -->
         <dependency>

@@ -15,6 +15,11 @@
     <name>domain</name>
     <description>Domain objects for soccer recommendations</description>
 
+    <properties>
+        <jacoco.minLine>0.38</jacoco.minLine>
+        <jacoco.minBranch>0.22</jacoco.minBranch>
+    </properties>
+
     <dependencies>
         <!-- JPA annotations -->
         <dependency>

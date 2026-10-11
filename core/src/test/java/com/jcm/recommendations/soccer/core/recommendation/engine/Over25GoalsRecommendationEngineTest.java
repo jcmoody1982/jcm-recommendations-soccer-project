@@ -7,6 +7,7 @@ import com.jcm.recommendations.soccer.domain.Fixture;
 import com.jcm.recommendations.soccer.domain.FixtureOdds;
 import com.jcm.recommendations.soccer.domain.FixturePotentials;
 import com.jcm.recommendations.soccer.domain.Team;
+import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -80,6 +81,46 @@ class Over25GoalsRecommendationEngineTest {
                 .build();
 
         assertThat(engine.analyze(context)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("season Over 2.5 rate falls back to count / matches played")
+    void seasonOverPercentage_fallsBackToCount() {
+        assertThat(engine.seasonOverPercentage(null)).isNull();
+        assertThat(engine.seasonOverPercentage(TeamSeasonStats.builder().seasonOver25PercentageOverall(55.0).build()))
+                .isEqualTo(55.0);
+        assertThat(engine.seasonOverPercentage(TeamSeasonStats.builder().seasonOver25Overall(6).matchesPlayed(8).build()))
+                .isEqualTo(75.0);
+        assertThat(engine.seasonOverPercentage(TeamSeasonStats.builder().seasonOver25Overall(6).matchesPlayed(0).build()))
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("form Over 2.5 rate falls back to count over the last five")
+    void formOverPercentage_fallsBackToLastFive() {
+        assertThat(engine.formOverPercentage(null)).isNull();
+        assertThat(engine.formOverPercentage(TeamRecentForm.builder().over25PercentageOverall(40.0).build()))
+                .isEqualTo(40.0);
+        assertThat(engine.formOverPercentage(TeamRecentForm.builder().over25Overall(3).build())).isEqualTo(60.0);
+        assertThat(engine.formOverPercentage(TeamRecentForm.builder().build())).isNull();
+    }
+
+    @Test
+    @DisplayName("missing odds and potentials publish unpriced without the API factor")
+    void analyze_withoutOddsOrPotentials_publishesUnpriced() {
+        FixtureContext full = veryHighScoringContext();
+        FixtureContext bare = FixtureContext.builder()
+                .fixture(full.getFixture())
+                .homeTeam(full.getHomeTeam())
+                .awayTeam(full.getAwayTeam())
+                .homeTeamStats(full.getHomeTeamStats())
+                .awayTeamStats(full.getAwayTeamStats())
+                .build();
+
+        Recommendation rec = engine.analyze(bare).orElseThrow();
+
+        assertThat(rec.getOdds()).isNull();
+        assertThat(rec.getFactors()).doesNotContainKey("apiO25Potential");
     }
 
     private FixtureContext veryHighScoringContext() {

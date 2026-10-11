@@ -68,7 +68,11 @@ class ResultsPerformanceServiceTest {
         assertThat(view.byConfidence().get("MODERATE").wins()).isEqualTo(0);
         assertThat(view.byConfidence().get("MODERATE").losses()).isEqualTo(1);
 
-        assertThat(view.byType()).hasSize(RecommendationType.values().length);
+        assertThat(view.byType()).extracting(ResultsPerformanceService.TypePerformance::type)
+                .doesNotContain("UNDER_GOALS", "WINNING_FORM_MISMATCH", "LOSING_FORM_MISMATCH",
+                        "RESULT_BTTS", "PLAYER_TO_SCORE")
+                .contains("BTTS", "OVER_GOALS", "MATCH_RESULT");
+        assertThat(view.byType()).hasSize(RecommendationType.values().length - 5);
         ResultsPerformanceService.TypePerformance btts = view.byType().stream()
                 .filter(t -> "BTTS".equals(t.type()))
                 .findFirst()
