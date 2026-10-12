@@ -38,10 +38,13 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
      * actually being recommended, so each line carries its own thresholds: a second half averages
      * about 1.45 goals, putting Over 0.5 in the 68-86% band and Over 1.5 in the 33-60% band. There
      * is no single scale on which both lines can be read.
+     *
+     * <p>Over 1.5 is capped at MODERATE: under its own 54 STRONG line it hit 49% on 345 picks
+     * (2026-09-13..10-11), so "Strong" was being shown on a coin flip.
      */
     private enum Line {
         OVER_05(1, "Over 0.5 2H Goals", 80.0, 72.0),
-        OVER_15(2, "Over 1.5 2H Goals", 54.0, 46.0);
+        OVER_15(2, "Over 1.5 2H Goals", Double.POSITIVE_INFINITY, 46.0);
 
         private final int goalsNeeded;
         private final String market;

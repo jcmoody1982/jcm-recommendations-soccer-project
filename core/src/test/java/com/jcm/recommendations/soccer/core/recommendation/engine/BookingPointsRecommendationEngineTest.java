@@ -30,7 +30,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_withHighCardsTeams_returnsOverRecommendation() {
         FixtureContext context = createVeryHighCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.BOOKING_POINTS);
@@ -40,11 +40,32 @@ class BookingPointsRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("very high expected points take the safer Over 40 line, never Over 50")
+    void analyze_veryHighCards_prefersOver40() {
+        FixtureContext context = createVeryHighCardsContext();
+
+        Recommendation rec = engine.analyze(context).orElseThrow();
+
+        assertThat((Double) rec.getFactors().get("expectedBookingPoints")).isGreaterThanOrEqualTo(58.0);
+        assertThat(rec.getMarket()).isEqualTo(BookingPointsRecommendationEngine.OVER_40_MARKET);
+    }
+
+    @Test
+    @DisplayName("Under lines are modelled but not published")
+    void analyze_lowCards_pausesUnderLines() {
+        FixtureContext context = createLowCardsContext();
+
+        assertThat(engine.analyzeLive(context)).get()
+                .extracting(Recommendation::getMarket).isEqualTo("Under 40 Booking Points");
+        assertThat(engine.analyze(context)).isEmpty();
+    }
+
+    @Test
     @DisplayName("analyze returns Under recommendation for low cards with edge")
     void analyze_withLowCardsTeams_returnsUnderRecommendation() {
         FixtureContext context = createLowCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).contains("Under");
@@ -55,7 +76,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_sumsTeamCardsForMatchTotal() {
         FixtureContext context = createLowCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("matchCardsSeasonTotal")).isEqualTo(1.9);
@@ -68,7 +89,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_midRange_returnsEmpty() {
         FixtureContext context = createMidRangeCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }
@@ -78,7 +99,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_convertsCardsPotentialAsCardCount() {
         FixtureContext context = createVeryHighCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("apiCardsPotential")).isEqualTo(6.5);
@@ -90,7 +111,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_missingApiPotential_renormalizes() {
         FixtureContext context = createVeryHighCardsContextWithoutApi();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).doesNotContainKey("apiCardsPotential");
@@ -102,7 +123,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_withoutReferee_capsAtModerate() {
         FixtureContext context = createVeryHighCardsContextWithoutReferee();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
@@ -115,7 +136,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_withRefereeAndLargeEdge_demotesUnpricedToModerate() {
         FixtureContext context = createExtremeHighCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
@@ -131,8 +152,8 @@ class BookingPointsRecommendationEngineTest {
         FixtureContext contextWithForm = createVeryHighCardsContextWithForm();
         FixtureContext contextWithoutForm = createVeryHighCardsContext();
 
-        Optional<Recommendation> resultWithForm = engine.analyze(contextWithForm);
-        Optional<Recommendation> resultWithoutForm = engine.analyze(contextWithoutForm);
+        Optional<Recommendation> resultWithForm = engine.analyzeLive(contextWithForm);
+        Optional<Recommendation> resultWithoutForm = engine.analyzeLive(contextWithoutForm);
 
         assertThat(resultWithForm).isPresent();
         assertThat(resultWithoutForm).isPresent();
@@ -145,7 +166,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_withHighCardsTeams_appliesGradedBoost() {
         FixtureContext context = createVeryHighCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("highCardsBoostApplied")).isEqualTo(true);
@@ -159,7 +180,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_withStrictReferee_appliesStrictnessBoost() {
         FixtureContext context = createContextWithStrictReferee();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("refereeStrictnessBoostApplied")).isEqualTo(true);
@@ -172,7 +193,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_tracksMatchIntensityPoints() {
         FixtureContext context = createClosePositionsHighCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("matchIntensityPoints")).isEqualTo(4.0);
@@ -189,7 +210,7 @@ class BookingPointsRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away"))
                 .build();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }
@@ -199,7 +220,7 @@ class BookingPointsRecommendationEngineTest {
     void analyze_includesExpectedBookingPoints() {
         FixtureContext context = createVeryHighCardsContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("expectedBookingPoints");

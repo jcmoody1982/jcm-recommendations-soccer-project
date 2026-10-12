@@ -209,6 +209,22 @@ class SecondHalfGoalsRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("Over 1.5 2H is capped at MODERATE even above its old 54 STRONG line")
+    void over152H_neverStrong() {
+        FixtureContext context = createVeryHighScoringContext();
+        context.getHomeTeamStats().setScoredAvg2hHome(3.0);
+        context.getHomeTeamStats().setConcededAvg2hHome(3.0);
+        context.getAwayTeamStats().setScoredAvg2hAway(3.0);
+        context.getAwayTeamStats().setConcededAvg2hAway(3.0);
+
+        Recommendation result = engine.analyze(context).orElseThrow();
+
+        assertThat(result.getMarket()).isEqualTo("Over 1.5 2H Goals");
+        assertThat(result.getScore()).isGreaterThanOrEqualTo(54.0);
+        assertThat(result.getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+    }
+
+    @Test
     @DisplayName("applyRealisticCeiling soft-caps the Over 0.5 2H high tail under 90")
     void applyRealisticCeiling_capsOver05Tail() {
         assertThat(SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(80.0, false)).isEqualTo(80.0);

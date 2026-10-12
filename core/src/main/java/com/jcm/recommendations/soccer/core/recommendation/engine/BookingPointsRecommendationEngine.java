@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,10 +57,11 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
     // Selectivity vs over/under lines
     private static final double MIN_EDGE = 8.0;
     private static final double STRONG_EDGE = 12.0;
-    private static final double LINE_OVER_50 = 50.0;
     private static final double LINE_OVER_40 = 40.0;
     private static final double LINE_UNDER_40 = 40.0;
-    private static final double LINE_UNDER_30 = 30.0;
+
+    /** The only line still published; Under 40 hit 50% across 2026-09-13..10-11 and is paused. */
+    static final String OVER_40_MARKET = "Over 40 Booking Points";
 
     @Override
     public RecommendationType getType() {
@@ -70,6 +70,11 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
 
     @Override
     public Optional<Recommendation> analyze(FixtureContext context) {
+        return analyzeLive(context).filter(rec -> OVER_40_MARKET.equals(rec.getMarket()));
+    }
+
+    /** Every line the model can pick, including paused ones. */
+    Optional<Recommendation> analyzeLive(FixtureContext context) {
         if (!isApplicable(context)) {
             return Optional.empty();
         }
@@ -230,30 +235,20 @@ public class BookingPointsRecommendationEngine implements RecommendationEngine {
         return total;
     }
 
+    /**
+     * Always the safer line. Stretching to Over 50 / Under 30 whenever the edge allowed hit 48% and
+     * 28% (2026-09-13..10-11) while Over 40 hit 71% on the same model.
+     */
     private Optional<MarketPick> selectMarket(double expectedPoints) {
-        List<MarketPick> candidates = new ArrayList<>();
-
-        if (expectedPoints >= LINE_OVER_50 + MIN_EDGE) {
-            candidates.add(new MarketPick(
-                    "Over 50 Booking Points", LINE_OVER_50, true, expectedPoints - LINE_OVER_50));
-        }
         if (expectedPoints >= LINE_OVER_40 + MIN_EDGE) {
-            candidates.add(new MarketPick(
-                    "Over 40 Booking Points", LINE_OVER_40, true, expectedPoints - LINE_OVER_40));
-        }
-        if (expectedPoints <= LINE_UNDER_30 - MIN_EDGE) {
-            candidates.add(new MarketPick(
-                    "Under 30 Booking Points", LINE_UNDER_30, false, LINE_UNDER_30 - expectedPoints));
+            return Optional.of(new MarketPick(
+                    OVER_40_MARKET, LINE_OVER_40, true, expectedPoints - LINE_OVER_40));
         }
         if (expectedPoints <= LINE_UNDER_40 - MIN_EDGE) {
-            candidates.add(new MarketPick(
+            return Optional.of(new MarketPick(
                     "Under 40 Booking Points", LINE_UNDER_40, false, LINE_UNDER_40 - expectedPoints));
         }
-
-        // Prefer stronger lines (Over 50 > Over 40, Under 30 > Under 40), then larger edge
-        return candidates.stream().max(Comparator
-                .comparingDouble((MarketPick p) -> p.over() ? p.line() : -p.line())
-                .thenComparingDouble(MarketPick::edge));
+        return Optional.empty();
     }
 
     private ConfidenceLevel determineConfidence(double edge, boolean hasReferee) {

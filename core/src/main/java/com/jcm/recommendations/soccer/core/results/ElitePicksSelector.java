@@ -133,12 +133,25 @@ public final class ElitePicksSelector {
         return row != null && row.getOdds() != null && row.getOdds() >= ELITE_MIN_PRICE;
     }
 
+    /**
+     * Shortest Over 1.5 price Elite will carry, above the general floor. Under 1.22 Over 1.5 hit 82%
+     * against an 88% break-even across 2026-09-13..10-11: accurate, but not a bet.
+     */
+    public static final double ELITE_MIN_OVER_15_PRICE = 1.22;
+
+    static boolean isShortPricedOver15(RecommendationSnapshot row) {
+        return isOver15Line(row.getMarket())
+                && row.getOdds() != null
+                && row.getOdds() < ELITE_MIN_OVER_15_PRICE;
+    }
+
     public static boolean isEliteEligible(RecommendationSnapshot row) {
         return row != null
                 && "STRONG".equalsIgnoreCase(row.getConfidence())
                 && isEliteEligibleType(row.getType())
                 && !isExcludedFromElitePicks(row.getMarket())
-                && hasBackablePrice(row);
+                && hasBackablePrice(row)
+                && !isShortPricedOver15(row);
     }
 
     /**

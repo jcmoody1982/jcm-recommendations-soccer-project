@@ -26,10 +26,10 @@ export const SECTION_ORDER: RecommendationType[] = [
   'VALUE_BET',
   'BOOKING_POINTS',
   'OVER_CORNERS',
-  'UNDER_CORNERS',
   'HOME_AWAY_SPECIALIST',
   // Paused (engines still registered for recalibration): RESULT_BTTS, PLAYER_TO_SCORE,
-  // WINNING_FORM_MISMATCH, LOSING_FORM_MISMATCH, UNDER_GOALS
+  // WINNING_FORM_MISMATCH, LOSING_FORM_MISMATCH, UNDER_GOALS, UNDER_CORNERS.
+  // OVER_GOALS only cross-checks Over 2.5 and publishes nothing itself.
 ];
 
 export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {

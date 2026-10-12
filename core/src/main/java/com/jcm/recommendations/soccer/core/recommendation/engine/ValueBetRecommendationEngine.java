@@ -151,7 +151,7 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
     }
 
     private Optional<ValueOpportunity> checkOverGoalsValue(FixtureContext context, String market, Double odds) {
-        Optional<Recommendation> overRec = overGoalsEngine.analyze(context);
+        Optional<Recommendation> overRec = overGoalsEngine.assess(context);
         if (overRec.isEmpty()) {
             return Optional.empty();
         }

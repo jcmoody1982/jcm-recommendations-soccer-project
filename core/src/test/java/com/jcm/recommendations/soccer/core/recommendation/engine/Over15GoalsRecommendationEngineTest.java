@@ -1,6 +1,7 @@
 package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationEngine;
+import com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel;
 import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
@@ -177,6 +178,43 @@ class Over15GoalsRecommendationEngineTest {
         Optional<Recommendation> result = engine.analyze(contextWithGoalStats(1.3, 1.1, 1.1, 1.2, 68.0, 66.0));
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a STRONG pick priced under 1.22 publishes as MODERATE, keeping it off Strong and Elite")
+    void analyze_shortPricedStrongPick_isDemotedToModerate() {
+        FixtureContext strongFixture = contextWithGoalStats(4.0, 3.5, 3.0, 3.2, 100.0, 100.0);
+        assertThat(engine.analyze(strongFixture)).get()
+                .extracting(Recommendation::getConfidence).isEqualTo(ConfidenceLevel.STRONG);
+
+        Recommendation shortPriced = engine.analyze(withOver15Odds(strongFixture, 1.15)).orElseThrow();
+
+        assertThat(shortPriced.getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(shortPriced.getOdds()).isEqualTo(1.15);
+        assertThat(shortPriced.getFactors()).containsEntry("shortPriceDemotion", true);
+    }
+
+    @Test
+    @DisplayName("the 1.22 floor is inclusive and unpriced picks keep their tier")
+    void analyze_atFloorOrUnpriced_keepsStrong() {
+        FixtureContext strongFixture = contextWithGoalStats(4.0, 3.5, 3.0, 3.2, 100.0, 100.0);
+
+        assertThat(engine.analyze(withOver15Odds(strongFixture, Over15GoalsRecommendationEngine.MIN_STRONG_ODDS)))
+                .get().extracting(Recommendation::getConfidence).isEqualTo(ConfidenceLevel.STRONG);
+        assertThat(engine.analyze(withOver15Odds(strongFixture, null)))
+                .get().extracting(Recommendation::getConfidence).isEqualTo(ConfidenceLevel.STRONG);
+    }
+
+    private FixtureContext withOver15Odds(FixtureContext base, Double over15Odds) {
+        return FixtureContext.builder()
+                .fixture(base.getFixture())
+                .homeTeam(base.getHomeTeam())
+                .awayTeam(base.getAwayTeam())
+                .homeTeamStats(base.getHomeTeamStats())
+                .awayTeamStats(base.getAwayTeamStats())
+                .odds(FixtureOdds.builder().fixtureId(1000L).oddsFtOver15(over15Odds).build())
+                .potentials(base.getPotentials())
+                .build();
     }
 
     private double scoreFor(FixtureContext context) {

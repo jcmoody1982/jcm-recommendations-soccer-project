@@ -68,8 +68,19 @@ public class CornersRecommendationEngine implements RecommendationEngine {
         return RecommendationType.OVER_CORNERS;
     }
 
+    /**
+     * The only line still published. Under 8.5/9.5 hit 46% and Over 10.5 hit 47% across
+     * 2026-09-13..10-11 with no price to judge them by, so those lines are paused.
+     */
+    static final String PUBLISHED_MARKET = "Over 9.5 Corners";
+
     @Override
     public Optional<Recommendation> analyze(FixtureContext context) {
+        return analyzeLive(context).filter(rec -> PUBLISHED_MARKET.equals(rec.getMarket()));
+    }
+
+    /** Every line the model can pick, including paused ones. */
+    Optional<Recommendation> analyzeLive(FixtureContext context) {
         if (!isApplicable(context)) {
             return Optional.empty();
         }

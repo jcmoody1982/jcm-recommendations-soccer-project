@@ -11,9 +11,22 @@ import org.springframework.stereotype.Component;
  *
  * <p>Published scores are soft-capped below 80 after the 2026-09-11..23 window: the 80–89 band
  * hit ~40% at an average claimed score of 86 (−46 gap). Ranking is preserved; certainty is not.
+ *
+ * <p>From the 2026-09-13..10-11 review: the published score blends 60% toward the de-vigged market
+ * (the model claimed 68% on a 59% hit rate), and a pick only publishes when
+ * {@link OverGoalsRecommendationEngine} independently reaches Over 2.5 too. Agreed picks hit 65%;
+ * picks this engine made alone hit 52% at −15% ROI.
  */
 @Component
 public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendationEngine {
+
+    static final double PUBLISH_MARKET_WEIGHT = 0.60;
+
+    private final OverGoalsRecommendationEngine overGoalsEngine;
+
+    public Over25GoalsRecommendationEngine(OverGoalsRecommendationEngine overGoalsEngine) {
+        this.overGoalsEngine = overGoalsEngine;
+    }
 
     /**
      * Over 2.5 is a far lower base rate than Over 1.5 — around half of fixtures — so the same
@@ -94,5 +107,23 @@ public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             return null;
         }
         return context.getOdds().getOddsFtOver25();
+    }
+
+    @Override
+    protected double marketWeight() {
+        return PUBLISH_MARKET_WEIGHT;
+    }
+
+    @Override
+    protected Double oddsForOppositeMarket(FixtureContext context) {
+        if (!context.hasOdds()) {
+            return null;
+        }
+        return context.getOdds().getOddsFtUnder25();
+    }
+
+    @Override
+    protected boolean confirmedByCrossCheck(FixtureContext context) {
+        return overGoalsEngine.assess(context).isPresent();
     }
 }

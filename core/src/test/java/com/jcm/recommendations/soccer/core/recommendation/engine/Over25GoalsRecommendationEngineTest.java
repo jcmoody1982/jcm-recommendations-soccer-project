@@ -16,14 +16,76 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class Over25GoalsRecommendationEngineTest {
 
     private Over25GoalsRecommendationEngine engine;
+    private OverGoalsRecommendationEngine overGoalsEngine;
 
     @BeforeEach
     void setUp() {
-        engine = new Over25GoalsRecommendationEngine();
+        overGoalsEngine = mock(OverGoalsRecommendationEngine.class);
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.of(mock(Recommendation.class)));
+        engine = new Over25GoalsRecommendationEngine(overGoalsEngine);
+    }
+
+    @Test
+    @DisplayName("analyze publishes nothing when the Over Goals cross-check does not also reach Over 2.5")
+    void analyze_withoutCrossCheckAgreement_returnsEmpty() {
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.empty());
+
+        assertThat(engine.analyze(veryHighScoringContext())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("published score blends 60% toward the de-vigged Over/Under 2.5 market")
+    void analyze_withBothPrices_blendsTowardFairMarket() {
+        FixtureContext base = veryHighScoringContext();
+        FixtureContext priced = withOdds(base, FixtureOdds.builder()
+                .fixtureId(1000L).oddsFtOver25(1.60).oddsFtUnder25(2.30).build());
+
+        Recommendation rec = engine.analyze(priced).orElseThrow();
+
+        double fair = (1 / 1.60) / ((1 / 1.60) + (1 / 2.30)) * 100.0;
+        double model = (double) rec.getFactors().get("modelScore");
+        assertThat(rec.getFactors()).containsEntry("marketBlendApplied", true);
+        assertThat((double) rec.getFactors().get("fairMarketProbability")).isCloseTo(fair, within(1e-9));
+        assertThat(rec.getScore()).isCloseTo(0.4 * model + 0.6 * fair, within(1e-9));
+        assertThat(rec.getScore()).isLessThan(model);
+    }
+
+    @Test
+    @DisplayName("without an Under 2.5 price the blend falls back to the raw implied probability")
+    void fairOverProbability_fallsBackToRawImplied() {
+        assertThat(TotalGoalsOverRecommendationEngine.fairOverProbability(2.0, null)).isCloseTo(50.0, within(1e-9));
+        assertThat(TotalGoalsOverRecommendationEngine.fairOverProbability(2.0, 2.0)).isCloseTo(50.0, within(1e-9));
+        assertThat(TotalGoalsOverRecommendationEngine.fairOverProbability(null, 2.0)).isNull();
+        assertThat(TotalGoalsOverRecommendationEngine.fairOverProbability(1.0, 2.0)).isNull();
+    }
+
+    @Test
+    @DisplayName("a blend that drags the score below Moderate drops the pick")
+    void analyze_whenMarketDisagrees_dropsPick() {
+        FixtureContext longPriced = withOdds(veryHighScoringContext(), FixtureOdds.builder()
+                .fixtureId(1000L).oddsFtOver25(3.50).oddsFtUnder25(1.30).build());
+
+        assertThat(engine.analyze(longPriced)).isEmpty();
+    }
+
+    private FixtureContext withOdds(FixtureContext base, FixtureOdds odds) {
+        return FixtureContext.builder()
+                .fixture(base.getFixture())
+                .homeTeam(base.getHomeTeam())
+                .awayTeam(base.getAwayTeam())
+                .homeTeamStats(base.getHomeTeamStats())
+                .awayTeamStats(base.getAwayTeamStats())
+                .odds(odds)
+                .potentials(base.getPotentials())
+                .build();
     }
 
     @Test
@@ -121,6 +183,8 @@ class Over25GoalsRecommendationEngineTest {
 
         assertThat(rec.getOdds()).isNull();
         assertThat(rec.getFactors()).doesNotContainKey("apiO25Potential");
+        assertThat(rec.getFactors()).containsEntry("marketBlendApplied", false);
+        assertThat(rec.getScore()).isEqualTo((double) rec.getFactors().get("modelScore"));
     }
 
     private FixtureContext veryHighScoringContext() {

@@ -30,7 +30,7 @@ class CornersRecommendationEngineTest {
     void analyze_withHighCornerTeams_returnsOver105() {
         FixtureContext context = createHighCornersContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.OVER_CORNERS);
@@ -40,11 +40,26 @@ class CornersRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("only Over 9.5 publishes; Over 10.5 and Under lines are modelled but paused")
+    void analyze_publishesOnlyOver95() {
+        FixtureContext high = createHighCornersContext();
+        FixtureContext low = createLowCornersContext();
+        FixtureContext moderate = createModerateCornersWithHighApiPotential();
+
+        assertThat(engine.analyzeLive(high)).get().extracting(Recommendation::getMarket).isEqualTo("Over 10.5 Corners");
+        assertThat(engine.analyze(high)).isEmpty();
+        assertThat(engine.analyzeLive(low)).get().extracting(Recommendation::getType).isEqualTo(RecommendationType.UNDER_CORNERS);
+        assertThat(engine.analyze(low)).isEmpty();
+        assertThat(engine.analyze(moderate)).get()
+                .extracting(Recommendation::getMarket).isEqualTo(CornersRecommendationEngine.PUBLISHED_MARKET);
+    }
+
+    @Test
     @DisplayName("analyze returns Under 9.5 for low corner teams")
     void analyze_withLowCornerTeams_returnsUnder() {
         FixtureContext context = createLowCornersContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.UNDER_CORNERS);
@@ -56,7 +71,7 @@ class CornersRecommendationEngineTest {
     void analyze_withAverageCorners_returnsEmpty() {
         FixtureContext context = createAverageCornersContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isEmpty();
     }
@@ -66,7 +81,7 @@ class CornersRecommendationEngineTest {
     void analyze_tracksApiPotentials() {
         FixtureContext context = createHighCornersContextWithPotentials();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("apiCornersO95Potential");
@@ -78,7 +93,7 @@ class CornersRecommendationEngineTest {
     void analyze_appliesApiConfidenceBoost() {
         FixtureContext context = createModerateCornersWithHighApiPotential();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("apiConfidenceBoostApplied")).isEqualTo(true);
@@ -90,7 +105,7 @@ class CornersRecommendationEngineTest {
     void analyze_tracksFormDataAvailability() {
         FixtureContext context = createHighCornersContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("formDataAvailable");
@@ -101,7 +116,7 @@ class CornersRecommendationEngineTest {
     void analyze_appliesTrendMultiplierUp() {
         FixtureContext context = createCornersWithUpwardTrend();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("trendDirection")).isEqualTo("UP");
@@ -113,7 +128,7 @@ class CornersRecommendationEngineTest {
     void analyze_appliesTrendMultiplierDown() {
         FixtureContext context = createCornersWithDownwardTrend();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("trendDirection")).isEqualTo("DOWN");
@@ -125,7 +140,7 @@ class CornersRecommendationEngineTest {
     void analyze_tracksCornersConceeded() {
         FixtureContext context = createHighCornersContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("homeConcededAvg");
@@ -137,7 +152,7 @@ class CornersRecommendationEngineTest {
     void analyze_tracksPlayingStyleMultiplier() {
         FixtureContext context = createHighCornersContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("playingStyleMultiplier");
@@ -149,7 +164,7 @@ class CornersRecommendationEngineTest {
     void analyze_tracksPositionDifference() {
         FixtureContext context = createHighCornersContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors()).containsKey("homePosition");
@@ -162,7 +177,7 @@ class CornersRecommendationEngineTest {
     void analyze_withoutFormData_stillWorks() {
         FixtureContext context = createHighCornersContextNoForm();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("formDataAvailable")).isEqualTo(false);
@@ -232,7 +247,7 @@ class CornersRecommendationEngineTest {
                 .potentials(potentials)
                 .build();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         Recommendation rec = result.get();
@@ -252,7 +267,7 @@ class CornersRecommendationEngineTest {
     void analyze_withVeryLowExpected_selectsUnder85() {
         FixtureContext context = createLowCornersContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.analyzeLive(context);
 
         assertThat(result).isPresent();
         Recommendation rec = result.get();

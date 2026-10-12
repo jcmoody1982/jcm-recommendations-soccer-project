@@ -60,7 +60,7 @@ class ValueBetRecommendationEngineTest {
     void analyze_withNoValueOpportunities_returnsEmpty() {
         FixtureContext context = createBalancedContextWithOdds();
         when(bttsEngine.analyze(any())).thenReturn(Optional.empty());
-        when(overGoalsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.empty());
         when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
         when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
 
@@ -82,7 +82,7 @@ class ValueBetRecommendationEngineTest {
                 .build();
         
         when(bttsEngine.analyze(any())).thenReturn(Optional.of(bttsRec));
-        when(overGoalsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.empty());
         when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
         when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
 
@@ -107,7 +107,7 @@ class ValueBetRecommendationEngineTest {
                 .build();
         
         when(bttsEngine.analyze(any())).thenReturn(Optional.of(bttsRec));
-        when(overGoalsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.empty());
         when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
         when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
 
@@ -136,7 +136,7 @@ class ValueBetRecommendationEngineTest {
                 .build();
         
         when(bttsEngine.analyze(any())).thenReturn(Optional.of(bttsRec));
-        when(overGoalsEngine.analyze(any())).thenReturn(Optional.of(overRec));
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.of(overRec));
         when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
         when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
 
@@ -164,7 +164,7 @@ class ValueBetRecommendationEngineTest {
                 .build();
         
         when(bttsEngine.analyze(any())).thenReturn(Optional.of(bttsRec));
-        when(overGoalsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.empty());
         when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
         when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
 
@@ -194,7 +194,7 @@ class ValueBetRecommendationEngineTest {
                 .build();
         
         when(bttsEngine.analyze(any())).thenReturn(Optional.of(bttsRec));
-        when(overGoalsEngine.analyze(any())).thenReturn(Optional.of(overRec));
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.of(overRec));
         when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
         when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
 
@@ -299,7 +299,7 @@ class ValueBetRecommendationEngineTest {
                 .build();
 
         when(bttsEngine.analyze(any())).thenReturn(Optional.of(bttsRec));
-        when(overGoalsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.empty());
         when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
         when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
 
@@ -312,7 +312,7 @@ class ValueBetRecommendationEngineTest {
 
     private void stubNoGoalEngines() {
         when(bttsEngine.analyze(any())).thenReturn(Optional.empty());
-        when(overGoalsEngine.analyze(any())).thenReturn(Optional.empty());
+        when(overGoalsEngine.assess(any())).thenReturn(Optional.empty());
         when(underGoalsEngine.analyze(any())).thenReturn(Optional.empty());
         when(bookingPointsEngine.analyze(any())).thenReturn(Optional.empty());
     }

@@ -85,6 +85,55 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         return rawScore;
     }
 
+    /**
+     * Weight on the de-vigged market probability when a price exists. Default 0 publishes the
+     * model unchanged.
+     */
+    protected double marketWeight() {
+        return 0.0;
+    }
+
+    /** Price on the other side of the line, used to strip the bookmaker margin. */
+    protected Double oddsForOppositeMarket(FixtureContext context) {
+        return null;
+    }
+
+    /** Second opinion a pick must also pass before it publishes. Default accepts every pick. */
+    protected boolean confirmedByCrossCheck(FixtureContext context) {
+        return true;
+    }
+
+    /**
+     * Shortest price that may carry STRONG. Priced picks below it publish as MODERATE, which also
+     * keeps them off Elite. Null disables the floor.
+     */
+    protected Double minStrongOdds() {
+        return null;
+    }
+
+    /**
+     * Fair probability (0-100) of the over side. De-vigs against the opposite price when it
+     * exists, otherwise falls back to the raw implied probability.
+     */
+    static Double fairOverProbability(Double overOdds, Double underOdds) {
+        if (overOdds == null || overOdds <= 1.0) {
+            return null;
+        }
+        double impliedOver = 1.0 / overOdds;
+        if (underOdds == null || underOdds <= 1.0) {
+            return impliedOver * 100.0;
+        }
+        double impliedUnder = 1.0 / underOdds;
+        return impliedOver / (impliedOver + impliedUnder) * 100.0;
+    }
+
+    static double blendWithMarket(double modelScore, Double fairMarketProbability, double marketWeight) {
+        if (fairMarketProbability == null || marketWeight <= 0.0) {
+            return modelScore;
+        }
+        return ((1.0 - marketWeight) * modelScore) + (marketWeight * fairMarketProbability);
+    }
+
     @Override
     public RecommendationType getType() {
         return spec().type();
@@ -117,18 +166,45 @@ public abstract class TotalGoalsOverRecommendationEngine implements Recommendati
         }
 
         double rawScore = calculateScore(context, spec, homeOverPct, awayOverPct, expectedGoals);
-        double score = applyPublishCeiling(rawScore);
+        double modelScore = applyPublishCeiling(rawScore);
+        Double odds = oddsForMarket(context);
+        Double fairMarket = marketWeight() > 0.0
+                ? fairOverProbability(odds, oddsForOppositeMarket(context))
+                : null;
+        double score = blendWithMarket(modelScore, fairMarket, marketWeight());
+
         ConfidenceLevel confidence = determineConfidence(score, spec);
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
         }
 
-        Double odds = oddsForMarket(context);
         if (!passesOddsGate(odds)) {
             return Optional.empty();
         }
 
-        Map<String, Object> factors = buildFactors(context, spec, score, rawScore, expectedGoals, homeOverPct, awayOverPct);
+        if (!confirmedByCrossCheck(context)) {
+            log.debug("{} not confirmed by cross-check: fixtureId={}", spec.market(), context.getFixture().getId());
+            return Optional.empty();
+        }
+
+        boolean shortPriceDemotion = false;
+        Double strongFloor = minStrongOdds();
+        if (confidence == ConfidenceLevel.STRONG && strongFloor != null && odds != null && odds < strongFloor) {
+            confidence = ConfidenceLevel.MODERATE;
+            shortPriceDemotion = true;
+        }
+
+        Map<String, Object> factors = buildFactors(context, spec, modelScore, rawScore, expectedGoals, homeOverPct, awayOverPct);
+        factors.put("modelScore", modelScore);
+        factors.put("marketBlendApplied", fairMarket != null);
+        if (fairMarket != null) {
+            factors.put("fairMarketProbability", fairMarket);
+            factors.put("publishMarketWeight", marketWeight());
+        }
+        factors.put("calculatedScore", score);
+        if (shortPriceDemotion) {
+            factors.put("shortPriceDemotion", true);
+        }
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(spec.type())

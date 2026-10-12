@@ -28,9 +28,20 @@ public class Over15GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             1.5
     );
 
+    /**
+     * Below this price Over 1.5 is accurate but cannot clear the margin: 2026-09-13..10-11 hit 82%
+     * under 1.22 against an 88% break-even. Such picks stay visible as MODERATE, off Strong and Elite.
+     */
+    static final double MIN_STRONG_ODDS = 1.22;
+
     @Override
     protected LineSpec spec() {
         return SPEC;
+    }
+
+    @Override
+    protected Double minStrongOdds() {
+        return MIN_STRONG_ODDS;
     }
 
     @Override

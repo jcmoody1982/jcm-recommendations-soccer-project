@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Recommendation, RecommendationType } from '../types';
 import {
+  ELITE_MIN_OVER_15_PRICE,
   ELITE_MIN_PRICE,
   ELITE_PICKS_LIMIT,
   elitePickKey,
@@ -117,6 +118,16 @@ describe('selectElitePicks', () => {
     const atFloor = rec({ odds: ELITE_MIN_PRICE, score: 97 });
 
     expect(selectElitePicks([unpriced, tooShort, atFloor])).toEqual([atFloor]);
+  });
+
+  it('excludes Over 1.5 priced under 1.22 from every type but keeps other markets at the general floor', () => {
+    const shortOver15 = rec({ type: 'OVER_15_GOALS', market: 'Over 1.5 Goals', odds: 1.21, score: 95 });
+    const shortValue = rec({ type: 'VALUE_BET', market: 'Over 1.5 Goals', odds: 1.2, score: 94 });
+    const over15AtFloor = rec({ type: 'OVER_15_GOALS', market: 'Over 1.5 Goals', odds: ELITE_MIN_OVER_15_PRICE, score: 93 });
+    const doubleChance = rec({ type: 'DOUBLE_CHANCE', market: 'Home/Draw (1X)', odds: 1.2, score: 92 });
+
+    expect(selectElitePicks([shortOver15, shortValue, over15AtFloor, doubleChance]))
+      .toEqual([over15AtFloor, doubleChance]);
   });
 
   it('respects a custom limit', () => {

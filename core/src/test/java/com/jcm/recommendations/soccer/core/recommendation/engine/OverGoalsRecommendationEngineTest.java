@@ -26,11 +26,20 @@ class OverGoalsRecommendationEngineTest {
     }
 
     @Test
+    @DisplayName("analyze publishes nothing; the engine only cross-checks Over 2.5 through assess")
+    void analyze_neverPublishes() {
+        FixtureContext context = createHighScoringContext();
+
+        assertThat(engine.assess(context)).isPresent();
+        assertThat(engine.analyze(context)).isEmpty();
+    }
+
+    @Test
     @DisplayName("analyze returns recommendation for high scoring context")
     void analyze_withHighScoringTeams_returnsRecommendation() {
         FixtureContext context = createHighScoringContext();
         
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
         
         if (result.isPresent()) {
             assertThat(result.get().getType()).isEqualTo(RecommendationType.OVER_GOALS);
@@ -43,7 +52,7 @@ class OverGoalsRecommendationEngineTest {
     void analyze_withLowScoringTeams_returnsEmpty() {
         FixtureContext context = createContextWithGoalStats(0.5, 0.3, 0.4, 0.5);
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         assertThat(result).isEmpty();
     }
@@ -53,7 +62,7 @@ class OverGoalsRecommendationEngineTest {
     void analyze_includesExpectedGoalsInFactors() {
         FixtureContext context = createHighScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         if (result.isPresent()) {
             assertThat(result.get().getFactors()).containsKey("expectedGoals");
@@ -67,7 +76,7 @@ class OverGoalsRecommendationEngineTest {
     void analyze_withOdds_includesOddsInResult() {
         FixtureContext context = createHighScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         if (result.isPresent()) {
             assertThat(result.get().getOdds()).isNotNull();
@@ -83,7 +92,7 @@ class OverGoalsRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away"))
                 .build();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         assertThat(result).isEmpty();
     }
@@ -94,8 +103,8 @@ class OverGoalsRecommendationEngineTest {
         FixtureContext contextWithForm = createHighScoringContextWithForm();
         FixtureContext contextWithoutForm = createHighScoringContext();
 
-        Optional<Recommendation> resultWithForm = engine.analyze(contextWithForm);
-        Optional<Recommendation> resultWithoutForm = engine.analyze(contextWithoutForm);
+        Optional<Recommendation> resultWithForm = engine.assess(contextWithForm);
+        Optional<Recommendation> resultWithoutForm = engine.assess(contextWithoutForm);
 
         if (resultWithForm.isPresent()) {
             assertThat(resultWithForm.get().getFactors().get("formDataAvailable")).isEqualTo(true);
@@ -110,7 +119,7 @@ class OverGoalsRecommendationEngineTest {
     void analyze_withHighCombinedGoals_appliesHighScoringBoost() {
         FixtureContext context = createVeryHighScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("highScoringBoostApplied")).isEqualTo(true);
@@ -122,7 +131,7 @@ class OverGoalsRecommendationEngineTest {
     void analyze_withHighXgData_appliesXgBoost() {
         FixtureContext context = createContextWithXgData(1.6, 1.4);
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(true);
@@ -135,7 +144,7 @@ class OverGoalsRecommendationEngineTest {
     void analyze_withoutXgData_noXgBoost() {
         FixtureContext context = createHighScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getFactors().get("xgDataAvailable")).isEqualTo(false);
@@ -145,7 +154,7 @@ class OverGoalsRecommendationEngineTest {
     @Test
     @DisplayName("analyze never steps up to Over 3.5")
     void analyze_neverStepsUpToOver35() {
-        Optional<Recommendation> result = engine.analyze(createHighScoringContext());
+        Optional<Recommendation> result = engine.assess(createHighScoringContext());
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Over 2.5 Goals");
@@ -156,7 +165,7 @@ class OverGoalsRecommendationEngineTest {
     void analyze_tracksOver35Percentages() {
         FixtureContext context = createHighScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         if (result.isPresent()) {
             assertThat(result.get().getFactors()).containsKey("homeOver35Pct");
@@ -169,7 +178,7 @@ class OverGoalsRecommendationEngineTest {
     void analyze_tracksConcededAverages() {
         FixtureContext context = createHighScoringContext();
 
-        Optional<Recommendation> result = engine.analyze(context);
+        Optional<Recommendation> result = engine.assess(context);
 
         if (result.isPresent()) {
             assertThat(result.get().getFactors()).containsKey("homeGoalsConcededAvg");

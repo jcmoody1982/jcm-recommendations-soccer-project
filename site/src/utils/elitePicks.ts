@@ -107,12 +107,23 @@ export function hasBackablePrice(rec: Recommendation): boolean {
   return rec.odds != null && rec.odds >= ELITE_MIN_PRICE;
 }
 
+/**
+ * Shortest Over 1.5 price Elite will carry, above the general floor. Under 1.22 Over 1.5 hit 82%
+ * against an 88% break-even across 2026-09-13..10-11: accurate, but not a bet.
+ */
+export const ELITE_MIN_OVER_15_PRICE = 1.22;
+
+export function isShortPricedOver15(rec: Recommendation): boolean {
+  return isOver15Line(rec.market) && rec.odds != null && rec.odds < ELITE_MIN_OVER_15_PRICE;
+}
+
 export function isEliteEligible(rec: Recommendation): boolean {
   return (
     rec.confidence?.toUpperCase() === 'STRONG'
     && isEliteEligibleType(rec.type)
     && !isExcludedFromElitePicks(rec.market)
     && hasBackablePrice(rec)
+    && !isShortPricedOver15(rec)
   );
 }
 

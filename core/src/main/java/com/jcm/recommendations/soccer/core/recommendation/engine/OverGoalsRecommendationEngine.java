@@ -58,8 +58,18 @@ public class OverGoalsRecommendationEngine implements RecommendationEngine {
         return RecommendationType.OVER_GOALS;
     }
 
+    /**
+     * Publishes nothing on its own. Every pick it made was "Over 2.5 Goals", duplicating
+     * {@link Over25GoalsRecommendationEngine} on most fixtures (2026-09-13..10-11: 203 of 233),
+     * so it now serves only as the second opinion Over 2.5 must pass. See {@link #assess}.
+     */
     @Override
     public Optional<Recommendation> analyze(FixtureContext context) {
+        return Optional.empty();
+    }
+
+    /** The Over 2.5 read this engine would make, for callers that use it as a signal. */
+    public Optional<Recommendation> assess(FixtureContext context) {
         if (!isApplicable(context)) {
             return Optional.empty();
         }

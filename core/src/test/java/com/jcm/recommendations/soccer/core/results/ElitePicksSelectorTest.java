@@ -223,7 +223,7 @@ class ElitePicksSelectorTest {
         // cap of three still allowed nine slots that all read "Over 1.5 something".
         List<RecommendationSnapshot> day = List.of(
                 snapWithMarket(1L, date, 100L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 93.0, 1.22, 1000L),
-                snapWithMarket(2L, date, 200L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 92.0, 1.20, 2000L),
+                snapWithMarket(2L, date, 200L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 92.0, 1.25, 2000L),
                 snapWithMarket(3L, date, 300L, "FIRST_HALF_GOALS", "Over 1.5 HT Goals", "STRONG", 91.0, 2.10, 3000L),
                 snapWithMarket(4L, date, 400L, "SECOND_HALF_GOALS", "Over 1.5 2H Goals", "STRONG", 90.0, 2.05, 4000L),
                 snapWithMarket(5L, date, 500L, "OVER_25_GOALS", "Over 2.5 Goals", "STRONG", 89.0, 1.85, 5000L),
@@ -298,6 +298,21 @@ class ElitePicksSelectorTest {
         assertThat(ElitePicksSelector.hasBackablePrice(
                 snapWithMarket(3L, date, 300L, "BTTS", "BTTS Yes", "STRONG", 90.0, 1.01, 3000L)))
                 .isFalse();
+    }
+
+    @Test
+    void excludesOver15PricedUnder122FromEveryTypeButKeepsOtherMarketsAtTheGeneralFloor() {
+        LocalDate date = LocalDate.of(2026, 10, 12);
+        List<RecommendationSnapshot> day = List.of(
+                snapWithMarket(1L, date, 100L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 95.0, 1.21, 1000L),
+                snapWithMarket(2L, date, 200L, "VALUE_BET", "Over 1.5 Goals", "STRONG", 94.0, 1.20, 2000L),
+                snapWithMarket(3L, date, 300L, "OVER_15_GOALS", "Over 1.5 Goals", "STRONG", 93.0, 1.22, 3000L),
+                snapWithMarket(4L, date, 400L, "DOUBLE_CHANCE", "Home/Draw (1X)", "STRONG", 92.0, 1.20, 4000L)
+        );
+
+        List<RecommendationSnapshot> elite = ElitePicksSelector.select(day);
+
+        assertThat(elite).extracting(RecommendationSnapshot::getFixtureId).containsExactly(300L, 400L);
     }
 
     private static RecommendationSnapshot snap(
