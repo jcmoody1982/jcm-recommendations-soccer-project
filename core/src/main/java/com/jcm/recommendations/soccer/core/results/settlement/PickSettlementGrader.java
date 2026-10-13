@@ -41,7 +41,8 @@ public class PickSettlementGrader {
             case OVER_CORNERS, UNDER_CORNERS -> gradeCorners(snapshot.getMarket(), match);
             case BOOKING_POINTS -> gradeBookingPoints(snapshot.getMarket(), match);
             case BTTS -> gradeBtts(snapshot.getMarket(), match);
-            case OVER_GOALS, UNDER_GOALS, OVER_05_GOALS, OVER_15_GOALS, OVER_25_GOALS ->
+            case OVER_05_GOALS -> gradeTeamOver05(snapshot, match);
+            case OVER_GOALS, UNDER_GOALS, OVER_15_GOALS, OVER_25_GOALS ->
                     gradeOverUnderGoals(snapshot.getMarket(), match, true);
             case MATCH_RESULT -> gradeTeamOrDraw(snapshot, match, true);
             case DRAW -> gradeDraw(match);
@@ -246,6 +247,29 @@ public class PickSettlementGrader {
             return ft.get()[0] == 0 ? GradeResult.win() : GradeResult.loss();
         }
         return GradeResult.unsupported("Unparseable clean sheet market: " + market);
+    }
+
+    /**
+     * "{team} Over 0.5 Goals" settles on that team's goals. A bare "Over 0.5 Goals" (older snapshots)
+     * is still the match total.
+     */
+    private GradeResult gradeTeamOver05(RecommendationSnapshot snapshot, CompletedMatch match) {
+        String market = safe(snapshot.getMarket());
+        String team = market.replaceAll("(?i)\\s*Over 0\\.5 Goals\\s*$", "").trim();
+        if (team.isEmpty()) {
+            return gradeOverUnderGoals(market, match, true);
+        }
+        Optional<Integer[]> ft = ftGoals(match);
+        if (ft.isEmpty()) {
+            return GradeResult.pending("Missing FT goals");
+        }
+        if (namesEqual(team, snapshot.getHomeTeamName())) {
+            return ft.get()[0] > 0 ? GradeResult.win() : GradeResult.loss();
+        }
+        if (namesEqual(team, snapshot.getAwayTeamName())) {
+            return ft.get()[1] > 0 ? GradeResult.win() : GradeResult.loss();
+        }
+        return GradeResult.unsupported("Unparseable team Over 0.5 market: " + market);
     }
 
     private GradeResult gradeResultBtts(RecommendationSnapshot snapshot, CompletedMatch match) {

@@ -172,10 +172,20 @@ const SQUAD_VALUE_FACTOR_ORDER: readonly string[] = [
   'market',
 ];
 
+const TEAM_OVER_05_FACTOR_ORDER: readonly string[] = [
+  'team',
+  'venue',
+  'teamExpectedGoals',
+  'teamScoresPct',
+  'opponentConcedesPct',
+  'poissonProbability',
+  'calculatedScore',
+];
+
 const FACTOR_ORDER_BY_TYPE: Partial<Record<RecommendationType, readonly string[]>> = {
   BTTS: BTTS_FACTOR_ORDER,
   DOUBLE_CHANCE: DOUBLE_CHANCE_FACTOR_ORDER,
-  OVER_05_GOALS: SQUAD_VALUE_FACTOR_ORDER,
+  OVER_05_GOALS: TEAM_OVER_05_FACTOR_ORDER,
   OVER_15_GOALS: TOTAL_GOALS_OVER_FACTOR_ORDER,
   OVER_25_GOALS: TOTAL_GOALS_OVER_FACTOR_ORDER,
   PLAYER_TO_SCORE: PLAYER_PROP_FACTOR_ORDER,

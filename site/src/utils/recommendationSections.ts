@@ -114,7 +114,7 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
   },
   OVER_05_GOALS: {
     title: 'Team Over 0.5 Goals',
-    scoreLabel: 'Win likelihood',
+    scoreLabel: 'Probability',
     scoreUnit: '%',
     showPrice: false,
   },

@@ -44,11 +44,20 @@ class PickSettlementGraderTest {
     }
 
     @Test
-    void over05WithTeamPrefixStillGradesMatchTotal() {
+    void over05WithTeamPrefixGradesThatTeamsGoals() {
+        RecommendationSnapshot home = snapshot("OVER_05_GOALS", "Arsenal Over 0.5 Goals");
+        assertThat(grader.grade(home, complete(1, 0)).outcome()).isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(home, complete(0, 1)).outcome()).isEqualTo(PickOutcome.LOSS);
+
+        RecommendationSnapshot away = snapshot("OVER_05_GOALS", "Chelsea Over 0.5 Goals");
+        assertThat(grader.grade(away, complete(0, 2)).outcome()).isEqualTo(PickOutcome.WIN);
+        assertThat(grader.grade(away, complete(3, 0)).outcome()).isEqualTo(PickOutcome.LOSS);
+    }
+
+    @Test
+    void over05WithUnknownTeamIsUnsupported() {
         assertThat(grader.grade(snapshot("OVER_05_GOALS", "Barnet FC Over 0.5 Goals"), complete(1, 0)).outcome())
-                .isEqualTo(PickOutcome.WIN);
-        assertThat(grader.grade(snapshot("OVER_05_GOALS", "Barnet FC Over 0.5 Goals"), complete(0, 0)).outcome())
-                .isEqualTo(PickOutcome.LOSS);
+                .isNotIn(PickOutcome.WIN, PickOutcome.LOSS);
     }
 
     @Test
