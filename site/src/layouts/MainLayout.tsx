@@ -5,6 +5,7 @@ import { useShortlist } from '../contexts/ShortlistContext';
 import { SettingsDropdown } from '../components/SettingsDropdown';
 import {
   isNavActive,
+  SOCCER_BET_GEN,
   SOCCER_FIXTURES,
   SOCCER_RECOMMENDATIONS,
   SOCCER_RESULTS,
@@ -19,6 +20,7 @@ const soccerNavItems = [
   { path: SOCCER_FIXTURES, label: 'Fixtures' },
   { path: SOCCER_RESULTS, label: 'Results' },
   { path: SOCCER_SHORTLIST, label: 'Shortlist', showBadge: true },
+  { path: SOCCER_BET_GEN, label: 'Bet Gen' },
 ];
 
 type Theme = 'light' | 'dark' | 'system';

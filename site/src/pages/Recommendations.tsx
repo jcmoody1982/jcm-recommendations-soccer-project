@@ -24,6 +24,13 @@ import {
   sectionTitle,
 } from '../utils/recommendationSections';
 import { isFeaturedCompetition } from '../utils/featuredCompetitions';
+import {
+  COMPETITION_SCOPE_OPTIONS,
+  CONFIDENCE_OPTIONS,
+  matchesConfidence,
+  type CompetitionScope,
+  type ConfidenceFilter,
+} from '../utils/recommendationFilters';
 import styles from './Recommendations.module.css';
 
 /** Always render these boards so a Strong-only view is not mistaken for a missing market. */
@@ -40,24 +47,6 @@ const HORIZON_OPTIONS = [3, 7] as const;
 const DEFAULT_HORIZON = 7;
 const KICKOFF_WINDOWS: KickoffWindow[] = ['all', 'soon', 'today', 'tomorrow'];
 const SORT_OPTIONS: KickoffSort[] = ['score', 'kickoff'];
-
-/** tipped = Strong + Moderate (excludes WEAK). Default chip is Strong only. */
-type ConfidenceFilter = 'tipped' | 'strong' | 'moderate' | 'all';
-
-/** all = every competition; featured = curated watchlist in featuredCompetitions.ts */
-type CompetitionScope = 'all' | 'featured';
-
-const CONFIDENCE_OPTIONS: Array<{ value: ConfidenceFilter; label: string }> = [
-  { value: 'strong', label: 'Strong' },
-  { value: 'moderate', label: 'Moderate' },
-  { value: 'tipped', label: 'Strong + Moderate' },
-  { value: 'all', label: 'All' },
-];
-
-const COMPETITION_SCOPE_OPTIONS: Array<{ value: CompetitionScope; label: string }> = [
-  { value: 'all', label: 'All competitions' },
-  { value: 'featured', label: 'Featured' },
-];
 
 function parseHorizon(value: string | null): number {
   const n = value == null ? NaN : Number(value);
@@ -107,15 +96,6 @@ function matchesSearchText(rec: Recommendation, searchLower: string): boolean {
     || rec.awayTeamName.toLowerCase().includes(searchLower)
     || Boolean(rec.leagueName && rec.leagueName.toLowerCase().includes(searchLower))
   );
-}
-
-function matchesConfidence(confidence: string, filter: ConfidenceFilter): boolean {
-  const band = confidence?.toUpperCase();
-  if (filter === 'all') return true;
-  if (filter === 'strong') return band === 'STRONG';
-  if (filter === 'moderate') return band === 'MODERATE';
-  // tipped: hide WEAK
-  return band === 'STRONG' || band === 'MODERATE';
 }
 
 export default function Recommendations() {

@@ -5,7 +5,7 @@ import { ShortlistProvider } from './contexts/ShortlistContext';
 import { AuthProvider } from './contexts/AuthContext';
 import MainLayout from './layouts/MainLayout';
 import RequireAuth from './components/RequireAuth';
-import { Dashboard, FixtureDetail, Login, Recommendations, Results, Shortlist, UsFootball } from './pages';
+import { BetGen, Dashboard, FixtureDetail, Login, Recommendations, Results, Shortlist, UsFootball } from './pages';
 import {
   SOCCER_FIXTURES,
   SOCCER_RECOMMENDATIONS,
@@ -62,6 +62,7 @@ function App() {
                   <Route path="soccer/recommendations" element={<Recommendations />} />
                   <Route path="soccer/shortlist" element={<Shortlist />} />
                   <Route path="soccer/results" element={<Results />} />
+                  <Route path="soccer/bet-gen" element={<BetGen />} />
                   <Route path="soccer/fixtures" element={<Dashboard />} />
                   <Route path="soccer/fixtures/:fixtureId" element={<FixtureDetail />} />
                   <Route path="us-football" element={<UsFootball />} />

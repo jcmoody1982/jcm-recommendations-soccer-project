@@ -2,6 +2,7 @@ export const SOCCER_RECOMMENDATIONS = '/soccer/recommendations';
 export const SOCCER_FIXTURES = '/soccer/fixtures';
 export const SOCCER_RESULTS = '/soccer/results';
 export const SOCCER_SHORTLIST = '/soccer/shortlist';
+export const SOCCER_BET_GEN = '/soccer/bet-gen';
 export const US_FOOTBALL_PATH = '/us-football';
 
 export type SportId = 'soccer' | 'us-football';

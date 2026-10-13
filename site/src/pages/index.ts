@@ -1,3 +1,4 @@
+export { default as BetGen } from './BetGen';
 export { default as Dashboard } from './Dashboard';
 export { default as FixtureDetail } from './FixtureDetail';
 export { default as Login } from './Login';
