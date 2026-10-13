@@ -6,6 +6,7 @@ import com.jcm.recommendations.soccer.core.repository.FixtureOddsRepository;
 import com.jcm.recommendations.soccer.core.repository.FixtureRepository;
 import com.jcm.recommendations.soccer.core.results.RecommendationSnapshotService;
 import com.jcm.recommendations.soccer.core.results.ResultsMatchIngestService;
+import com.jcm.recommendations.soccer.core.results.ResultsPerformanceService;
 import com.jcm.recommendations.soccer.core.results.SettlementService;
 import com.jcm.recommendations.soccer.core.service.DataSyncService;
 import com.jcm.recommendations.soccer.core.service.FixtureService;
@@ -61,6 +62,8 @@ class SecurityConfigTest {
     private ResultsMatchIngestService resultsMatchIngestService;
     @MockitoBean
     private SettlementService settlementService;
+    @MockitoBean
+    private ResultsPerformanceService resultsPerformanceService;
 
     @Test
     void anonymousApiRequestIsRejectedWithJson401() throws Exception {

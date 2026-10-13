@@ -192,6 +192,37 @@ class RecommendationServiceTest {
         assertThat(result.strongRecommendations()).isEqualTo(1);
     }
 
+    @Test
+    void shadowEngines_areKeptOffTheBoardButFeedTheSnapshot() {
+        RecommendationEngine shadowEngine = org.mockito.Mockito.mock(RecommendationEngine.class);
+        RecommendationService service = new RecommendationService(
+                fixtureService, contextBuilder, List.of(mockEngine, shadowEngine));
+        Fixture fixture = createFixture();
+        Recommendation board = createRecommendation(fixture);
+        Recommendation shadow = Recommendation.builder()
+                .fixtureId(fixture.getId())
+                .type(RecommendationType.PLAYER_TO_SCORE)
+                .confidence(ConfidenceLevel.MODERATE)
+                .score(30.0)
+                .market("Striker to score")
+                .build();
+
+        when(fixtureService.getUpcomingFixtures(anyDouble())).thenReturn(List.of(fixture));
+        when(contextBuilder.buildContextsForFixtures(any())).thenReturn(List.of(createContext(fixture)));
+        when(mockEngine.getType()).thenReturn(RecommendationType.BTTS);
+        when(mockEngine.analyzeAll(any())).thenReturn(List.of(board));
+        when(shadowEngine.getType()).thenReturn(RecommendationType.PLAYER_TO_SCORE);
+        when(shadowEngine.analyzeAll(any())).thenReturn(List.of(shadow));
+
+        assertThat(service.generateAllRecommendations(1.0))
+                .extracting(Recommendation::getType)
+                .containsExactly(RecommendationType.BTTS);
+        assertThat(service.generateAllRecommendationsIncludingShadow(1.0))
+                .extracting(Recommendation::getType)
+                .containsExactlyInAnyOrder(RecommendationType.BTTS, RecommendationType.PLAYER_TO_SCORE);
+        assertThat(service.getRecommendationsByType(RecommendationType.PLAYER_TO_SCORE, 1.0)).isEmpty();
+    }
+
     private Fixture createFixture() {
         return Fixture.builder()
                 .id(1000L)

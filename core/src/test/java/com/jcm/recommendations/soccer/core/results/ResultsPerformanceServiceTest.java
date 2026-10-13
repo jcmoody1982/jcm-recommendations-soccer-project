@@ -70,9 +70,9 @@ class ResultsPerformanceServiceTest {
 
         assertThat(view.byType()).extracting(ResultsPerformanceService.TypePerformance::type)
                 .doesNotContain("UNDER_GOALS", "WINNING_FORM_MISMATCH", "LOSING_FORM_MISMATCH",
-                        "RESULT_BTTS", "PLAYER_TO_SCORE")
+                        "RESULT_BTTS", "PLAYER_TO_SCORE", "PLAYER_TO_ASSIST")
                 .contains("BTTS", "OVER_GOALS", "MATCH_RESULT");
-        assertThat(view.byType()).hasSize(RecommendationType.values().length - 5);
+        assertThat(view.byType()).hasSize(RecommendationType.values().length - 6);
         ResultsPerformanceService.TypePerformance btts = view.byType().stream()
                 .filter(t -> "BTTS".equals(t.type()))
                 .findFirst()
@@ -228,6 +228,31 @@ class ResultsPerformanceServiceTest {
                 .orElseThrow();
         assertThat(mid.sampleSize()).isEqualTo(1);
         assertThat(mid.gap()).isEqualTo(28.0);
+    }
+
+    @Test
+    void shadowReportCoversOnlyShadowTypesInFineBands() {
+        LocalDate d1 = LocalDate.of(2026, 10, 1);
+        when(snapshotRepository.findBySnapshotDateBetweenInclusive(any(), any())).thenReturn(List.of(
+                snap(1L, d1, 100L, "PLAYER_TO_SCORE", "MODERATE", PickOutcome.WIN, null, 37.0, null),
+                snap(2L, d1, 200L, "PLAYER_TO_SCORE", "MODERATE", PickOutcome.LOSS, null, 38.0, null),
+                snap(3L, d1, 300L, "PLAYER_TO_SCORE", "MODERATE", PickOutcome.LOSS, null, 22.0, null),
+                snap(4L, d1, 400L, "PLAYER_TO_ASSIST", "MODERATE", PickOutcome.LOSS, null, 18.0, null),
+                snap(5L, d1, 500L, "BTTS", "STRONG", PickOutcome.WIN, null, 70.0, 1.8)));
+
+        List<ResultsPerformanceService.ShadowPerformance> report = service.getShadowPerformance("30d");
+
+        assertThat(report).extracting(ResultsPerformanceService.ShadowPerformance::type)
+                .containsExactlyInAnyOrder("PLAYER_TO_SCORE", "PLAYER_TO_ASSIST");
+        ResultsPerformanceService.ShadowPerformance scorers = report.stream()
+                .filter(r -> "PLAYER_TO_SCORE".equals(r.type()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(scorers.overall().sampleSize()).isEqualTo(3);
+        assertThat(scorers.calibration())
+                .extracting(ResultsPerformanceService.CalibrationBand::band)
+                .containsExactly("20-24", "35-39");
+        assertThat(scorers.calibration().get(1).hitRate()).isEqualTo(50.0);
     }
 
     @Test

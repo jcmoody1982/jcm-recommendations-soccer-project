@@ -19,7 +19,6 @@ export const SECTION_ORDER: RecommendationType[] = [
   'OVER_05_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
-  'PLAYER_TO_ASSIST',
   'DRAW',
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
@@ -27,8 +26,9 @@ export const SECTION_ORDER: RecommendationType[] = [
   'BOOKING_POINTS',
   'OVER_CORNERS',
   'HOME_AWAY_SPECIALIST',
-  // Paused (engines still registered for recalibration): RESULT_BTTS, PLAYER_TO_SCORE,
+  // Paused (engines still registered for recalibration): RESULT_BTTS,
   // WINNING_FORM_MISMATCH, LOSING_FORM_MISMATCH, UNDER_GOALS, UNDER_CORNERS.
+  // Shadow (graded server-side, never served to the board): PLAYER_TO_SCORE, PLAYER_TO_ASSIST.
   // OVER_GOALS only cross-checks Over 2.5 and publishes nothing itself.
 ];
 

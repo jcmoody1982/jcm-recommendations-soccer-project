@@ -28,9 +28,19 @@ public class RecommendationService {
         return generateAllRecommendations(7);
     }
 
+    /** Board-facing picks: every engine except those in {@link ShadowMarkets}. */
     @Cacheable(value = CacheConfig.RECOMMENDATIONS_CACHE, key = "#daysAhead")
     public List<Recommendation> generateAllRecommendations(double daysAhead) {
-        log.info("Generating recommendations for fixtures: daysAhead={}", daysAhead);
+        return runEngines(daysAhead, false);
+    }
+
+    /** Board picks plus shadow engines, for the daily snapshot only. Not cached. */
+    public List<Recommendation> generateAllRecommendationsIncludingShadow(double daysAhead) {
+        return runEngines(daysAhead, true);
+    }
+
+    private List<Recommendation> runEngines(double daysAhead, boolean includeShadow) {
+        log.info("Generating recommendations for fixtures: daysAhead={}, includeShadow={}", daysAhead, includeShadow);
         Instant startTime = Instant.now();
 
         List<Fixture> fixtures = fixtureService.getUpcomingFixtures(daysAhead);
@@ -47,6 +57,9 @@ public class RecommendationService {
         List<Recommendation> allRecommendations = new ArrayList<>();
 
         for (RecommendationEngine engine : engines) {
+            if (!includeShadow && ShadowMarkets.isShadow(engine.getType())) {
+                continue;
+            }
             try {
                 log.debug("Running engine: type={}", engine.getType());
                 List<Recommendation> engineRecs = engine.analyzeAll(contexts);
@@ -89,6 +102,9 @@ public class RecommendationService {
         List<Recommendation> recommendations = new ArrayList<>();
 
         for (RecommendationEngine engine : engines) {
+            if (ShadowMarkets.isShadow(engine.getType())) {
+                continue;
+            }
             try {
                 engine.analyze(context).ifPresent(recommendations::add);
             } catch (Exception e) {
@@ -113,6 +129,9 @@ public class RecommendationService {
 
     public List<Recommendation> getRecommendationsByType(RecommendationType type, double daysAhead) {
         log.info("Generating recommendations by type: type={}, daysAhead={}", type, daysAhead);
+        if (ShadowMarkets.isShadow(type)) {
+            return Collections.emptyList();
+        }
 
         List<Fixture> fixtures = fixtureService.getUpcomingFixtures(daysAhead);
         List<FixtureContext> contexts = contextBuilder.buildContextsForFixtures(fixtures);

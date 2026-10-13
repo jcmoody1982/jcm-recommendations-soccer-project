@@ -10,79 +10,82 @@ import com.jcm.recommendations.soccer.domain.PlayerSeasonStats;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
-import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.calculateVenueConcededAvg;
 import static com.jcm.recommendations.soccer.core.recommendation.util.RecommendationUtils.safeInt;
 
 /**
- * Shared fixture-level player prop engine. Line-specific rates, priors and thresholds come from
- * {@link PropSpec} (UC-040 to score, UC-041 to assist).
+ * Shared fixture-level player prop engine (UC-040 to score, UC-041 to assist). Both run in shadow
+ * mode: picks are snapshotted and graded but kept off the boards, Results and Elite until the
+ * admin shadow report shows the published probability holds up.
  *
- * <p>The published score is the modelled probability that the player records at least one event
- * in this fixture, from a Poisson draw on their expected event count:
- * {@code P(>=1) = 1 - exp(-lambda)}. Lambda is the player's shrunk per-90 rate scaled by expected
- * minutes, a tight opponent factor, and an empirical calibration dampener.
+ * <p>The player's expected events in this fixture are anchored on the team rather than on the
+ * player alone: {@code lambda = playerRatePer90 x (teamExpectedGoals / teamSeasonGoalsPerMatch)
+ * x expectedMinutes / 90}. The published probability is then
+ * {@code availability x (1 - exp(-lambda))}, where availability is the share of the team's matches
+ * the player has appeared in, because a player who does not play settles as a loss here.
  *
- * <p>Production grading (2026-09-04 to 2026-09-10) showed raw Poisson scores ~18–23pp above
- * realised hit rates: selecting the best candidate per fixture (winner's curse), treating season
- * minutes as guaranteed, and a wide opponent multiplier all inflated lambda. Rank boosts were
- * removed, the opponent factor was narrowed to 0.90–1.10, and {@link #LAMBDA_CALIBRATION} pulls
- * the residual gap down without pretending the model is fully calibrated.
+ * <p>Replaces the 2026-09 model, which hit ~28% while claiming 35-45%: it preferred home-only or
+ * away-only rates but shrank them by whole-season minutes, so the picks that cleared the bar were
+ * mostly noisy venue splits, and a flat 0.75 dampener stood in for any fixture context.
  */
 @Slf4j
 public abstract class PlayerPropRecommendationEngine implements RecommendationEngine {
 
-    private static final int MIN_APPEARANCES = 5;
-    private static final int MIN_MINUTES = 270;
-    private static final int MIN_MINUTES_PER_MATCH = 45;
+    /** Season minutes before a player is considered; below this a per-90 rate is mostly noise. */
+    static final int MIN_MINUTES = 600;
 
-    /**
-     * Pseudo-minutes of prior evidence blended into every per-90 rate. Five matches' worth, so a
-     * player with 300 minutes is held close to the baseline while a season regular is trusted.
-     */
-    private static final int SHRINKAGE_PSEUDO_MINUTES = 450;
+    /** Regular starters only: rotation and impact subs are hard to price without line-ups. */
+    static final int MIN_MINUTES_PER_MATCH = 70;
 
-    /** Typical goals conceded per match, used to turn opponent leakiness into a multiplier. */
-    private static final double LEAGUE_AVG_CONCEDED = 1.35;
-    private static final double OPPONENT_FACTOR_MIN = 0.90;
-    private static final double OPPONENT_FACTOR_MAX = 1.10;
+    /** Pseudo-minutes of prior evidence blended into every per-90 rate (ten full matches). */
+    static final int SHRINKAGE_PSEUDO_MINUTES = 900;
 
-    /**
-     * Scales lambda after rate × minutes × opponent. Chosen from the ~0.75 residual needed once
-     * rank boosts and the wide opponent band are removed; not a full empirical Bayes fit.
-     */
-    static final double LAMBDA_CALIBRATION = 0.75;
+    /** How far this fixture can move the player's rate away from his season average. */
+    static final double FIXTURE_FACTOR_MIN = 0.60;
+    static final double FIXTURE_FACTOR_MAX = 1.60;
 
-    /** Assumed minutes when a player has no recorded per-match average. */
-    private static final double DEFAULT_EXPECTED_MINUTES = 70.0;
     private static final double FULL_MATCH_MINUTES = 90.0;
 
     /**
-     * @param minPer90 rate a player must clear to be considered at all
-     * @param elitePer90 rate treated as the top of the realistic range for this market
-     * @param priorPer90 baseline rate that thin samples are shrunk toward
-     * @param thresholdStrong published probability at or above which the pick is STRONG
-     * @param thresholdModerate published probability at or above which the pick is MODERATE
+     * @param priorPer90 baseline open-play rate that every player is shrunk toward
+     * @param trackingFloor probability at or above which the fixture's best candidate is snapshotted
+     * @param publishBar probability the candidate would need to be published once out of shadow
      */
     protected record PropSpec(
             RecommendationType type,
             String marketVerb,
-            double minPer90,
-            double elitePer90,
             double priorPer90,
-            double thresholdStrong,
-            double thresholdModerate
+            double trackingFloor,
+            double publishBar
     ) {}
 
     protected abstract PropSpec spec();
 
-    protected abstract double per90(PlayerSeasonStats player, boolean isHome);
+    /** Open-play events this season (goals excluding penalties, or assists). */
+    protected abstract int openPlayEvents(PlayerSeasonStats player);
+
+    /** Penalty events this season, credited at face value rather than shrunk toward the prior. */
+    protected abstract int penaltyEvents(PlayerSeasonStats player);
+
+    record Candidate(
+            PlayerSeasonStats player,
+            boolean isHome,
+            String playerName,
+            String teamName,
+            double ratePer90,
+            double teamExpectedGoals,
+            double fixtureFactor,
+            double expectedMinutes,
+            double availability,
+            double expectedEvents,
+            double score
+    ) {}
 
     @Override
     public RecommendationType getType() {
@@ -101,187 +104,110 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         }
 
         PropSpec spec = spec();
-        List<Candidate> candidates = new ArrayList<>();
-        considerPlayers(context, true, spec, candidates);
-        considerPlayers(context, false, spec, candidates);
-        if (candidates.isEmpty()) {
+        Optional<Candidate> best = Stream.concat(candidates(context, true), candidates(context, false))
+                .max(Comparator.comparingDouble(Candidate::score));
+        if (best.isEmpty() || best.get().score() < spec.trackingFloor()) {
             return Optional.empty();
         }
 
-        Candidate best = candidates.stream()
-                .filter(c -> displayName(c.player) != null)
-                .max(Comparator.comparingDouble(Candidate::score))
-                .orElse(null);
-        if (best == null) {
-            log.debug("Skipping {} tip: no named candidates for fixtureId={}",
-                    spec.marketVerb(), context.getFixture().getId());
-            return Optional.empty();
-        }
-
-        ConfidenceLevel confidence = determineConfidence(best.score, spec);
-        if (confidence == ConfidenceLevel.WEAK) {
-            return Optional.empty();
-        }
-
-        String playerName = displayName(best.player);
-        String market = playerName + " " + spec.marketVerb();
+        Candidate pick = best.get();
+        String market = pick.playerName() + " " + spec.marketVerb();
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(spec.type())
-                .confidence(confidence)
-                .score(best.score)
+                .confidence(ConfidenceLevel.MODERATE)
+                .score(pick.score())
                 .market(market)
                 .odds(null)
                 .description(RecommendationFactory.buildStandardDescription(
-                        confidence, market, best.score, "score", context))
-                .factors(buildFactors(best, spec, playerName))
+                        ConfidenceLevel.MODERATE, market, pick.score(), "score", context))
+                .factors(buildFactors(pick, spec))
                 .build();
 
-        log.info("{} recommendation generated: fixtureId={}, player={}, score={}, confidence={}",
-                spec.marketVerb(),
-                context.getFixture().getId(),
-                playerName,
-                String.format("%.1f", best.score),
-                confidence);
+        log.debug("{} shadow pick: fixtureId={}, player={}, score={}",
+                spec.marketVerb(), context.getFixture().getId(), pick.playerName(),
+                String.format("%.1f", pick.score()));
 
         return Optional.of(recommendation);
     }
 
-    private void considerPlayers(
-            FixtureContext context,
-            boolean isHome,
-            PropSpec spec,
-            List<Candidate> candidates) {
+    Stream<Candidate> candidates(FixtureContext context, boolean isHome) {
         List<PlayerSeasonStats> players = isHome ? context.getHomePlayers() : context.getAwayPlayers();
-        if (players == null) {
-            return;
+        if (players == null || players.isEmpty()) {
+            return Stream.empty();
         }
-        TeamSeasonStats opponentStats = isHome ? context.getAwayTeamStats() : context.getHomeTeamStats();
+        TeamSeasonStats team = isHome ? context.getHomeTeamStats() : context.getAwayTeamStats();
         String teamName = isHome ? context.getHomeTeam().getName() : context.getAwayTeam().getName();
-        double opponentConcededAvg = opponentConcededAvg(opponentStats, isHome);
-        double opponentFactor = opponentFactor(opponentConcededAvg);
+        double teamExpectedGoals = TeamGoalsModel.expectedGoals(context, isHome);
+        double fixtureFactor = fixtureFactor(teamExpectedGoals, TeamGoalsModel.seasonGoalsPerMatch(team));
+        int teamMatches = safeInt(team.getMatchesPlayed());
 
-        for (PlayerSeasonStats player : players) {
-            if (!passesFilter(player, spec, isHome)) {
-                continue;
-            }
-            double rate = per90(player, isHome);
-            double shrunkRate = shrinkPer90(rate, safeInt(player.getMinutesPlayedOverall()), spec.priorPer90());
-            double expectedMinutes = expectedMinutes(player);
-            double expectedEvents = shrunkRate
-                    * (expectedMinutes / FULL_MATCH_MINUTES)
-                    * opponentFactor
-                    * LAMBDA_CALIBRATION;
-            double score = probabilityOfAtLeastOne(expectedEvents);
-            candidates.add(new Candidate(
-                    player, isHome, teamName, rate, shrunkRate, expectedMinutes,
-                    opponentConcededAvg, expectedEvents, score));
-        }
+        return players.stream()
+                .filter(this::passesFilter)
+                .map(player -> {
+                    double rate = ratePer90(player);
+                    double minutes = expectedMinutes(player);
+                    double availability = availability(player, teamMatches);
+                    double lambda = rate * fixtureFactor * (minutes / FULL_MATCH_MINUTES);
+                    double score = availability * probabilityOfAtLeastOne(lambda);
+                    return new Candidate(player, isHome, displayName(player), teamName, rate,
+                            teamExpectedGoals, fixtureFactor, minutes, availability, lambda, score);
+                });
     }
 
-    private boolean passesFilter(PlayerSeasonStats player, PropSpec spec, boolean isHome) {
-        if (player == null || player.getPlayerId() == null) {
-            return false;
-        }
-        if (isGoalkeeper(player.getPosition())) {
-            return false;
-        }
-        int appearances = safeInt(player.getAppearancesOverall());
+    private boolean passesFilter(PlayerSeasonStats player) {
+        return player != null
+                && player.getPlayerId() != null
+                && displayName(player) != null
+                && !isGoalkeeper(player.getPosition())
+                && safeInt(player.getMinutesPlayedOverall()) >= MIN_MINUTES
+                && safeInt(player.getMinPerMatch()) >= MIN_MINUTES_PER_MATCH;
+    }
+
+    /** Shrunk open-play rate plus the penalty rate, per 90 minutes. */
+    double ratePer90(PlayerSeasonStats player) {
         int minutes = safeInt(player.getMinutesPlayedOverall());
-        if (appearances < MIN_APPEARANCES && minutes < MIN_MINUTES) {
-            return false;
-        }
-        if (safeInt(player.getMinPerMatch(), 90) < MIN_MINUTES_PER_MATCH) {
-            return false;
-        }
-        return per90(player, isHome) >= spec.minPer90();
+        double openPlay = shrinkPer90(openPlayEvents(player), minutes, spec().priorPer90());
+        double penalties = minutes > 0 ? penaltyEvents(player) * FULL_MATCH_MINUTES / minutes : 0.0;
+        return openPlay + penalties;
     }
 
     /**
-     * Poisson probability of at least one event given an expected count. Naturally bounded below
-     * 100 without a clamp, so candidates stay rank-ordered right at the top of the range.
+     * Empirical Bayes shrinkage: {@code (events + prior x pseudo/90) / (minutes + pseudo) x 90}.
+     * A season regular keeps most of his own rate; a hot start over 600 minutes does not.
      */
+    static double shrinkPer90(int events, int minutes, double priorPer90) {
+        double pseudoEvents = priorPer90 * SHRINKAGE_PSEUDO_MINUTES / FULL_MATCH_MINUTES;
+        return (Math.max(0, events) + pseudoEvents) * FULL_MATCH_MINUTES
+                / (Math.max(0, minutes) + SHRINKAGE_PSEUDO_MINUTES);
+    }
+
+    /** This fixture's expected team goals relative to the side's season average, clamped. */
+    static double fixtureFactor(double teamExpectedGoals, Double seasonGoalsPerMatch) {
+        if (seasonGoalsPerMatch == null || seasonGoalsPerMatch <= 0 || teamExpectedGoals <= 0) {
+            return 1.0;
+        }
+        double factor = teamExpectedGoals / seasonGoalsPerMatch;
+        return Math.min(FIXTURE_FACTOR_MAX, Math.max(FIXTURE_FACTOR_MIN, factor));
+    }
+
+    static double expectedMinutes(PlayerSeasonStats player) {
+        return Math.min(FULL_MATCH_MINUTES, safeInt(player.getMinPerMatch()));
+    }
+
+    /** Share of the team's matches the player has appeared in; unknown counts as available. */
+    static double availability(PlayerSeasonStats player, int teamMatches) {
+        int appearances = safeInt(player.getAppearancesOverall());
+        if (teamMatches <= 0 || appearances <= 0) {
+            return 1.0;
+        }
+        return Math.min(1.0, appearances / (double) teamMatches);
+    }
+
     static double probabilityOfAtLeastOne(double expectedEvents) {
         if (expectedEvents <= 0) {
             return 0.0;
         }
         return 100.0 * (1.0 - Math.exp(-expectedEvents));
-    }
-
-    /**
-     * Empirical Bayes shrinkage on a per-90 rate. Without this a player with 300 minutes and three
-     * goals reads as 0.90 per 90 and beats a proven starter, which is how the old scoring kept
-     * selecting small-sample outliers.
-     */
-    static double shrinkPer90(double observedPer90, int minutesPlayed, double priorPer90) {
-        if (minutesPlayed <= 0) {
-            return priorPer90;
-        }
-        double weight = minutesPlayed / (double) (minutesPlayed + SHRINKAGE_PSEUDO_MINUTES);
-        return (weight * observedPer90) + ((1.0 - weight) * priorPer90);
-    }
-
-    /** Minutes the player is expected to be on the pitch, from their season per-match average. */
-    static double expectedMinutes(PlayerSeasonStats player) {
-        int perMatch = safeInt(player.getMinPerMatch());
-        if (perMatch <= 0) {
-            return DEFAULT_EXPECTED_MINUTES;
-        }
-        return Math.min(FULL_MATCH_MINUTES, perMatch);
-    }
-
-    /** Opponent leakiness as a tight multiplier around 1.0 (0.90–1.10). */
-    static double opponentFactor(double opponentConcededAvg) {
-        if (opponentConcededAvg <= 0) {
-            return 1.0;
-        }
-        double factor = opponentConcededAvg / LEAGUE_AVG_CONCEDED;
-        return Math.min(OPPONENT_FACTOR_MAX, Math.max(OPPONENT_FACTOR_MIN, factor));
-    }
-
-    private static double opponentConcededAvg(TeamSeasonStats opponent, boolean playerIsHome) {
-        if (opponent == null) {
-            return 1.0;
-        }
-        return calculateVenueConcededAvg(opponent, !playerIsHome, 1.0);
-    }
-
-    private static ConfidenceLevel determineConfidence(double score, PropSpec spec) {
-        if (score >= spec.thresholdStrong()) {
-            return ConfidenceLevel.STRONG;
-        }
-        if (score >= spec.thresholdModerate()) {
-            return ConfidenceLevel.MODERATE;
-        }
-        return ConfidenceLevel.WEAK;
-    }
-
-    private static Map<String, Object> buildFactors(Candidate best, PropSpec spec, String playerName) {
-        Map<String, Object> factors = new HashMap<>();
-        factors.put("playerId", best.player.getPlayerId());
-        factors.put("playerName", playerName);
-        factors.put("teamName", best.teamName);
-        factors.put("isHome", best.isHome);
-        factors.put("per90", best.per90);
-        factors.put("shrunkPer90", best.shrunkPer90);
-        factors.put("expectedMinutes", best.expectedMinutes);
-        factors.put("expectedEvents", best.expectedEvents);
-        factors.put("appearances", safeInt(best.player.getAppearancesOverall()));
-        factors.put("minutes", safeInt(best.player.getMinutesPlayedOverall()));
-        factors.put("opponentConcededAvg", best.opponentConcededAvg);
-        if (best.player.getRankInClubTopScorer() != null) {
-            factors.put("rankInClubTopScorer", best.player.getRankInClubTopScorer());
-        }
-        factors.put("marketVerb", spec.marketVerb());
-        factors.put("calculatedScore", best.score);
-        return factors;
-    }
-
-    static double venuePer90(Integer events, Integer minutes, double overallFallback) {
-        int mins = safeInt(minutes);
-        if (mins < 90) {
-            return overallFallback;
-        }
-        return safeInt(events) * 90.0 / mins;
     }
 
     static boolean isGoalkeeper(String position) {
@@ -302,11 +228,7 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         if (player.getFullName() != null && !player.getFullName().isBlank()) {
             return player.getFullName().trim();
         }
-        String fromParts = joinNameParts(player.getFirstName(), player.getLastName());
-        if (fromParts != null) {
-            return fromParts;
-        }
-        return null;
+        return joinNameParts(player.getFirstName(), player.getLastName());
     }
 
     private static String joinNameParts(String firstName, String lastName) {
@@ -324,15 +246,35 @@ public abstract class PlayerPropRecommendationEngine implements RecommendationEn
         return first + " " + last;
     }
 
-    private record Candidate(
-            PlayerSeasonStats player,
-            boolean isHome,
-            String teamName,
-            double per90,
-            double shrunkPer90,
-            double expectedMinutes,
-            double opponentConcededAvg,
-            double expectedEvents,
-            double score
-    ) {}
+    /** Season count, falling back to the feed's per-90 figure when the raw count is missing. */
+    static int seasonCount(Integer count, Double per90, Integer minutes) {
+        if (count != null) {
+            return Math.max(0, count);
+        }
+        if (per90 == null || minutes == null || minutes <= 0) {
+            return 0;
+        }
+        return (int) Math.round(per90 * minutes / FULL_MATCH_MINUTES);
+    }
+
+    private static Map<String, Object> buildFactors(Candidate pick, PropSpec spec) {
+        Map<String, Object> factors = new HashMap<>();
+        factors.put("playerId", pick.player().getPlayerId());
+        factors.put("playerName", pick.playerName());
+        factors.put("teamName", pick.teamName());
+        factors.put("isHome", pick.isHome());
+        factors.put("ratePer90", pick.ratePer90());
+        factors.put("teamExpectedGoals", pick.teamExpectedGoals());
+        factors.put("fixtureFactor", pick.fixtureFactor());
+        factors.put("expectedMinutes", pick.expectedMinutes());
+        factors.put("availability", pick.availability());
+        factors.put("expectedEvents", pick.expectedEvents());
+        factors.put("appearances", safeInt(pick.player().getAppearancesOverall()));
+        factors.put("minutes", safeInt(pick.player().getMinutesPlayedOverall()));
+        factors.put("marketVerb", spec.marketVerb());
+        factors.put("shadow", true);
+        factors.put("meetsPublishBar", pick.score() >= spec.publishBar());
+        factors.put("calculatedScore", pick.score());
+        return factors;
+    }
 }

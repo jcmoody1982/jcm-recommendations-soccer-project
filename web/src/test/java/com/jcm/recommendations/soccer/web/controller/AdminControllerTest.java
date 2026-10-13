@@ -6,6 +6,7 @@ import com.jcm.recommendations.soccer.core.repository.FixtureOddsRepository;
 import com.jcm.recommendations.soccer.core.repository.FixtureRepository;
 import com.jcm.recommendations.soccer.core.results.RecommendationSnapshotService;
 import com.jcm.recommendations.soccer.core.results.ResultsMatchIngestService;
+import com.jcm.recommendations.soccer.core.results.ResultsPerformanceService;
 import com.jcm.recommendations.soccer.core.results.SettlementService;
 import com.jcm.recommendations.soccer.core.service.DataSyncService;
 import com.jcm.recommendations.soccer.core.service.FixtureService;
@@ -62,6 +63,8 @@ class AdminControllerTest {
     private ResultsMatchIngestService resultsMatchIngestService;
     @MockitoBean
     private SettlementService settlementService;
+    @MockitoBean
+    private ResultsPerformanceService resultsPerformanceService;
 
     private static DataSyncService.SyncSummary syncSummary(boolean success) {
         return new DataSyncService.SyncSummary(5, 2, 10, 4, 0, 0, 0, 0, 0, success);
@@ -154,5 +157,27 @@ class AdminControllerTest {
                 .andExpect(jsonPath("$.fixturesWithBttsOdds").value(1))
                 .andExpect(jsonPath("$.fixturesWithMatchOdds").value(1))
                 .andExpect(jsonPath("$.fixturesWithZeroOdds").value(1));
+    }
+
+    @Test
+    void shadowPerformanceReturnsTheReport() throws Exception {
+        ResultsPerformanceService.BucketStats stats = new ResultsPerformanceService.BucketStats(
+                3, 7, 0, 2, 0, 30.0, 10, true, 0, null, null, null, null);
+        when(resultsPerformanceService.getShadowPerformance("30d")).thenReturn(List.of(
+                new ResultsPerformanceService.ShadowPerformance(
+                        "PLAYER_TO_SCORE", "30d", DAY.minusDays(29), DAY, stats, List.of())));
+
+        mockMvc.perform(get("/api/admin/shadow-performance").param("period", "30d"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("PLAYER_TO_SCORE"))
+                .andExpect(jsonPath("$[0].overall.hitRate").value(30.0));
+    }
+
+    @Test
+    void shadowPerformanceRejectsAnUnknownPeriod() throws Exception {
+        when(resultsPerformanceService.getShadowPerformance("14d")).thenThrow(new IllegalArgumentException("bad"));
+
+        mockMvc.perform(get("/api/admin/shadow-performance").param("period", "14d"))
+                .andExpect(status().isBadRequest());
     }
 }

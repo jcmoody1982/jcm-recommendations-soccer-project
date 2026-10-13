@@ -151,11 +151,13 @@ const TOTAL_GOALS_OVER_FACTOR_ORDER: readonly string[] = [
 const PLAYER_PROP_FACTOR_ORDER: readonly string[] = [
   'playerName',
   'teamName',
-  'per90',
+  'ratePer90',
+  'teamExpectedGoals',
+  'fixtureFactor',
+  'expectedMinutes',
+  'availability',
   'appearances',
   'minutes',
-  'opponentConcededAvg',
-  'rankInClubTopScorer',
   'calculatedScore',
 ];
 

@@ -47,7 +47,8 @@ public class RecommendationSnapshotService {
         log.info("Snapshot starting: snapshotDate={}, daysAhead={}, timezone={}",
                 snapshotDate, String.format("%.3f", daysAhead), resultsProperties.getTimezone());
 
-        List<Recommendation> recommendations = recommendationService.generateAllRecommendations(daysAhead);
+        List<Recommendation> recommendations =
+                recommendationService.generateAllRecommendationsIncludingShadow(daysAhead);
         List<Recommendation> eligible = recommendations.stream()
                 .filter(this::isActionableConfidence)
                 .filter(r -> isKickoffOnDate(r.getMatchDateUnix(), snapshotDate))

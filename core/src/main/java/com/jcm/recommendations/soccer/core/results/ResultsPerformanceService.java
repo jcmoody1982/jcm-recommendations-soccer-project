@@ -1,6 +1,7 @@
 package com.jcm.recommendations.soccer.core.results;
 
 import com.jcm.recommendations.soccer.core.config.ResultsProperties;
+import com.jcm.recommendations.soccer.core.recommendation.ShadowMarkets;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
 import com.jcm.recommendations.soccer.core.repository.RecommendationSnapshotRepository;
 import com.jcm.recommendations.soccer.domain.PickOutcome;
@@ -27,15 +28,14 @@ public class ResultsPerformanceService {
     public static final int MIN_SAMPLE = 10;
 
     /**
-     * Types paused from boards/metrics. UNDER_GOALS awaits a Poisson rebuild. Form mismatch,
-     * Result+BTTS, and Player to Score are held after the 2026-09-11..23 window (~28–38% hit).
+     * Types paused from boards/metrics, on top of {@link ShadowMarkets}. UNDER_GOALS awaits a Poisson
+     * rebuild. Form mismatch and Result+BTTS are held after the 2026-09-11..23 window (~28–38% hit).
      */
     private static final Set<String> EXCLUDED_TYPES = Set.of(
             "UNDER_GOALS",
             "WINNING_FORM_MISMATCH",
             "LOSING_FORM_MISMATCH",
-            "RESULT_BTTS",
-            "PLAYER_TO_SCORE"
+            "RESULT_BTTS"
     );
 
     /**
@@ -52,6 +52,9 @@ public class ResultsPerformanceService {
 
     /** Inclusive lower bounds of the reliability bands, ascending. */
     private static final int[] CALIBRATION_BAND_FLOORS = {0, 50, 60, 70, 80, 90};
+
+    /** Player props live between ~15% and ~55%, so the shadow report needs finer bands there. */
+    private static final int[] SHADOW_BAND_FLOORS = {0, 20, 25, 30, 35, 40, 45, 50};
 
     private final RecommendationSnapshotRepository snapshotRepository;
     private final ResultsProperties resultsProperties;
@@ -98,6 +101,15 @@ public class ResultsPerformanceService {
             List<CalibrationBand> calibration
     ) {}
 
+    public record ShadowPerformance(
+            String type,
+            String period,
+            LocalDate fromDate,
+            LocalDate toDate,
+            BucketStats overall,
+            List<CalibrationBand> calibration
+    ) {}
+
     public record PerformanceView(
             String period,
             LocalDate fromDate,
@@ -134,14 +146,14 @@ public class ResultsPerformanceService {
 
         Map<String, List<RecommendationSnapshot>> byType = new LinkedHashMap<>();
         for (RecommendationType type : RecommendationType.values()) {
-            if (EXCLUDED_TYPES.contains(type.name())) {
+            if (isExcluded(type.name())) {
                 continue;
             }
             byType.put(type.name(), new ArrayList<>());
         }
         for (RecommendationSnapshot row : rows) {
             String type = row.getType() == null ? "UNKNOWN" : row.getType();
-            if (EXCLUDED_TYPES.contains(type)) {
+            if (isExcluded(type)) {
                 continue;
             }
             byType.computeIfAbsent(type, key -> new ArrayList<>()).add(row);
@@ -218,7 +230,34 @@ public class ResultsPerformanceService {
 
     static boolean isIncludedType(RecommendationSnapshot row) {
         String type = row.getType();
-        return type == null || !EXCLUDED_TYPES.contains(type);
+        return type == null || !isExcluded(type);
+    }
+
+    private static boolean isExcluded(String type) {
+        return EXCLUDED_TYPES.contains(type) || ShadowMarkets.isShadow(type);
+    }
+
+    /**
+     * Admin-only record for {@link ShadowMarkets} engines: settled counts and claimed-vs-actual in
+     * 5-point bands, which is the evidence needed to set a publish bar before promoting them.
+     */
+    public List<ShadowPerformance> getShadowPerformance(String periodRaw) {
+        String period = normalizePeriod(periodRaw);
+        LocalDate toDate = LocalDate.now(resultsProperties.zoneId());
+        LocalDate fromDate = resolveFromDate(period, toDate);
+        List<RecommendationSnapshot> rows = loadRows(fromDate, toDate);
+
+        List<ShadowPerformance> report = new ArrayList<>();
+        for (RecommendationType type : ShadowMarkets.TYPES) {
+            List<RecommendationSnapshot> typeRows = rows.stream()
+                    .filter(r -> type.name().equals(r.getType()))
+                    .toList();
+            report.add(new ShadowPerformance(
+                    type.name(), period, fromDate, toDate,
+                    summarize(typeRows),
+                    calibrate(type.name(), typeRows, SHADOW_BAND_FLOORS)));
+        }
+        return report;
     }
 
     static String normalizePeriod(String periodRaw) {
@@ -300,11 +339,15 @@ public class ResultsPerformanceService {
      * strike rate without any existing metric flagging it.
      */
     static List<CalibrationBand> calibrate(String type, List<RecommendationSnapshot> rows) {
+        return calibrate(type, rows, CALIBRATION_BAND_FLOORS);
+    }
+
+    static List<CalibrationBand> calibrate(String type, List<RecommendationSnapshot> rows, int[] floors) {
         if (type == null || !PROBABILITY_SCORED_TYPES.contains(type) || rows == null) {
             return List.of();
         }
 
-        int bandCount = CALIBRATION_BAND_FLOORS.length;
+        int bandCount = floors.length;
         int[] wins = new int[bandCount];
         int[] counts = new int[bandCount];
         double[] scoreSums = new double[bandCount];
@@ -318,7 +361,7 @@ public class ResultsPerformanceService {
             if (score == null) {
                 continue;
             }
-            int index = bandIndex(score);
+            int index = bandIndex(score, floors);
             counts[index]++;
             scoreSums[index] += score;
             if (outcome == PickOutcome.WIN) {
@@ -334,7 +377,7 @@ public class ResultsPerformanceService {
             double avgScore = scoreSums[i] / counts[i];
             double hitRate = (wins[i] * 100.0) / counts[i];
             bands.add(new CalibrationBand(
-                    bandLabel(i),
+                    bandLabel(i, floors),
                     counts[i],
                     avgScore,
                     hitRate,
@@ -344,24 +387,24 @@ public class ResultsPerformanceService {
         return bands;
     }
 
-    private static int bandIndex(double score) {
+    private static int bandIndex(double score, int[] floors) {
         int index = 0;
-        for (int i = 0; i < CALIBRATION_BAND_FLOORS.length; i++) {
-            if (score >= CALIBRATION_BAND_FLOORS[i]) {
+        for (int i = 0; i < floors.length; i++) {
+            if (score >= floors[i]) {
                 index = i;
             }
         }
         return index;
     }
 
-    private static String bandLabel(int index) {
-        int floor = CALIBRATION_BAND_FLOORS[index];
+    private static String bandLabel(int index, int[] floors) {
+        int floor = floors[index];
         if (index == 0) {
-            return "<" + CALIBRATION_BAND_FLOORS[1];
+            return "<" + floors[1];
         }
-        if (index == CALIBRATION_BAND_FLOORS.length - 1) {
+        if (index == floors.length - 1) {
             return floor + "+";
         }
-        return floor + "-" + (CALIBRATION_BAND_FLOORS[index + 1] - 1);
+        return floor + "-" + (floors[index + 1] - 1);
     }
 }

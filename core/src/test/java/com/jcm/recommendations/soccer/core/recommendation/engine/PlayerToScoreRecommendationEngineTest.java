@@ -12,34 +12,22 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PlayerToScoreRecommendationEngineTest {
 
-    /** Goals conceded over 10 matches that lands the opponent on the league-average rate. */
-    private static final int NEUTRAL_DEFENCE_CONCEDED = 14;
-
-    /** Soft defence so calibrated lambda clears the raised moderate floor in fixture tests. */
-    private static final int LEAKY_DEFENCE_CONCEDED = 25;
+    /** Goals the away side concedes on the road over 9 matches; 15 is this league's norm. */
+    private static final int NEUTRAL_AWAY_CONCEDED = 15;
+    private static final int LEAKY_AWAY_CONCEDED = 27;
 
     private PlayerToScoreRecommendationEngine engine;
 
     @BeforeEach
     void setUp() {
         engine = new PlayerToScoreRecommendationEngine();
-    }
-
-
-    @Test
-    @DisplayName("analyze is paused and publishes nothing")
-    void analyze_whenPaused_returnsEmpty() {
-        assertThat(PlayerToScoreRecommendationEngine.PAUSED).isTrue();
-        assertThat(engine.analyze(contextWithPlayers(
-                scorer(10L, "Mohamed Salah", 0.85, 18, 1500, 1),
-                scorer(11L, "Squad Forward", 0.28, 10, 700, 3)))).isEmpty();
     }
 
     @Test
@@ -49,190 +37,112 @@ class PlayerToScoreRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze picks the highest per-90 regular across both squads")
-    void analyze_picksBestScorer() {
-        Optional<Recommendation> result = engine.analyzeLive(contextWithPlayers(
-                scorer(10L, "Mohamed Salah", 0.85, 18, 1500, 1),
-                scorer(11L, "Squad Forward", 0.28, 10, 700, 3)));
+    @DisplayName("tracks the likeliest scorer across both squads as an unpriced Moderate shadow pick")
+    void analyze_picksBestScorerAcrossSquads() {
+        FixtureContext context = context(NEUTRAL_AWAY_CONCEDED,
+                List.of(striker(10L, "Home Striker", 10, 1, 1500, 17, 88)),
+                List.of(striker(20L, "Away Forward", 5, 0, 1400, 16, 80)));
 
-        assertThat(result).isPresent();
-        assertThat(result.get().getType()).isEqualTo(RecommendationType.PLAYER_TO_SCORE);
-        assertThat(result.get().getMarket()).isEqualTo("Mohamed Salah to score");
-        assertThat(result.get().getOdds()).isNull();
-        assertThat(result.get().getFactors()).containsEntry("playerId", 10L);
-        assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.STRONG);
-        assertThat(result.get().getScore()).isLessThan(55.0);
+        Recommendation rec = engine.analyze(context).orElseThrow();
+
+        assertThat(rec.getMarket()).isEqualTo("Home Striker to score");
+        assertThat(rec.getOdds()).isNull();
+        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(rec.getScore()).isBetween(35.0, 42.0);
+        assertThat(rec.getFactors())
+                .containsEntry("playerId", 10L)
+                .containsEntry("isHome", true)
+                .containsEntry("shadow", true)
+                .containsEntry("meetsPublishBar", true)
+                .containsKeys("ratePer90", "teamExpectedGoals", "fixtureFactor", "availability", "expectedEvents");
     }
 
     @Test
-    @DisplayName("analyze publishes a calibrated probability below the raw Poisson ceiling")
-    void analyze_eliteScorer_staysWithinRealisticRange() {
-        Optional<Recommendation> result = engine.analyzeLive(contextWithOpponentConceded(
-                scorer(10L, "Elite Striker", 0.85, 20, 1600, null),
-                LEAKY_DEFENCE_CONCEDED));
+    @DisplayName("an ordinary forward is tracked but flagged as below the publish bar")
+    void analyze_averageForward_isTrackedBelowBar() {
+        Recommendation rec = engine.analyze(context(NEUTRAL_AWAY_CONCEDED,
+                List.of(striker(10L, "Squad Forward", 5, 0, 1400, 16, 80)), List.of())).orElseThrow();
 
-        assertThat(result).isPresent();
-        // Raw Poisson on 0.85 per-90 over 90 minutes is ~57%; calibration + floors keep the
-        // published score in the mid band the board can defend.
-        assertThat(result.get().getScore()).isLessThan(50.0);
-        assertThat(result.get().getScore()).isGreaterThan(35.0);
+        assertThat(rec.getScore()).isBetween(20.0, 25.0);
+        assertThat(rec.getFactors()).containsEntry("meetsPublishBar", false);
     }
 
     @Test
-    @DisplayName("analyze prefers the proven scorer over an equal-rate small sample")
-    void analyze_thinSample_isShrunkTowardPrior() {
-        Optional<Recommendation> result = engine.analyzeLive(contextWithPlayers(
-                scorer(10L, "Proven Starter", 0.80, 20, 1600, null),
-                scorer(11L, "Hot Streak Sub", 0.80, 6, 400, null)));
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Proven Starter to score");
+    @DisplayName("nothing is tracked when the best candidate is under the tracking floor")
+    void analyze_belowTrackingFloor_isEmpty() {
+        assertThat(engine.analyze(context(NEUTRAL_AWAY_CONCEDED,
+                List.of(striker(10L, "Holding Midfielder", 2, 0, 1200, 16, 80)), List.of()))).isEmpty();
     }
 
     @Test
-    @DisplayName("analyze scores a part-time player below a full-match player on the same rate")
-    void analyze_expectedMinutes_lowerTheScore() {
-        PlayerSeasonStats fullMatch = scorer(10L, "Ninety Minute Man", 0.85, 20, 1600, null);
-        fullMatch.setMinPerMatch(90);
-        PlayerSeasonStats partial = scorer(10L, "Hour Player", 0.85, 20, 1600, null);
-        partial.setMinPerMatch(70);
+    @DisplayName("a leaky opponent lifts the same striker's probability through team expected goals")
+    void analyze_fixtureContextMovesTheScore() {
+        PlayerSeasonStats striker = striker(10L, "Home Striker", 10, 1, 1500, 17, 88);
 
-        double fullScore = scoreFor(fullMatch, LEAKY_DEFENCE_CONCEDED);
-        double partialScore = scoreFor(partial, LEAKY_DEFENCE_CONCEDED);
+        double neutral = engine.analyze(context(NEUTRAL_AWAY_CONCEDED, List.of(striker), List.of()))
+                .orElseThrow().getScore();
+        double leaky = engine.analyze(context(LEAKY_AWAY_CONCEDED, List.of(striker), List.of()))
+                .orElseThrow().getScore();
 
-        assertThat(partialScore).isLessThan(fullScore);
+        assertThat(leaky).isGreaterThan(neutral + 5.0);
     }
 
     @Test
-    @DisplayName("analyze skips keepers and low-minute players")
-    void analyze_skipsKeepersAndBenchPlayers() {
-        PlayerSeasonStats keeper = scorer(20L, "Alisson", 0.05, 20, 1800, null);
+    @DisplayName("a player who misses matches is discounted for availability")
+    void analyze_availabilityDiscountsIrregulars() {
+        double regular = engine.analyze(context(NEUTRAL_AWAY_CONCEDED,
+                List.of(striker(10L, "Ever Present", 10, 1, 1500, 18, 88)), List.of())).orElseThrow().getScore();
+        double irregular = engine.analyze(context(NEUTRAL_AWAY_CONCEDED,
+                List.of(striker(10L, "Often Absent", 10, 1, 1500, 12, 88)), List.of())).orElseThrow().getScore();
+
+        assertThat(irregular).isLessThan(regular * 0.75);
+    }
+
+    @Test
+    @DisplayName("penalties are credited in full rather than shrunk toward the prior")
+    void ratePer90_penaltiesAreNotShrunk() {
+        double openPlayOnly = engine.ratePer90(striker(10L, "Open Play", 10, 0, 1500, 17, 88));
+        double penaltyTaker = engine.ratePer90(striker(11L, "Penalty Taker", 10, 4, 1500, 17, 88));
+
+        assertThat(penaltyTaker).isGreaterThan(openPlayOnly);
+    }
+
+    @Test
+    @DisplayName("a hot home-only split no longer drives the pick")
+    void analyze_ignoresVenueSplits() {
+        PlayerSeasonStats plain = striker(10L, "Home Striker", 10, 1, 1500, 17, 88);
+        PlayerSeasonStats hotAtHome = striker(10L, "Home Striker", 10, 1, 1500, 17, 88);
+        hotAtHome.setGoalsPer90Home(1.5);
+
+        double plainScore = engine.analyze(context(NEUTRAL_AWAY_CONCEDED, List.of(plain), List.of()))
+                .orElseThrow().getScore();
+        double splitScore = engine.analyze(context(NEUTRAL_AWAY_CONCEDED, List.of(hotAtHome), List.of()))
+                .orElseThrow().getScore();
+
+        assertThat(splitScore).isEqualTo(plainScore);
+    }
+
+    @Test
+    @DisplayName("filters drop keepers, thin samples, part-timers and nameless players")
+    void analyze_filters() {
+        PlayerSeasonStats keeper = striker(1L, "Keeper", 10, 1, 1500, 17, 90);
         keeper.setPosition("Goalkeeper");
-        PlayerSeasonStats sub = scorer(21L, "Impact Sub", 0.90, 2, 80, 1);
-        sub.setMinPerMatch(20);
+        PlayerSeasonStats thin = striker(2L, "Thin Sample", 4, 0, 500, 6, 85);
+        PlayerSeasonStats partTimer = striker(3L, "Impact Sub", 8, 0, 900, 17, 55);
+        PlayerSeasonStats nameless = striker(4L, null, 10, 1, 1500, 17, 88);
+        PlayerSeasonStats noId = striker(null, "No Id", 10, 1, 1500, 17, 88);
 
-        Optional<Recommendation> result = engine.analyzeLive(contextWithPlayers(keeper, sub));
-
-        assertThat(result).isEmpty();
+        assertThat(engine.analyze(context(NEUTRAL_AWAY_CONCEDED,
+                Arrays.asList(keeper, thin, null), List.of(partTimer, nameless, noId)))).isEmpty();
     }
 
     @Test
-    @DisplayName("analyze drops a marginal scorer below the moderate threshold")
-    void analyze_marginalScorer_isNotPublished() {
-        Optional<Recommendation> result = engine.analyzeLive(contextWithOpponentConceded(
-                scorer(10L, "Occasional Scorer", 0.26, 8, 500, null),
-                NEUTRAL_DEFENCE_CONCEDED));
-
-        assertThat(result).isEmpty();
+    @DisplayName("not applicable without player stats")
+    void analyze_withoutPlayers_isEmpty() {
+        assertThat(engine.analyze(context(NEUTRAL_AWAY_CONCEDED, null, null))).isEmpty();
     }
 
-    @Test
-    @DisplayName("analyze builds the market from first and last name when known-as is missing")
-    void analyze_usesFirstAndLastNameWhenKnownAsMissing() {
-        PlayerSeasonStats namedByParts = scorer(10L, null, 0.85, 18, 1500, 1);
-        namedByParts.setFirstName("Mohamed");
-        namedByParts.setLastName("Salah");
-
-        Optional<Recommendation> result = engine.analyzeLive(contextWithPlayers(
-                namedByParts,
-                scorer(11L, "Squad Forward", 0.28, 10, 700, 3)));
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Mohamed Salah to score");
-        assertThat(result.get().getFactors()).containsEntry("playerName", "Mohamed Salah");
-    }
-
-    @Test
-    @DisplayName("analyze skips a tip when no candidate has a usable name")
-    void analyze_namelessCandidates_areSkipped() {
-        PlayerSeasonStats nameless = scorer(10L, null, 0.85, 18, 1500, 1);
-
-        Optional<Recommendation> result = engine.analyzeLive(
-                contextWithOpponentConceded(nameless, LEAKY_DEFENCE_CONCEDED));
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    @DisplayName("analyze prefers the best named scorer over a nameless higher-rated candidate")
-    void analyze_prefersNamedCandidateOverNamelessLeader() {
-        PlayerSeasonStats namelessLeader = scorer(10L, null, 0.90, 20, 1600, 1);
-        PlayerSeasonStats namedRunnerUp = scorer(11L, "Named Forward", 0.80, 18, 1500, 2);
-        namedRunnerUp.setClubTeamId(1L);
-
-        Optional<Recommendation> result = engine.analyzeLive(baseContextBuilder(LEAKY_DEFENCE_CONCEDED)
-                .homePlayers(List.of(namelessLeader, namedRunnerUp))
-                .awayPlayers(List.of())
-                .build());
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Named Forward to score");
-    }
-
-    @Test
-    @DisplayName("displayName prefers known-as, then full name, then first/last parts")
-    void displayName_fallsBackThroughNameFields() {
-        assertThat(PlayerPropRecommendationEngine.displayName(
-                PlayerSeasonStats.builder().knownAs("Salah").fullName("Mohamed Salah").build()))
-                .isEqualTo("Salah");
-        assertThat(PlayerPropRecommendationEngine.displayName(
-                PlayerSeasonStats.builder().fullName("Mohamed Salah").firstName("Mo").build()))
-                .isEqualTo("Mohamed Salah");
-        assertThat(PlayerPropRecommendationEngine.displayName(
-                PlayerSeasonStats.builder().firstName("Mohamed").lastName("Salah").build()))
-                .isEqualTo("Mohamed Salah");
-        assertThat(PlayerPropRecommendationEngine.displayName(
-                PlayerSeasonStats.builder().playerId(1L).build()))
-                .isNull();
-    }
-
-    @Test
-    @DisplayName("analyze returns empty when player lists are missing")
-    void analyze_withoutPlayers_returnsEmpty() {
-        Optional<Recommendation> result = engine.analyzeLive(baseContextBuilder(NEUTRAL_DEFENCE_CONCEDED).build());
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    @DisplayName("probabilityOfAtLeastOne follows the Poisson complement")
-    void probabilityOfAtLeastOne_matchesPoisson() {
-        assertThat(PlayerPropRecommendationEngine.probabilityOfAtLeastOne(0.0)).isZero();
-        assertThat(PlayerPropRecommendationEngine.probabilityOfAtLeastOne(0.55))
-                .isCloseTo(42.3, org.assertj.core.data.Offset.offset(0.1));
-        assertThat(PlayerPropRecommendationEngine.probabilityOfAtLeastOne(10.0)).isLessThan(100.0);
-    }
-
-    @Test
-    @DisplayName("opponentFactor stays within the tight 0.90–1.10 band")
-    void opponentFactor_isClampedTightly() {
-        assertThat(PlayerPropRecommendationEngine.opponentFactor(0.5)).isEqualTo(0.90);
-        assertThat(PlayerPropRecommendationEngine.opponentFactor(1.35)).isEqualTo(1.0);
-        assertThat(PlayerPropRecommendationEngine.opponentFactor(3.0)).isEqualTo(1.10);
-    }
-
-    private double scoreFor(PlayerSeasonStats player, int concededAway) {
-        Optional<Recommendation> result = engine.analyzeLive(
-                contextWithOpponentConceded(player, concededAway));
-        assertThat(result).isPresent();
-        return result.get().getScore();
-    }
-
-    private FixtureContext contextWithPlayers(PlayerSeasonStats homePlayer, PlayerSeasonStats awayPlayer) {
-        return baseContextBuilder(18)
-                .homePlayers(List.of(homePlayer))
-                .awayPlayers(List.of(awayPlayer))
-                .build();
-    }
-
-    private FixtureContext contextWithOpponentConceded(PlayerSeasonStats homePlayer, int concededAway) {
-        return baseContextBuilder(concededAway)
-                .homePlayers(List.of(homePlayer))
-                .awayPlayers(List.of())
-                .build();
-    }
-
-    private FixtureContext.FixtureContextBuilder baseContextBuilder(int awayConcededAway) {
+    static FixtureContext context(int awayConcededAway, List<PlayerSeasonStats> home, List<PlayerSeasonStats> away) {
         return FixtureContext.builder()
                 .fixture(Fixture.builder()
                         .id(1000L)
@@ -246,41 +156,41 @@ class PlayerToScoreRecommendationEngineTest {
                         .build())
                 .homeTeam(Team.builder().id(1L).name("Home Team").build())
                 .awayTeam(Team.builder().id(2L).name("Away Team").build())
-                .homeTeamStats(TeamSeasonStats.builder()
-                        .teamId(1L)
-                        .seasonId(100L)
-                        .matchesPlayed(10)
-                        .matchesPlayedHome(10)
-                        .matchesPlayedAway(10)
-                        .seasonConcededHome(12)
-                        .seasonConcededAway(14)
-                        .build())
-                .awayTeamStats(TeamSeasonStats.builder()
-                        .teamId(2L)
-                        .seasonId(100L)
-                        .matchesPlayed(10)
-                        .matchesPlayedHome(10)
-                        .matchesPlayedAway(10)
-                        .seasonConcededHome(16)
-                        .seasonConcededAway(awayConcededAway)
-                        .build());
+                .homeTeamStats(team(1L, 15))
+                .awayTeamStats(team(2L, awayConcededAway))
+                .homePlayers(home)
+                .awayPlayers(away)
+                .build();
     }
 
-    private static PlayerSeasonStats scorer(
-            Long playerId, String knownAs, double per90, int appearances, int minutes, Integer rank) {
-        return PlayerSeasonStats.builder()
-                .playerId(playerId)
+    /** 18 matches (9 home, 9 away), 26 goals scored, 15 conceded at home. */
+    private static TeamSeasonStats team(long id, int concededAway) {
+        return TeamSeasonStats.builder()
+                .teamId(id)
                 .seasonId(100L)
-                .clubTeamId(playerId == 10L ? 1L : 2L)
+                .matchesPlayed(18)
+                .matchesPlayedHome(9)
+                .matchesPlayedAway(9)
+                .seasonGoalsOverall(26)
+                .seasonGoalsHome(15)
+                .seasonGoalsAway(11)
+                .seasonConcededHome(11)
+                .seasonConcededAway(concededAway)
+                .build();
+    }
+
+    private static PlayerSeasonStats striker(Long id, String knownAs, int goals, int penalties,
+            int minutes, int appearances, int minPerMatch) {
+        return PlayerSeasonStats.builder()
+                .playerId(id)
+                .seasonId(100L)
                 .knownAs(knownAs)
                 .position("Forward")
                 .appearancesOverall(appearances)
                 .minutesPlayedOverall(minutes)
-                .minPerMatch(80)
-                .goalsPer90Overall(per90)
-                .goalsPer90Home(per90)
-                .goalsPer90Away(per90)
-                .rankInClubTopScorer(rank)
+                .minPerMatch(minPerMatch)
+                .goalsOverall(goals)
+                .penaltyGoals(penalties)
                 .build();
     }
 }

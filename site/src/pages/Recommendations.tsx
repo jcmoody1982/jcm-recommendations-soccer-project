@@ -34,7 +34,6 @@ const PINNED_EMPTY_TYPES: RecommendationType[] = [
   'OVER_05_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
-  'PLAYER_TO_ASSIST',
 ];
 
 /** How many days of picks to load. Kickoff chips filter inside this window. */

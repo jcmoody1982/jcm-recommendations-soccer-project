@@ -1,26 +1,18 @@
 package com.jcm.recommendations.soccer.core.recommendation.engine;
 
 import com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel;
-import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
-import com.jcm.recommendations.soccer.domain.Fixture;
 import com.jcm.recommendations.soccer.domain.PlayerSeasonStats;
-import com.jcm.recommendations.soccer.domain.Team;
-import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
+import static com.jcm.recommendations.soccer.core.recommendation.engine.PlayerToScoreRecommendationEngineTest.context;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Engine logic tests only — {@link PlayerToAssistRecommendationEngine} is not a Spring
- * {@code @Component}, so production does not register it until assist calibration lands.
- */
 class PlayerToAssistRecommendationEngineTest {
 
     private PlayerToAssistRecommendationEngine engine;
@@ -37,81 +29,62 @@ class PlayerToAssistRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze picks the creator with the strongest assist per-90")
+    @DisplayName("tracks the leading creator as an unpriced Moderate shadow pick")
     void analyze_picksBestCreator() {
-        Optional<Recommendation> result = engine.analyze(contextWith(
-                creator(30L, "Bruno Fernandes", 0.85, 16, 1600),
-                creator(31L, "Wide Midfielder", 0.22, 12, 900)));
+        Recommendation rec = engine.analyze(context(15,
+                List.of(creator(30L, "Playmaker", 8, 1500, 17)),
+                List.of(creator(31L, "Wide Midfielder", 3, 1300, 16)))).orElseThrow();
 
-        assertThat(result).isPresent();
-        assertThat(result.get().getType()).isEqualTo(RecommendationType.PLAYER_TO_ASSIST);
-        assertThat(result.get().getMarket()).isEqualTo("Bruno Fernandes to assist");
-        assertThat(result.get().getOdds()).isNull();
-        assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.STRONG);
+        assertThat(rec.getMarket()).isEqualTo("Playmaker to assist");
+        assertThat(rec.getOdds()).isNull();
+        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(rec.getScore()).isBetween(25.0, 35.0);
+        assertThat(rec.getFactors())
+                .containsEntry("shadow", true)
+                .containsEntry("meetsPublishBar", true);
     }
 
     @Test
-    @DisplayName("analyze keeps assist probabilities below the goalscorer range")
-    void analyze_staysWithinRealisticAssistRange() {
-        Optional<Recommendation> result = engine.analyze(contextWith(
-                creator(30L, "Elite Creator", 0.75, 20, 1600),
-                creator(31L, "Wide Midfielder", 0.22, 12, 900)));
+    @DisplayName("assist probabilities sit well below a comparable goalscorer's")
+    void analyze_assistsAreRarerThanGoals() {
+        PlayerSeasonStats player = creator(30L, "Playmaker", 8, 1500, 17);
+        player.setGoalsOverall(8);
+        player.setPenaltyGoals(0);
 
-        assertThat(result).isPresent();
-        assertThat(result.get().getScore()).isLessThan(45.0);
-        assertThat(result.get().getScore()).isGreaterThan(30.0);
+        double assist = engine.analyze(context(15, List.of(player), List.of())).orElseThrow().getScore();
+        double goal = new PlayerToScoreRecommendationEngine()
+                .analyze(context(15, List.of(player), List.of())).orElseThrow().getScore();
+
+        assertThat(assist).isLessThan(goal);
     }
 
     @Test
-    @DisplayName("analyze drops a marginal creator below the moderate threshold")
-    void analyze_marginalCreator_isNotPublished() {
-        Optional<Recommendation> result = engine.analyze(contextWith(
-                creator(30L, "Occasional Creator", 0.21, 8, 500),
-                creator(31L, "Deep Midfielder", 0.20, 8, 500)));
-
-        assertThat(result).isEmpty();
+    @DisplayName("a rare creator stays under the tracking floor")
+    void analyze_marginalCreator_isEmpty() {
+        assertThat(engine.analyze(context(15, List.of(creator(30L, "Deep Midfielder", 1, 1200, 16)), List.of())))
+                .isEmpty();
     }
 
-    private FixtureContext contextWith(PlayerSeasonStats homePlayer, PlayerSeasonStats awayPlayer) {
-        return FixtureContext.builder()
-                .fixture(Fixture.builder()
-                        .id(1000L)
-                        .seasonId(100L)
-                        .homeTeamId(1L)
-                        .awayTeamId(2L)
-                        .homeTeamName("Home Team")
-                        .awayTeamName("Away Team")
-                        .dateUnix(System.currentTimeMillis() / 1000 + 86400)
-                        .status("incomplete")
-                        .build())
-                .homeTeam(Team.builder().id(1L).name("Home Team").build())
-                .awayTeam(Team.builder().id(2L).name("Away Team").build())
-                .homeTeamStats(TeamSeasonStats.builder()
-                        .teamId(1L).seasonId(100L).matchesPlayed(10)
-                        .matchesPlayedHome(10).matchesPlayedAway(10)
-                        .seasonConcededHome(12).seasonConcededAway(14).build())
-                .awayTeamStats(TeamSeasonStats.builder()
-                        .teamId(2L).seasonId(100L).matchesPlayed(10)
-                        .matchesPlayedHome(10).matchesPlayedAway(10)
-                        .seasonConcededHome(16).seasonConcededAway(25).build())
-                .homePlayers(List.of(homePlayer))
-                .awayPlayers(List.of(awayPlayer))
-                .build();
+    @Test
+    @DisplayName("falls back to the feed's assists per 90 when the season count is missing")
+    void analyze_usesPer90FallBack() {
+        PlayerSeasonStats player = creator(30L, "Playmaker", 8, 1500, 17);
+        player.setAssistsOverall(null);
+        player.setAssistsPer90Overall(0.48);
+
+        assertThat(engine.analyze(context(15, List.of(player), List.of()))).isPresent();
     }
 
-    private static PlayerSeasonStats creator(Long playerId, String knownAs, double per90, int appearances, int minutes) {
+    private static PlayerSeasonStats creator(Long id, String knownAs, int assists, int minutes, int appearances) {
         return PlayerSeasonStats.builder()
-                .playerId(playerId)
+                .playerId(id)
                 .seasonId(100L)
-                .clubTeamId(playerId == 30L ? 1L : 2L)
                 .knownAs(knownAs)
                 .position("Midfielder")
                 .appearancesOverall(appearances)
                 .minutesPlayedOverall(minutes)
-                .minPerMatch(80)
-                .assistsPer90Overall(per90)
-                .assistsHome((int) Math.round(per90 * minutes / 90.0))
-                .minutesPlayedHome(minutes)
+                .minPerMatch(85)
+                .assistsOverall(assists)
                 .build();
     }
 }

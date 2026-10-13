@@ -5,6 +5,7 @@ import com.jcm.recommendations.soccer.core.repository.FixtureOddsRepository;
 import com.jcm.recommendations.soccer.core.repository.FixtureRepository;
 import com.jcm.recommendations.soccer.core.results.RecommendationSnapshotService;
 import com.jcm.recommendations.soccer.core.results.ResultsMatchIngestService;
+import com.jcm.recommendations.soccer.core.results.ResultsPerformanceService;
 import com.jcm.recommendations.soccer.core.results.SettlementService;
 import com.jcm.recommendations.soccer.core.service.DataSyncService;
 import com.jcm.recommendations.soccer.core.service.FixtureService;
@@ -36,6 +37,7 @@ public class AdminController {
     private final RecommendationSnapshotService recommendationSnapshotService;
     private final ResultsMatchIngestService resultsMatchIngestService;
     private final SettlementService settlementService;
+    private final ResultsPerformanceService resultsPerformanceService;
 
     @PostMapping("/sync")
     public ResponseEntity<Map<String, Object>> triggerSync(
@@ -106,6 +108,16 @@ public class AdminController {
     @PostMapping("/settle")
     public ResponseEntity<SettlementService.SettlementSummary> triggerSettle() {
         return ResponseEntity.ok(settlementService.settlePending());
+    }
+
+    @GetMapping("/shadow-performance")
+    public ResponseEntity<List<ResultsPerformanceService.ShadowPerformance>> shadowPerformance(
+            @RequestParam(required = false) String period) {
+        try {
+            return ResponseEntity.ok(resultsPerformanceService.getShadowPerformance(period));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PostMapping("/cache/evict")

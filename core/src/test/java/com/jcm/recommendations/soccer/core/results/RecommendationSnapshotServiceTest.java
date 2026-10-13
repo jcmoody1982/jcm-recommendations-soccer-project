@@ -54,7 +54,7 @@ class RecommendationSnapshotServiceTest {
         long todayKickoff = today.atTime(15, 0).atZone(ZoneId.of("Europe/London")).toEpochSecond();
         long tomorrowKickoff = today.plusDays(1).atTime(15, 0).atZone(ZoneId.of("Europe/London")).toEpochSecond();
 
-        when(recommendationService.generateAllRecommendations(anyDouble())).thenReturn(List.of(
+        when(recommendationService.generateAllRecommendationsIncludingShadow(anyDouble())).thenReturn(List.of(
                 rec(1L, todayKickoff, ConfidenceLevel.STRONG, RecommendationType.BTTS),
                 rec(2L, todayKickoff, ConfidenceLevel.WEAK, RecommendationType.BTTS),
                 rec(3L, tomorrowKickoff, ConfidenceLevel.STRONG, RecommendationType.BTTS)
@@ -100,7 +100,7 @@ class RecommendationSnapshotServiceTest {
         }
 
         Recommendation existing = rec(1L, pastKickoff, ConfidenceLevel.STRONG, RecommendationType.BTTS);
-        when(recommendationService.generateAllRecommendations(anyDouble())).thenReturn(List.of(existing));
+        when(recommendationService.generateAllRecommendationsIncludingShadow(anyDouble())).thenReturn(List.of(existing));
         RecommendationSnapshot pendingRow = RecommendationSnapshot.builder()
                 .id(99L)
                 .snapshotDate(today)
@@ -142,7 +142,7 @@ class RecommendationSnapshotServiceTest {
         LocalDate kickoffDate = Instant.ofEpochSecond(todayKickoff)
                 .atZone(ZoneId.of("Europe/London")).toLocalDate();
 
-        when(recommendationService.generateAllRecommendations(anyDouble()))
+        when(recommendationService.generateAllRecommendationsIncludingShadow(anyDouble()))
                 .thenReturn(List.of(rec(1L, todayKickoff, ConfidenceLevel.STRONG, RecommendationType.BTTS)));
         RecommendationSnapshot settled = RecommendationSnapshot.builder()
                 .id(5L)
@@ -182,7 +182,7 @@ class RecommendationSnapshotServiceTest {
         updated.setScore(81.0);
         updated.setFactors(java.util.Map.of("edge", 0.12));
 
-        when(recommendationService.generateAllRecommendations(anyDouble())).thenReturn(List.of(updated));
+        when(recommendationService.generateAllRecommendationsIncludingShadow(anyDouble())).thenReturn(List.of(updated));
         RecommendationSnapshot existingRow = RecommendationSnapshot.builder()
                 .id(7L)
                 .snapshotDate(kickoffDate)
@@ -228,7 +228,7 @@ class RecommendationSnapshotServiceTest {
         recommendation.setMarket("Over 2.5 Goals");
         recommendation.setFactors(java.util.Map.of("expectedGoals", 2.8));
 
-        when(recommendationService.generateAllRecommendations(anyDouble())).thenReturn(List.of(recommendation));
+        when(recommendationService.generateAllRecommendationsIncludingShadow(anyDouble())).thenReturn(List.of(recommendation));
         when(snapshotRepository.findBySnapshotDateAndFixtureIdAndType(any(), any(), any()))
                 .thenReturn(Optional.empty());
         when(snapshotRepository.save(any())).thenAnswer(inv -> {

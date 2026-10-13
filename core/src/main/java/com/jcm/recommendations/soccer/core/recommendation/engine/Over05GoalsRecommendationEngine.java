@@ -6,7 +6,6 @@ import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
 import com.jcm.recommendations.soccer.core.recommendation.util.RecommendationFactory;
-import com.jcm.recommendations.soccer.domain.TeamRecentForm;
 import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,11 +38,6 @@ public class Over05GoalsRecommendationEngine implements RecommendationEngine {
 
     /** Split between the Poisson estimate and the empirical scoring rates. */
     private static final double WEIGHT_POISSON = 0.50;
-
-    // Contributions to the team's expected goals, renormalised over whichever inputs are present.
-    private static final double WEIGHT_LAMBDA_SEASON = 0.50;
-    private static final double WEIGHT_LAMBDA_XG = 0.30;
-    private static final double WEIGHT_LAMBDA_FORM = 0.20;
 
     /** Typical rate at which a side scores at this venue; empirical rates are shrunk toward it. */
     static final double PRIOR_HOME_SCORES_PCT = 75.0;
@@ -118,14 +112,8 @@ public class Over05GoalsRecommendationEngine implements RecommendationEngine {
     TeamEstimate estimate(FixtureContext context, boolean home) {
         TeamSeasonStats team = home ? context.getHomeTeamStats() : context.getAwayTeamStats();
         TeamSeasonStats opponent = home ? context.getAwayTeamStats() : context.getHomeTeamStats();
-        TeamRecentForm teamForm = context.hasRecentForm()
-                ? (home ? context.getHomeTeamForm() : context.getAwayTeamForm())
-                : null;
-        TeamRecentForm opponentForm = context.hasRecentForm()
-                ? (home ? context.getAwayTeamForm() : context.getHomeTeamForm())
-                : null;
 
-        double expectedGoals = expectedTeamGoals(team, opponent, teamForm, opponentForm, home);
+        double expectedGoals = TeamGoalsModel.expectedGoals(context, home);
         double poissonPct = poissonAtLeast(expectedGoals, 1);
 
         double prior = home ? PRIOR_HOME_SCORES_PCT : PRIOR_AWAY_SCORES_PCT;
@@ -139,35 +127,6 @@ public class Over05GoalsRecommendationEngine implements RecommendationEngine {
         String teamName = home ? context.getHomeTeam().getName() : context.getAwayTeam().getName();
         return new TeamEstimate(home, teamName, expectedGoals, poissonPct, teamScoresPct, opponentConcedesPct,
                 applyRealisticCeiling(raw));
-    }
-
-    /**
-     * The team's goals at this venue against this opponent: its scoring rate averaged with what the
-     * opponent concedes at the reverse venue, from season goals, xG and recent form.
-     */
-    private double expectedTeamGoals(TeamSeasonStats team, TeamSeasonStats opponent,
-            TeamRecentForm teamForm, TeamRecentForm opponentForm, boolean home) {
-        double seasonScored = calculateVenueGoalsAvg(team, home, 1.0);
-        double seasonConceded = calculateVenueConcededAvg(opponent, !home, 1.0);
-        double weightedSum = ((seasonScored + seasonConceded) / 2.0) * WEIGHT_LAMBDA_SEASON;
-        double weightUsed = WEIGHT_LAMBDA_SEASON;
-
-        Double xgFor = home ? team.getXgForAvgHome() : team.getXgForAvgAway();
-        Double xgAgainst = home ? opponent.getXgAgainstAvgAway() : opponent.getXgAgainstAvgHome();
-        if (xgFor != null && xgAgainst != null) {
-            weightedSum += ((xgFor + xgAgainst) / 2.0) * WEIGHT_LAMBDA_XG;
-            weightUsed += WEIGHT_LAMBDA_XG;
-        }
-
-        if (teamForm != null && opponentForm != null) {
-            double formScored = safeDouble(home ? teamForm.getScoredAvgHome() : teamForm.getScoredAvgAway(), seasonScored);
-            double formConceded = safeDouble(
-                    home ? opponentForm.getConcededAvgAway() : opponentForm.getConcededAvgHome(), seasonConceded);
-            weightedSum += ((formScored + formConceded) / 2.0) * WEIGHT_LAMBDA_FORM;
-            weightUsed += WEIGHT_LAMBDA_FORM;
-        }
-
-        return weightedSum / weightUsed;
     }
 
     private static double shrink(double observedPct, int sampleSize, double priorPct) {

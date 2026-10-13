@@ -42,7 +42,7 @@ describe('section configuration', () => {
   });
 
   it('keeps paused engines off the board', () => {
-    for (const paused of ['RESULT_BTTS', 'PLAYER_TO_SCORE', 'WINNING_FORM_MISMATCH', 'LOSING_FORM_MISMATCH', 'UNDER_GOALS']) {
+    for (const paused of ['RESULT_BTTS', 'PLAYER_TO_SCORE', 'PLAYER_TO_ASSIST', 'WINNING_FORM_MISMATCH', 'LOSING_FORM_MISMATCH', 'UNDER_GOALS']) {
       expect(SECTION_ORDER).not.toContain(paused);
     }
   });

@@ -1,6 +1,7 @@
 package com.jcm.recommendations.soccer.core.results;
 
 import com.jcm.recommendations.soccer.core.config.ResultsProperties;
+import com.jcm.recommendations.soccer.core.recommendation.ShadowMarkets;
 import com.jcm.recommendations.soccer.core.repository.CompletedMatchRepository;
 import com.jcm.recommendations.soccer.core.repository.RecommendationSnapshotRepository;
 import com.jcm.recommendations.soccer.domain.CompletedMatch;
@@ -25,15 +26,14 @@ import java.util.stream.Collectors;
 public class ResultsQueryService {
 
     /**
-     * Types paused from Results day board and day summaries. Keep in sync with
-     * {@link ResultsPerformanceService} exclusions (except performance may lag a rebuild).
+     * Types paused from Results day board and day summaries, on top of {@link ShadowMarkets}. Keep in
+     * sync with {@link ResultsPerformanceService} exclusions (except performance may lag a rebuild).
      */
     private static final Set<String> EXCLUDED_TYPES = Set.of(
             "UNDER_GOALS",
             "WINNING_FORM_MISMATCH",
             "LOSING_FORM_MISMATCH",
-            "RESULT_BTTS",
-            "PLAYER_TO_SCORE"
+            "RESULT_BTTS"
     );
 
     private final RecommendationSnapshotRepository snapshotRepository;
@@ -260,7 +260,7 @@ public class ResultsQueryService {
 
     static boolean isIncludedType(RecommendationSnapshot row) {
         String type = row.getType();
-        return type == null || !EXCLUDED_TYPES.contains(type);
+        return type == null || (!EXCLUDED_TYPES.contains(type) && !ShadowMarkets.isShadow(type));
     }
 
     private PickView toPickView(RecommendationSnapshot row) {
