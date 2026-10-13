@@ -10,12 +10,8 @@ import {
 } from '../utils/kickoff';
 import { SECTION_CONFIG, SECTION_ORDER, includeInMarketSection } from '../utils/recommendationSections';
 import { SOCCER_FIXTURES, SOCCER_RECOMMENDATIONS } from '../utils/sport';
-import {
-  elitePickKey,
-  flattenGroupedRecommendations,
-  selectElitePicks,
-  toEliteKeySet,
-} from '../utils/elitePicks';
+import { elitePickKey } from '../utils/elitePicks';
+import { useElitePicks } from '../hooks/useElitePicks';
 import styles from './FixtureDetail.module.css';
 
 const CONFIDENCE_ORDER: Record<string, number> = {
@@ -52,15 +48,7 @@ export default function FixtureDetail() {
     enabled: Number.isFinite(id) && id > 0,
   });
 
-  const { data: groupedRecommendations } = useQuery({
-    queryKey: ['recommendations-grouped', 7],
-    queryFn: () => recommendationService.getGrouped(7),
-  });
-
-  const eliteKeys = useMemo(
-    () => toEliteKeySet(selectElitePicks(flattenGroupedRecommendations(groupedRecommendations))),
-    [groupedRecommendations],
-  );
+  const { keys: eliteKeys } = useElitePicks(7);
 
   const groupedByType = useMemo(() => {
     const sorted = [...recommendations].sort((a, b) => {

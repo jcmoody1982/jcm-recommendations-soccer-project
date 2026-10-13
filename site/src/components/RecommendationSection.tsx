@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import type { Recommendation, RecommendationType } from '../types';
+import type { PerformanceBucket, Recommendation, RecommendationType } from '../types';
 import { MarketIcon } from './MarketIcon';
 import { RecommendationRow } from './RecommendationRow';
 import { SECTION_CONFIG, sectionDomId } from '../utils/recommendationSections';
 import { elitePickKey } from '../utils/elitePicks';
+import { formatTrackRecord } from '../utils/trackRecord';
 import styles from './RecommendationSection.module.css';
 
 interface Props {
@@ -13,6 +14,8 @@ interface Props {
   incrementBy?: number;
   eliteKeys?: Set<string>;
   emptyHint?: string;
+  /** Recent graded record for this market; shown only when the sample is big enough. */
+  trackRecord?: PerformanceBucket;
 }
 
 function headerClassName(showPrice: boolean, showPositionGap: boolean): string {
@@ -36,8 +39,15 @@ export function RecommendationSection({
   incrementBy = 5,
   eliteKeys,
   emptyHint,
+  trackRecord,
 }: Props) {
   const [visibleCount, setVisibleCount] = useState(initialItems);
+  const trackRecordLine = formatTrackRecord(trackRecord);
+  const trackRecordNote = trackRecordLine && (
+    <p className={styles.trackRecord} title="Graded picks for this market over the last 30 days. See Results for the full record.">
+      {trackRecordLine}
+    </p>
+  );
 
   const config = SECTION_CONFIG[type] || {
     title: type,
@@ -66,6 +76,7 @@ export function RecommendationSection({
           <span className={styles.title}>{config.title}</span>
           <span className={styles.count}>0 picks</span>
         </h2>
+        {trackRecordNote}
         <p className={styles.emptyHint}>{emptyHint}</p>
       </section>
     );
@@ -88,6 +99,7 @@ export function RecommendationSection({
           {visibleRecommendations.length} of {recommendations.length} picks
         </span>
       </h2>
+      {trackRecordNote}
       <div className={headerClassName(showPrice, showPositionGap)}>
         <span></span>
         <span>League</span>

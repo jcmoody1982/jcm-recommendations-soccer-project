@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { recommendationService } from '../services/api';
+import { recommendationService, resultsService } from '../services/api';
 import {
   ElitePicksSection,
   RecommendationSection,
   RecommendationsPageSkeleton,
 } from '../components';
-import type { Recommendation, RecommendationType } from '../types';
+import type { PerformancePeriod, Recommendation, RecommendationType } from '../types';
 import {
   compareByKickoff,
   compareByScoreDesc,
@@ -15,11 +15,8 @@ import {
   type KickoffSort,
   type KickoffWindow,
 } from '../utils/kickoff';
-import {
-  flattenGroupedRecommendations,
-  selectElitePicks,
-  toEliteKeySet,
-} from '../utils/elitePicks';
+import { eliteDaysFromPool, flattenGroupedRecommendations } from '../utils/elitePicks';
+import { useElitePicks } from '../hooks/useElitePicks';
 import {
   SECTION_ORDER,
   includeInMarketSection,
@@ -35,6 +32,8 @@ const PINNED_EMPTY_TYPES: RecommendationType[] = [
   'OVER_15_GOALS',
   'OVER_25_GOALS',
 ];
+
+const TRACK_RECORD_PERIOD: PerformancePeriod = '30d';
 
 /** How many days of picks to load. Kickoff chips filter inside this window. */
 const HORIZON_OPTIONS = [3, 7] as const;
@@ -182,8 +181,20 @@ export default function Recommendations() {
     queryFn: () => recommendationService.getGrouped(daysAhead),
   });
 
+  const { picks: elitePicks, keys: eliteKeys } = useElitePicks(daysAhead);
+
+  const { data: performance } = useQuery({
+    queryKey: ['results-performance', TRACK_RECORD_PERIOD],
+    queryFn: () => resultsService.getPerformance(TRACK_RECORD_PERIOD),
+    staleTime: 10 * 60 * 1000,
+  });
+  const trackRecordByType = useMemo(
+    () => new Map((performance?.byType ?? []).map((row) => [row.type, row.overall])),
+    [performance],
+  );
+
   // Elite follows the same filters as the boards. Moderate hides it: Elite is Strong-only.
-  const elitePicks = useMemo(() => {
+  const eliteDays = useMemo(() => {
     const searchLower = searchQuery.toLowerCase().trim();
     const nowMs = Date.now();
     const pool = flattenGroupedRecommendations(groupedRecommendations).filter((rec) => {
@@ -196,8 +207,9 @@ export default function Recommendations() {
       if (!matchesKickoffWindow(rec.matchDateUnix, kickoffWindow, nowMs)) return false;
       return true;
     });
-    return selectElitePicks(pool);
+    return eliteDaysFromPool(elitePicks, pool);
   }, [
+    elitePicks,
     groupedRecommendations,
     kickoffWindow,
     competitionScope,
@@ -206,7 +218,6 @@ export default function Recommendations() {
     selectedLeague,
     typeFilter,
   ]);
-  const eliteKeys = useMemo(() => toEliteKeySet(elitePicks), [elitePicks]);
   const availableLeagues = useMemo(() => {
     if (!groupedRecommendations) return [];
     const leagueMap = new Map<string, string>();
@@ -655,9 +666,9 @@ export default function Recommendations() {
         </div>
       ) : (
         <>
-          {elitePicks.length > 0 && (
+          {eliteDays.length > 0 && (
             <div className={styles.lead}>
-              <ElitePicksSection recommendations={elitePicks} />
+              <ElitePicksSection days={eliteDays} trackRecord={performance?.elite} />
             </div>
           )}
 
@@ -677,6 +688,7 @@ export default function Recommendations() {
                       key={type}
                       type={type}
                       recommendations={recommendations}
+                      trackRecord={trackRecordByType.get(type)}
                       emptyHint={
                         confidenceFilter === 'strong'
                           ? 'No Strong picks in this window. These lines often grade Moderate — switch to Strong + Moderate.'
@@ -692,6 +704,7 @@ export default function Recommendations() {
                     recommendations={recommendations}
                     initialItems={5}
                     eliteKeys={eliteKeys}
+                    trackRecord={trackRecordByType.get(type)}
                   />
                 );
               })}

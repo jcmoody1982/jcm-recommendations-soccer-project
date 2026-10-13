@@ -5,6 +5,7 @@ import com.jcm.recommendations.soccer.core.recommendation.RecommendationService;
 import com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
+import com.jcm.recommendations.soccer.core.results.ElitePicksService;
 import com.jcm.recommendations.soccer.web.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,22 @@ class RecommendationControllerTest {
 
     @MockitoBean
     private RecommendationService recommendationService;
+
+    @MockitoBean
+    private ElitePicksService elitePicksService;
+
+    @Test
+    void eliteReturnsRankedPicksPerDay() throws Exception {
+        when(elitePicksService.elitePicks(7.0)).thenReturn(List.of(
+                new ElitePicksService.ElitePick(java.time.LocalDate.of(2026, 10, 13), 1, 42L, "BTTS")));
+
+        mockMvc.perform(get("/api/recommendations/elite"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].date").value("2026-10-13"))
+                .andExpect(jsonPath("$[0].rank").value(1))
+                .andExpect(jsonPath("$[0].fixtureId").value(42))
+                .andExpect(jsonPath("$[0].type").value("BTTS"));
+    }
 
     private static Recommendation rec(RecommendationType type, double score) {
         return Recommendation.builder()

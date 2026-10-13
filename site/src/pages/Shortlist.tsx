@@ -1,16 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useShortlist } from '../contexts/ShortlistContext';
 import { recommendationService } from '../services/api';
 import { RecommendationRow, ExportModal, MarketIcon } from '../components';
 import type { Recommendation, RecommendationType } from '../types';
 import { SECTION_CONFIG, SECTION_ORDER } from '../utils/recommendationSections';
-import {
-  elitePickKey,
-  flattenGroupedRecommendations,
-  selectElitePicks,
-  toEliteKeySet,
-} from '../utils/elitePicks';
+import { elitePickKey } from '../utils/elitePicks';
+import { useElitePicks } from '../hooks/useElitePicks';
 import styles from './Shortlist.module.css';
 
 export default function Shortlist() {
@@ -22,10 +18,7 @@ export default function Shortlist() {
     queryFn: () => recommendationService.getGrouped(7),
   });
 
-  const eliteKeys = useMemo(
-    () => toEliteKeySet(selectElitePicks(flattenGroupedRecommendations(allRecommendations))),
-    [allRecommendations],
-  );
+  const { keys: eliteKeys } = useElitePicks(7);
 
   const shortlistedRecommendations: Recommendation[] = [];
 

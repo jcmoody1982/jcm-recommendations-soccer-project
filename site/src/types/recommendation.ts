@@ -45,6 +45,14 @@ export interface Recommendation {
   generatedAt: string;
 }
 
+/** One Elite slot from /recommendations/elite; `date` is the London matchday (yyyy-mm-dd). */
+export interface ElitePick {
+  date: string;
+  rank: number;
+  fixtureId: number;
+  type: RecommendationType;
+}
+
 export interface RecommendationSummary {
   fixturesAnalyzed: number;
   totalRecommendations: number;

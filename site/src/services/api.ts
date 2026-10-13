@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type {
+  ElitePick,
   Recommendation,
   RecommendationSummary,
   RecommendationType,
@@ -113,6 +114,13 @@ export const recommendationService = {
 
   getSummary: async (daysAhead = 7): Promise<RecommendationSummary> => {
     const response = await api.get<RecommendationSummary>('/recommendations/summary', {
+      params: { daysAhead },
+    });
+    return response.data;
+  },
+
+  getElite: async (daysAhead = 7): Promise<ElitePick[]> => {
+    const response = await api.get<ElitePick[]>('/recommendations/elite', {
       params: { daysAhead },
     });
     return response.data;

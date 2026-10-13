@@ -14,7 +14,7 @@ import java.util.Set;
 /**
  * UC-036 / UC-037: rank Strong %-style snapshot picks into Elite
  * (top 10, ≤1 per fixture, ≤3 per market family, ≤3 Over 1.5, priced only).
- * Mirrors {@code site/src/utils/elitePicks.ts}.
+ * The only implementation: the boards read Elite through {@link ElitePicksService}.
  */
 public final class ElitePicksSelector {
 

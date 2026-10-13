@@ -4,6 +4,7 @@ import com.jcm.recommendations.soccer.core.recommendation.RecommendationService;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationService.RecommendationSummary;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
+import com.jcm.recommendations.soccer.core.results.ElitePicksService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import java.util.Map;
 public class RecommendationController {
 
     private final RecommendationService recommendationService;
+    private final ElitePicksService elitePicksService;
 
     @GetMapping
     public ResponseEntity<List<Recommendation>> getAllRecommendations(
@@ -34,6 +36,13 @@ public class RecommendationController {
         log.info("GET /api/recommendations/strong requested: daysAhead={}", daysAhead);
         List<Recommendation> recommendations = recommendationService.getStrongRecommendations(daysAhead);
         return ResponseEntity.ok(recommendations);
+    }
+
+    /** Elite Picks per matchday: persisted ranks where the day is snapshotted, live ranks after. */
+    @GetMapping("/elite")
+    public ResponseEntity<List<ElitePicksService.ElitePick>> getElitePicks(
+            @RequestParam(defaultValue = "7") double daysAhead) {
+        return ResponseEntity.ok(elitePicksService.elitePicks(daysAhead));
     }
 
     @GetMapping("/fixture/{fixtureId}")

@@ -7,6 +7,7 @@ import {
   formatKickoffDisplay,
   isEarlyKickoffUk,
 } from '../utils/kickoff';
+import { comparePrice, formatEdge } from '../utils/pricing';
 import { formatFactorEntries } from '../utils/recommendationFactors';
 import { SECTION_CONFIG, isStandaloneType } from '../utils/recommendationSections';
 import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
@@ -104,6 +105,14 @@ export function RecommendationRow({
   const score = Number(recommendation.score || 0).toFixed(0);
   const scoreUnit = config?.scoreUnit ?? '%';
   const scoreLabel = config?.scoreLabel ?? 'Score';
+  const priceComparison =
+    showPrice && config?.showPrice && scoreLabel === 'Probability'
+      ? comparePrice(recommendation.score, recommendation.odds)
+      : null;
+  const priceTitle = priceComparison
+    ? `Our price ${priceComparison.fairOdds.toFixed(2)} from ${score}% · book ${recommendation.odds?.toFixed(2)} · edge ${formatEdge(priceComparison.edgePct)}`
+    : undefined;
+  const edgeClass = priceComparison && priceComparison.edgePct > 0 ? styles.edgePositive : styles.edgeNegative;
 
   const factorEntries = formatFactorEntries(recommendation.factors, undefined, {
     type: recommendation.type,
@@ -186,8 +195,14 @@ export function RecommendationRow({
           </span>
         )}
         {showPrice && (
-          <span className={styles.price}>
+          <span className={styles.price} title={priceTitle}>
             {recommendation.odds ? recommendation.odds.toFixed(2) : '-'}
+            {priceComparison && (
+              <span className={styles.priceCompare}>
+                Ours {priceComparison.fairOdds.toFixed(2)}{' '}
+                <span className={edgeClass}>{formatEdge(priceComparison.edgePct)}</span>
+              </span>
+            )}
           </span>
         )}
         <span className={styles.score} title={scoreLabel}>
@@ -282,7 +297,15 @@ export function RecommendationRow({
           {showPrice && recommendation.odds && (
             <div className={styles.mobileInfo}>
               <span className={styles.mobileLabel}>Price</span>
-              <span className={styles.mobileValue}>{recommendation.odds.toFixed(2)}</span>
+              <span className={styles.mobileValue} title={priceTitle}>
+                {recommendation.odds.toFixed(2)}
+                {priceComparison && (
+                  <span className={styles.priceCompare}>
+                    Ours {priceComparison.fairOdds.toFixed(2)}{' '}
+                    <span className={edgeClass}>{formatEdge(priceComparison.edgePct)}</span>
+                  </span>
+                )}
+              </span>
             </div>
           )}
           <div className={styles.mobileInfo}>
