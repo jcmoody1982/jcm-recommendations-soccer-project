@@ -9,9 +9,7 @@ import com.jcm.recommendations.soccer.domain.TeamSeasonStats;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -19,9 +17,8 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 import static com.jcm.recommendations.soccer.core.recommendation.util.SquadValueSupport.*;
 
 /**
- * UC-026: Top vs Bottom — table mismatch picks backing the home favorite to win, with UC form/GD
- * filters and upset detection. Short-odds goals/handicap and upset double-chance angles are
- * listed as alternative markets.
+ * UC-026: Top vs Bottom — table mismatch picks backing the home favorite to win (match result
+ * only), with UC form/GD filters and upset detection.
  */
 @Component
 @Slf4j
@@ -45,7 +42,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
     private static final int FAVORITE_MIN_GD_STRONG = 10;
     private static final int UNDERDOG_MAX_GD_STRONG = -5;
 
-    private static final double SHORT_FAVORITE_ODDS = 1.40;
     private static final double UNDERDOG_POOR_AWAY_WIN_RATE = 20.0;
     private static final double AWAY_COMPETITIVE_WIN_RATE = 35.0;
     private static final double AWAY_IMPROVING_FORM_PPG = 1.5;
@@ -53,8 +49,7 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
     private static final int UPSET_WATCH_FACTORS = 2;
     private static final int UPSET_SKIP_FACTORS = 3;
 
-    private static final double BTTS_UNDERDOG_SCORED_PCT = 50.0;
-    private static final double BTTS_FAVORITE_CONCEDES_PCT = 40.0;
+    private static final double UNDERDOG_SCORES_AWAY_PCT = 50.0;
     private static final int H2H_MIN_MEETINGS = 3;
     private static final double H2H_FAVORITE_SUPPORT_BOOST = 4.0;
 
@@ -108,16 +103,13 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
-        // The selection is always the favourite to win. The quality score grades the table
-        // mismatch, so it only speaks for a result market; goals and handicap angles are listed
-        // as alternatives instead of replacing the pick.
+        // The selection is only ever the favourite to win: the quality score grades the table
+        // mismatch, so it speaks for the match result and nothing else.
         String homeTeam = context.getHomeTeam().getName();
         Double homeOdds = context.hasOdds() ? context.getOdds().getOddsFt1() : null;
         String flag = determineFlag(positionGap, qualityScore, upsetFactors);
 
-        List<String> alternativeMarkets = buildAlternativeMarkets(context, homeTeam, upsetFactors);
-        Map<String, Object> factors = buildFactors(
-                context, positionGap, qualityScore, upsetFactors, flag, alternativeMarkets);
+        Map<String, Object> factors = buildFactors(context, positionGap, qualityScore, upsetFactors, flag);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.TOP_VS_BOTTOM)
@@ -217,7 +209,7 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
             count++;
         }
 
-        if (calculateVenueScoredPercentage(awayStats, false) >= BTTS_UNDERDOG_SCORED_PCT) {
+        if (calculateVenueScoredPercentage(awayStats, false) >= UNDERDOG_SCORES_AWAY_PCT) {
             count++;
         }
 
@@ -274,34 +266,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         return level;
     }
 
-    private List<String> buildAlternativeMarkets(FixtureContext context, String homeTeam, int upsetFactors) {
-        List<String> alternatives = new ArrayList<>();
-
-        if (upsetFactors >= UPSET_WATCH_FACTORS) {
-            alternatives.add("Home/Draw (1X)");
-        }
-
-        if (context.hasOdds()) {
-            Double homeOdds = context.getOdds().getOddsFt1();
-            if (homeOdds != null && homeOdds < SHORT_FAVORITE_ODDS) {
-                alternatives.add("Over 2.5 Goals");
-                alternatives.add(homeTeam + " -1.5");
-            }
-        }
-
-        if (suggestsBttsMismatch(context.getHomeTeamStats(), context.getAwayTeamStats())) {
-            alternatives.add("BTTS Yes");
-        }
-
-        return alternatives;
-    }
-
-    private boolean suggestsBttsMismatch(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
-        double awayScoredPct = calculateVenueScoredPercentage(awayStats, false);
-        double homeConcededPct = 100.0 - calculateCleanSheetPercentage(homeStats, true);
-        return awayScoredPct >= BTTS_UNDERDOG_SCORED_PCT && homeConcededPct >= BTTS_FAVORITE_CONCEDES_PCT;
-    }
-
     private String determineFlag(int positionGap, double qualityScore, int upsetFactors) {
         if (upsetFactors >= UPSET_WATCH_FACTORS) {
             return "Upset Watch";
@@ -316,7 +280,7 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
     }
 
     private Map<String, Object> buildFactors(FixtureContext context, int positionGap, double qualityScore,
-            int upsetFactors, String flag, List<String> alternativeMarkets) {
+            int upsetFactors, String flag) {
         Map<String, Object> factors = new HashMap<>();
 
         factors.put("homePosition", context.getHomeTeamStats().getPosition());
@@ -327,8 +291,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         factors.put("awayFavoritesPaused", true);
         factors.put("flag", flag);
         factors.put("upsetFactorCount", upsetFactors);
-        factors.put("alternativeMarkets", alternativeMarkets);
-
         factors.put("homePpg", context.getHomeTeamStats().getPpgOverall());
         factors.put("awayPpg", context.getAwayTeamStats().getPpgOverall());
         factors.put("homePpgHome", context.getHomeTeamStats().getPpgHome());
@@ -352,10 +314,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         }
 
         putFactors(context, factors);
-
-        if (suggestsBttsMismatch(context.getHomeTeamStats(), context.getAwayTeamStats())) {
-            factors.put("bttsMismatchSuggested", true);
-        }
 
         return factors;
     }
