@@ -64,7 +64,6 @@ class TopVsBottomRecommendationEngineTest {
         assertThat(result.get().getMarket()).isEqualTo("Top Team");
         assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.STRONG);
         assertThat(result.get().getFactors().get("homeIsFavorite")).isEqualTo(true);
-        assertThat(result.get().getFactors().get("primaryMarketType")).isEqualTo("FAVORITE_WIN");
     }
 
     @Test
@@ -128,8 +127,8 @@ class TopVsBottomRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze pivots to Over 2.5 when favorite odds are short")
-    void analyze_shortOddsPivotsToGoalsLine() {
+    @DisplayName("analyze keeps the favorite to win when odds are short and lists goals/handicap as alternatives")
+    void analyze_shortOddsKeepsFavoriteWin() {
         FixtureContext context = mismatchBuilder(4L)
                 .homeTeamStats(homeStatsForMismatch())
                 .awayTeamStats(awayStatsForMismatch())
@@ -147,14 +146,16 @@ class TopVsBottomRecommendationEngineTest {
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Over 3.5 Goals");
-        assertThat(result.get().getFactors().get("flag")).isEqualTo("Goals Expected");
-        assertThat(result.get().getFactors().get("primaryMarketType")).isEqualTo("GOALS_LINE");
+        assertThat(result.get().getMarket()).isEqualTo("Top Team");
+        assertThat(result.get().getOdds()).isEqualTo(1.25);
+        @SuppressWarnings("unchecked")
+        List<String> alternatives = (List<String>) result.get().getFactors().get("alternativeMarkets");
+        assertThat(alternatives).contains("Over 2.5 Goals", "Top Team -1.5").doesNotContain("Over 3.5 Goals");
     }
 
     @Test
-    @DisplayName("analyze flags upset watch and pivots to 1X when away side is live")
-    void analyze_upsetWatchPivotsToDoubleChance() {
+    @DisplayName("analyze flags upset watch, keeps the favorite to win and lists 1X as an alternative")
+    void analyze_upsetWatchListsDoubleChanceAlternative() {
         FixtureContext context = mismatchBuilder(5L)
                 .homeTeamStats(homeStatsForMismatch())
                 .awayTeamStats(TeamSeasonStats.builder()
@@ -189,9 +190,12 @@ class TopVsBottomRecommendationEngineTest {
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Home/Draw (1X)");
+        assertThat(result.get().getMarket()).isEqualTo("Top Team");
         assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
         assertThat(result.get().getFactors().get("flag")).isEqualTo("Upset Watch");
+        @SuppressWarnings("unchecked")
+        List<String> alternatives = (List<String>) result.get().getFactors().get("alternativeMarkets");
+        assertThat(alternatives).contains("Home/Draw (1X)");
         assertThat((Integer) result.get().getFactors().get("upsetFactorCount")).isGreaterThanOrEqualTo(2);
     }
 

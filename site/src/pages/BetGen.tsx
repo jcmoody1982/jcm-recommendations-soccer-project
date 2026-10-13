@@ -36,6 +36,14 @@ const KICKOFF_OPTIONS: Array<{ value: KickoffWindow; label: string }> = [
 ];
 const SELECTION_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
 
+/** Same defaults as the Recommendations page. */
+const DEFAULT_FILTERS = {
+  horizon: 7,
+  kickoffWindow: 'all' as KickoffWindow,
+  confidence: 'strong' as ConfidenceFilter,
+  scope: 'all' as CompetitionScope,
+};
+
 function parseAmount(value: string): number | null {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -199,10 +207,10 @@ function AccumulatorCard({
 
 export default function BetGen() {
   const [mode, setMode] = useState<Mode>('top');
-  const [horizon, setHorizon] = useState<number>(7);
-  const [kickoffWindow, setKickoffWindow] = useState<KickoffWindow>('all');
-  const [confidence, setConfidence] = useState<ConfidenceFilter>('strong');
-  const [scope, setScope] = useState<CompetitionScope>('all');
+  const [horizon, setHorizon] = useState<number>(DEFAULT_FILTERS.horizon);
+  const [kickoffWindow, setKickoffWindow] = useState<KickoffWindow>(DEFAULT_FILTERS.kickoffWindow);
+  const [confidence, setConfidence] = useState<ConfidenceFilter>(DEFAULT_FILTERS.confidence);
+  const [scope, setScope] = useState<CompetitionScope>(DEFAULT_FILTERS.scope);
   const [stakeInput, setStakeInput] = useState('10');
   const [targetInput, setTargetInput] = useState('100');
   const [selections, setSelections] = useState(4);
@@ -230,6 +238,19 @@ export default function BetGen() {
     [mode, boards, targetOdds, selections]
   );
 
+  const hasActiveFilters =
+    scope !== DEFAULT_FILTERS.scope
+    || horizon !== DEFAULT_FILTERS.horizon
+    || kickoffWindow !== DEFAULT_FILTERS.kickoffWindow
+    || confidence !== DEFAULT_FILTERS.confidence;
+
+  const clearFilters = () => {
+    setScope(DEFAULT_FILTERS.scope);
+    setHorizon(DEFAULT_FILTERS.horizon);
+    setKickoffWindow(DEFAULT_FILTERS.kickoffWindow);
+    setConfidence(DEFAULT_FILTERS.confidence);
+  };
+
   const removeLeg = (leg: Recommendation) => {
     setExcluded((prev) => new Set(prev).add(elitePickKey(leg.fixtureId, leg.type)));
   };
@@ -250,6 +271,11 @@ export default function BetGen() {
         />
         <ChipGroup label="Kickoff window" options={KICKOFF_OPTIONS} value={kickoffWindow} onChange={setKickoffWindow} />
         <ChipGroup label="Confidence" options={CONFIDENCE_OPTIONS} value={confidence} onChange={setConfidence} />
+        {hasActiveFilters && (
+          <button type="button" className={styles.clearFilters} onClick={clearFilters}>
+            Clear filters
+          </button>
+        )}
       </div>
 
       <div className={styles.modes} role="tablist" aria-label="Bet builder">

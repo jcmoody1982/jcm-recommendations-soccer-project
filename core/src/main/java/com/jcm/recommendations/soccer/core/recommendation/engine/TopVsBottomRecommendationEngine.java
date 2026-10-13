@@ -19,8 +19,9 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 import static com.jcm.recommendations.soccer.core.recommendation.util.SquadValueSupport.*;
 
 /**
- * UC-026: Top vs Bottom — table mismatch picks for home favorites with UC form/GD filters,
- * upset detection, and short-odds goals/handicap pivots.
+ * UC-026: Top vs Bottom — table mismatch picks backing the home favorite to win, with UC form/GD
+ * filters and upset detection. Short-odds goals/handicap and upset double-chance angles are
+ * listed as alternative markets.
  */
 @Component
 @Slf4j
@@ -107,32 +108,33 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
             return Optional.empty();
         }
 
+        // The selection is always the favourite to win. The quality score grades the table
+        // mismatch, so it only speaks for a result market; goals and handicap angles are listed
+        // as alternatives instead of replacing the pick.
         String homeTeam = context.getHomeTeam().getName();
-        MarketSelection selection = selectPrimaryMarket(context, positionGap, qualityScore, upsetFactors, confidence);
-        String flag = determineFlag(positionGap, qualityScore, upsetFactors, selection);
+        Double homeOdds = context.hasOdds() ? context.getOdds().getOddsFt1() : null;
+        String flag = determineFlag(positionGap, qualityScore, upsetFactors);
 
-        List<String> alternativeMarkets = buildAlternativeMarkets(context, selection.market(), homeTeam);
+        List<String> alternativeMarkets = buildAlternativeMarkets(context, homeTeam, upsetFactors);
         Map<String, Object> factors = buildFactors(
-                context, positionGap, qualityScore, upsetFactors, flag, selection, alternativeMarkets);
+                context, positionGap, qualityScore, upsetFactors, flag, alternativeMarkets);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.TOP_VS_BOTTOM)
                 .confidence(confidence)
                 .score(qualityScore)
-                .market(selection.market())
-                .odds(selection.odds())
-                .description(buildDescription(context, selection.market(), positionGap, confidence, flag))
+                .market(homeTeam)
+                .odds(homeOdds)
+                .description(buildDescription(context, homeTeam, positionGap, confidence, flag))
                 .factors(factors)
                 .build();
 
         log.info("Top vs Bottom recommendation: fixtureId={}, market={}, gap={}, quality={}, flag={}, upsetFactors={}",
-                context.getFixture().getId(), selection.market(), positionGap,
+                context.getFixture().getId(), homeTeam, positionGap,
                 String.format("%.1f", qualityScore), flag, upsetFactors);
 
         return Optional.of(recommendation);
     }
-
-    private record MarketSelection(String market, Double odds) {}
 
     private double calculateQualityScore(FixtureContext context) {
         TeamSeasonStats homeStats = context.getHomeTeamStats();
@@ -272,68 +274,22 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         return level;
     }
 
-    private MarketSelection selectPrimaryMarket(FixtureContext context, int positionGap, double qualityScore,
-            int upsetFactors, ConfidenceLevel confidence) {
-        String homeTeam = context.getHomeTeam().getName();
-        Double homeOdds = context.hasOdds() ? context.getOdds().getOddsFt1() : null;
-
-        if (upsetFactors >= UPSET_WATCH_FACTORS && confidence == ConfidenceLevel.MODERATE) {
-            Double dcOdds = context.hasOdds() ? impliedDoubleChance1X(context) : null;
-            return new MarketSelection("Home/Draw (1X)", dcOdds);
-        }
-
-        if (homeOdds != null && homeOdds < SHORT_FAVORITE_ODDS) {
-            double expectedGoals = calculateVenueGoalsAvg(context.getHomeTeamStats(), true)
-                    + calculateVenueConcededAvg(context.getAwayTeamStats(), false);
-            if (expectedGoals >= 3.2) {
-                return new MarketSelection("Over 3.5 Goals", context.getOdds().getOddsFtOver35());
-            }
-            if (expectedGoals >= 2.6) {
-                return new MarketSelection("Over 2.5 Goals", context.getOdds().getOddsFtOver25());
-            }
-            if (positionGap >= MIN_GAP_STRONG && qualityScore >= QUALITY_STRONG) {
-                return new MarketSelection(homeTeam + " -1.5", null);
-            }
-        }
-
-        return new MarketSelection(homeTeam, homeOdds);
-    }
-
-    private Double impliedDoubleChance1X(FixtureContext context) {
-        Double home = context.getOdds().getOddsFt1();
-        Double draw = context.getOdds().getOddsFtX();
-        if (home == null || draw == null || home <= 0 || draw <= 0) {
-            return null;
-        }
-        double implied = (1.0 / home) + (1.0 / draw);
-        if (implied <= 0) {
-            return null;
-        }
-        return 1.0 / implied;
-    }
-
-    private List<String> buildAlternativeMarkets(FixtureContext context, String primaryMarket, String homeTeam) {
+    private List<String> buildAlternativeMarkets(FixtureContext context, String homeTeam, int upsetFactors) {
         List<String> alternatives = new ArrayList<>();
-        TeamSeasonStats homeStats = context.getHomeTeamStats();
-        TeamSeasonStats awayStats = context.getAwayTeamStats();
 
-        if (!primaryMarket.equals(homeTeam)) {
-            alternatives.add(homeTeam);
+        if (upsetFactors >= UPSET_WATCH_FACTORS) {
+            alternatives.add("Home/Draw (1X)");
         }
 
         if (context.hasOdds()) {
             Double homeOdds = context.getOdds().getOddsFt1();
             if (homeOdds != null && homeOdds < SHORT_FAVORITE_ODDS) {
-                if (!primaryMarket.contains("Over 2.5")) {
-                    alternatives.add("Over 2.5 Goals");
-                }
-                if (!primaryMarket.contains("-1.5")) {
-                    alternatives.add(homeTeam + " -1.5");
-                }
+                alternatives.add("Over 2.5 Goals");
+                alternatives.add(homeTeam + " -1.5");
             }
         }
 
-        if (suggestsBttsMismatch(homeStats, awayStats) && !primaryMarket.toLowerCase().contains("btts")) {
+        if (suggestsBttsMismatch(context.getHomeTeamStats(), context.getAwayTeamStats())) {
             alternatives.add("BTTS Yes");
         }
 
@@ -346,15 +302,9 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         return awayScoredPct >= BTTS_UNDERDOG_SCORED_PCT && homeConcededPct >= BTTS_FAVORITE_CONCEDES_PCT;
     }
 
-    private String determineFlag(int positionGap, double qualityScore, int upsetFactors, MarketSelection selection) {
+    private String determineFlag(int positionGap, double qualityScore, int upsetFactors) {
         if (upsetFactors >= UPSET_WATCH_FACTORS) {
             return "Upset Watch";
-        }
-        if (selection.market().contains("Over")) {
-            return "Goals Expected";
-        }
-        if (selection.market().contains("-1.5")) {
-            return "Handicap";
         }
         if (positionGap >= MIN_GAP_BANKER && qualityScore >= QUALITY_BANKER) {
             return "Banker";
@@ -366,7 +316,7 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
     }
 
     private Map<String, Object> buildFactors(FixtureContext context, int positionGap, double qualityScore,
-            int upsetFactors, String flag, MarketSelection selection, List<String> alternativeMarkets) {
+            int upsetFactors, String flag, List<String> alternativeMarkets) {
         Map<String, Object> factors = new HashMap<>();
 
         factors.put("homePosition", context.getHomeTeamStats().getPosition());
@@ -377,7 +327,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         factors.put("awayFavoritesPaused", true);
         factors.put("flag", flag);
         factors.put("upsetFactorCount", upsetFactors);
-        factors.put("primaryMarketType", primaryMarketType(selection.market()));
         factors.put("alternativeMarkets", alternativeMarkets);
 
         factors.put("homePpg", context.getHomeTeamStats().getPpgOverall());
@@ -409,20 +358,6 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         }
 
         return factors;
-    }
-
-    private static String primaryMarketType(String market) {
-        String lower = market.toLowerCase();
-        if (lower.contains("over") && lower.contains("goals")) {
-            return "GOALS_LINE";
-        }
-        if (lower.contains("-1.5")) {
-            return "HANDICAP";
-        }
-        if (lower.contains("1x") || lower.contains("home/draw")) {
-            return "UPSET_DOUBLE_CHANCE";
-        }
-        return "FAVORITE_WIN";
     }
 
     private String buildDescription(FixtureContext context, String market, int positionGap,
