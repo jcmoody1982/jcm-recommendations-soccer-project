@@ -13,7 +13,7 @@ import { SECTION_CONFIG, isStandaloneType } from '../utils/recommendationSection
 import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
 import { soccerFixturePath } from '../utils/sport';
 import { EarlyKickoffBadge, EarlyKickoffStrip } from './EarlyKickoffWarning';
-import { EliteBolt } from './EliteBolt';
+import { ConfidenceIcon } from './ConfidenceIcon';
 import { ProbabilityBar } from './ProbabilityBar';
 import { TeamBadge } from './TeamBadge';
 import styles from './RecommendationRow.module.css';
@@ -26,34 +26,6 @@ interface Props {
   linkToFixture?: boolean;
   isElite?: boolean;
 }
-
-const ConfidenceIcon = ({ level, isElite }: { level: string; isElite?: boolean }) => {
-  if (isElite) {
-    return <EliteBolt variant="badge" size={16} />;
-  }
-  if (level === 'STRONG') {
-    return (
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="9" fill="var(--confidence-strong)" stroke="var(--confidence-strong)" strokeWidth="1"/>
-        <path d="M6 10L9 13L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    );
-  }
-  if (level === 'MODERATE') {
-    return (
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="10" cy="10" r="8" stroke="var(--confidence-moderate)" strokeWidth="2" />
-        <path d="M7 10h6" stroke="var(--confidence-moderate)" strokeWidth="2.4" strokeLinecap="round" />
-      </svg>
-    );
-  }
-  return (
-    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="10" cy="10" r="9" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
-      <path d="M7 7L13 13M13 7L7 13" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-    </svg>
-  );
-};
 
 function rowClassName(showPrice: boolean, showPositionGap: boolean): string {
   if (showPrice && showPositionGap) return styles.rowPriceGap;

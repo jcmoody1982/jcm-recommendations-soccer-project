@@ -1,9 +1,0 @@
-.bolt {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--elite-bolt);
-  line-height: 0;
-  vertical-align: middle;
-}

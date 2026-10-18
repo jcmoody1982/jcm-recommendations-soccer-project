@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { resultsService } from '../services/api';
-import { EliteBolt } from '../components';
+import { ConfidenceIcon } from '../components';
 import { SECTION_ORDER, isStandaloneType, sectionTitle } from '../utils/recommendationSections';
 import { soccerFixturePath } from '../utils/sport';
 import type {
@@ -737,7 +737,7 @@ function CompactPickRow({
       <span className={styles.compactScore}>{score}</span>
       <div className={styles.compactPick}>
         <span className={styles.compactPickInner}>
-          {isElite && <EliteBolt variant="badge" size={14} />}
+          {isElite && <ConfidenceIcon level={pick.confidence} isElite size={14} />}
           <span>{pick.market}</span>
           {price && <span className={styles.compactPrice}>@{price}</span>}
         </span>
@@ -859,7 +859,7 @@ function FixtureList({
                       </span>
                     )}
                     <div className={styles.pickSelection}>
-                      {isElite && <EliteBolt variant="badge" size={16} />}
+                      {isElite && <ConfidenceIcon level={pick.confidence} isElite size={16} />}
                       <span className={styles.pickMarket}>{pick.market}</span>
                       {price && (
                         <span className={styles.pickPrice} title="Selection price">
