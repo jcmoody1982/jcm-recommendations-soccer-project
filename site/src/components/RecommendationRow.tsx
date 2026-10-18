@@ -258,9 +258,6 @@ export function RecommendationRow({
             {isInShortlist ? '★' : '☆'}
           </button>
         </div>
-        <div className={styles.mobileSelection}>
-          <span className={styles.selectionChip}>{selectionLabel}</span>
-        </div>
         <div className={styles.mobileCardBody}>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>When</span>
@@ -274,6 +271,11 @@ export function RecommendationRow({
                 {kickoff.primaryLabel} {kickoff.timeLabel}
               </span>
               {isEarlyKickoff && <EarlyKickoffBadge />}
+            </span>
+          </div>
+          <div className={styles.mobileSelection}>
+            <span className={styles.selectionChip} title={selectionLabel}>
+              {selectionLabel}
             </span>
           </div>
           {showPositionGap && (

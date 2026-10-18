@@ -486,13 +486,14 @@
 
   .mobileSelection {
     display: flex;
-    margin-bottom: 6px;
+    align-items: center;
+    min-width: 0;
   }
 
   .mobileSelection .selectionChip {
     max-width: 100%;
-    padding: 4px 11px;
-    font-size: 0.78rem;
+    padding: 2px 9px;
+    font-size: 0.72rem;
   }
 
   .mobileCardBody {
