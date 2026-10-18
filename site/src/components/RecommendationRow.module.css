@@ -313,11 +313,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.28rem;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  white-space: nowrap;
+  min-width: 0;
   text-align: right;
+}
+
+.selectionChip {
+  display: inline-block;
+  max-width: 240px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-color);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .positionGap {
@@ -470,6 +482,17 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .mobileSelection {
+    display: flex;
+    margin-bottom: 6px;
+  }
+
+  .mobileSelection .selectionChip {
+    max-width: 100%;
+    padding: 4px 11px;
+    font-size: 0.78rem;
   }
 
   .mobileCardBody {

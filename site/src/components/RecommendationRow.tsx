@@ -170,7 +170,11 @@ export function RecommendationRow({
             <span className={styles.leagueName}>{recommendation.leagueName}</span>
           )}
         </div>
-        <span className={styles.market}>{selectionLabel}</span>
+        <span className={styles.market}>
+          <span className={styles.selectionChip} title={selectionLabel}>
+            {selectionLabel}
+          </span>
+        </span>
         {showPositionGap && (
           <span className={styles.positionGap} title="League position gap">
             {gapLabel ?? '—'}
@@ -254,6 +258,9 @@ export function RecommendationRow({
             {isInShortlist ? '★' : '☆'}
           </button>
         </div>
+        <div className={styles.mobileSelection}>
+          <span className={styles.selectionChip}>{selectionLabel}</span>
+        </div>
         <div className={styles.mobileCardBody}>
           <div className={styles.mobileInfo}>
             <span className={styles.mobileLabel}>When</span>
@@ -268,10 +275,6 @@ export function RecommendationRow({
               </span>
               {isEarlyKickoff && <EarlyKickoffBadge />}
             </span>
-          </div>
-          <div className={styles.mobileInfo}>
-            <span className={styles.mobileLabel}>Selection</span>
-            <span className={styles.mobileValue}>{selectionLabel}</span>
           </div>
           {showPositionGap && (
             <div className={styles.mobileInfo}>
