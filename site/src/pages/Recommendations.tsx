@@ -499,7 +499,7 @@ export default function Recommendations() {
                   onClick={() => updateParams({ scope: option.value })}
                   title={
                     option.value === 'featured'
-                      ? 'Show only the curated Featured competition set'
+                      ? 'Show only the curated NYC Betting competition set'
                       : 'Show all competitions'
                   }
                 >
@@ -515,7 +515,7 @@ export default function Recommendations() {
               aria-label="League filter"
             >
               <option value="all">
-                {competitionScope === 'featured' ? 'All featured leagues' : 'All Leagues'}
+                {competitionScope === 'featured' ? 'All NYC Betting leagues' : 'All Leagues'}
               </option>
               {availableLeagues.map((league) => (
                 <option key={league.id} value={league.id}>

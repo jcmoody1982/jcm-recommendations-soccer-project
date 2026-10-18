@@ -13,7 +13,7 @@ export const CONFIDENCE_OPTIONS: Array<{ value: ConfidenceFilter; label: string 
 
 export const COMPETITION_SCOPE_OPTIONS: Array<{ value: CompetitionScope; label: string }> = [
   { value: 'all', label: 'All competitions' },
-  { value: 'featured', label: 'Featured' },
+  { value: 'featured', label: 'NYC Betting' },
 ];
 
 export function matchesConfidence(confidence: string, filter: ConfidenceFilter): boolean {

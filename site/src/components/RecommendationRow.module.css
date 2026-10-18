@@ -518,6 +518,10 @@
     line-height: 1.25;
   }
 
+  .mobileProbabilityBar {
+    max-width: 120px;
+  }
+
   .mobileGap {
     font-size: 0.72rem;
     font-weight: 700;

@@ -6,6 +6,8 @@ export interface PriceComparison {
   fairOdds: number;
   /** Expected return per unit at the book price, in percent: score% × odds − 100. */
   edgePct: number;
+  /** Win probability the book price implies, in percent: 100 ÷ odds (margin included). */
+  impliedPct: number;
 }
 
 /**
@@ -18,6 +20,7 @@ export function comparePrice(scorePct: number | null | undefined, odds: number |
   return {
     fairOdds: 100 / scorePct,
     edgePct: scorePct * odds - 100,
+    impliedPct: 100 / odds,
   };
 }
 

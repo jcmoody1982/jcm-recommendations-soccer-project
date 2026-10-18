@@ -14,6 +14,7 @@ import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
 import { soccerFixturePath } from '../utils/sport';
 import { EarlyKickoffBadge, EarlyKickoffStrip } from './EarlyKickoffWarning';
 import { EliteBolt } from './EliteBolt';
+import { ProbabilityBar } from './ProbabilityBar';
 import { TeamBadge } from './TeamBadge';
 import styles from './RecommendationRow.module.css';
 
@@ -217,6 +218,9 @@ export function RecommendationRow({
         <span className={styles.score} title={scoreLabel}>
           {score}
           {scoreUnit}
+          {priceComparison && (
+            <ProbabilityBar ourPct={recommendation.score} impliedPct={priceComparison.impliedPct} />
+          )}
         </span>
         <div className={styles.actions}>
           {hasInfo && (
@@ -323,6 +327,13 @@ export function RecommendationRow({
               {score}
               {scoreUnit}
             </span>
+            {priceComparison && (
+              <ProbabilityBar
+                ourPct={recommendation.score}
+                impliedPct={priceComparison.impliedPct}
+                className={styles.mobileProbabilityBar}
+              />
+            )}
           </div>
         </div>
         {hasInfo && (

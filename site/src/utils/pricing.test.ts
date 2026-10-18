@@ -6,6 +6,7 @@ describe('comparePrice', () => {
     const result = comparePrice(62, 1.8);
     expect(result?.fairOdds).toBeCloseTo(1.613, 3);
     expect(result?.edgePct).toBeCloseTo(11.6, 1);
+    expect(result?.impliedPct).toBeCloseTo(55.56, 2);
   });
 
   it('reports a negative edge when the book is shorter than our price', () => {
