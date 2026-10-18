@@ -288,6 +288,11 @@
   transition: color 0.15s ease;
 }
 
+.versus {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 .fixtureLink:hover {
   color: var(--accent-color);
   text-decoration: underline;

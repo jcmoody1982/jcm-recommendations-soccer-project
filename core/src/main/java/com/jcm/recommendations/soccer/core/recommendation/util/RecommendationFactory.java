@@ -28,6 +28,8 @@ public final class RecommendationFactory {
                 .awayTeamId(context.getAwayTeam().getId())
                 .homeTeamName(context.getHomeTeam().getName())
                 .awayTeamName(context.getAwayTeam().getName())
+                .homeTeamImage(context.getHomeTeam().getImage())
+                .awayTeamImage(context.getAwayTeam().getImage())
                 .matchDateUnix(context.getFixture().getDateUnix())
                 .leagueId(context.getLeague() != null ? context.getLeague().getCurrentSeasonId() : null)
                 .leagueName(context.getLeague() != null ? context.getLeague().getName() : null)

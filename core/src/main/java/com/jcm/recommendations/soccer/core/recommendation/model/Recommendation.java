@@ -15,6 +15,8 @@ public class Recommendation {
     private Long awayTeamId;
     private String homeTeamName;
     private String awayTeamName;
+    private String homeTeamImage;
+    private String awayTeamImage;
     private Long matchDateUnix;
     
     private Long leagueId;

@@ -14,6 +14,7 @@ import { formatTopVsBottomDisplay } from '../utils/topVsBottomDisplay';
 import { soccerFixturePath } from '../utils/sport';
 import { EarlyKickoffBadge, EarlyKickoffStrip } from './EarlyKickoffWarning';
 import { EliteBolt } from './EliteBolt';
+import { TeamBadge } from './TeamBadge';
 import styles from './RecommendationRow.module.css';
 
 interface Props {
@@ -88,9 +89,17 @@ export function RecommendationRow({
       ? formatTopVsBottomDisplay(recommendation)
       : null;
 
-  const fixtureLabel =
-    topVsBottom?.fixtureLabel
-    ?? `${recommendation.homeTeamName} vs ${recommendation.awayTeamName}`;
+  const homeLabel = topVsBottom?.homeLabel ?? recommendation.homeTeamName;
+  const awayLabel = topVsBottom?.awayLabel ?? recommendation.awayTeamName;
+  const fixtureLabel = (
+    <>
+      <TeamBadge src={recommendation.homeTeamImage} />
+      {homeLabel}
+      <span className={styles.versus}> vs </span>
+      <TeamBadge src={recommendation.awayTeamImage} />
+      {awayLabel}
+    </>
+  );
   const selectionLabel = topVsBottom?.selectionLabel ?? recommendation.market;
   const gapLabel = topVsBottom?.gapLabel ?? null;
 

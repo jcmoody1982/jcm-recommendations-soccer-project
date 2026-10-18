@@ -31,6 +31,8 @@ export interface Recommendation {
   awayTeamId: number;
   homeTeamName: string;
   awayTeamName: string;
+  homeTeamImage?: string | null;
+  awayTeamImage?: string | null;
   matchDateUnix: number;
   leagueId: number | null;
   leagueName: string | null;

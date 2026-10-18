@@ -18,6 +18,8 @@ export function formatTeamWithPosition(name: string, position: number | null | u
 
 export interface TopVsBottomDisplay {
   fixtureLabel: string;
+  homeLabel: string;
+  awayLabel: string;
   selectionLabel: string;
   /** e.g. "+15" when a position gap is available */
   gapLabel: string | null;
@@ -33,7 +35,9 @@ export function formatTopVsBottomDisplay(rec: Recommendation): TopVsBottomDispla
   const awayPos = asPosition(factors.awayPosition);
   const gap = asPosition(factors.positionGap);
 
-  const fixtureLabel = `${formatTeamWithPosition(rec.homeTeamName, homePos)} vs ${formatTeamWithPosition(rec.awayTeamName, awayPos)}`;
+  const homeLabel = formatTeamWithPosition(rec.homeTeamName, homePos);
+  const awayLabel = formatTeamWithPosition(rec.awayTeamName, awayPos);
+  const fixtureLabel = `${homeLabel} vs ${awayLabel}`;
 
   let selectionPos: number | null = null;
   if (factors.homeIsFavorite === true) {
@@ -49,5 +53,5 @@ export function formatTopVsBottomDisplay(rec: Recommendation): TopVsBottomDispla
   const selectionLabel = formatTeamWithPosition(rec.market, selectionPos);
   const gapLabel = gap != null && gap > 0 ? `+${gap}` : gap != null ? String(gap) : null;
 
-  return { fixtureLabel, selectionLabel, gapLabel };
+  return { fixtureLabel, homeLabel, awayLabel, selectionLabel, gapLabel };
 }
