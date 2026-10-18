@@ -59,6 +59,8 @@ export function RecommendationSection({
 
   const showPrice = config.showPrice;
   const showPositionGap = Boolean(config.showPositionGap);
+  const countNoun = config.countNoun ?? 'picks';
+  const sectionNote = config.note && <p className={styles.trackRecord}>{config.note}</p>;
 
   const visibleRecommendations = recommendations.slice(0, visibleCount);
   const hasMore = recommendations.length > visibleCount;
@@ -74,9 +76,10 @@ export function RecommendationSection({
         <h2 className={styles.header}>
           <MarketIcon type={type} title={config.title} />
           <span className={styles.title}>{config.title}</span>
-          <span className={styles.count}>0 picks</span>
+          <span className={styles.count}>0 {countNoun}</span>
         </h2>
         {trackRecordNote}
+        {sectionNote}
         <p className={styles.emptyHint}>{emptyHint}</p>
       </section>
     );
@@ -96,10 +99,11 @@ export function RecommendationSection({
         <MarketIcon type={type} title={config.title} />
         <span className={styles.title}>{config.title}</span>
         <span className={styles.count}>
-          {visibleRecommendations.length} of {recommendations.length} picks
+          {visibleRecommendations.length} of {recommendations.length} {countNoun}
         </span>
       </h2>
       {trackRecordNote}
+      {sectionNote}
       <div className={headerClassName(showPrice, showPositionGap)}>
         <span></span>
         <span>League</span>

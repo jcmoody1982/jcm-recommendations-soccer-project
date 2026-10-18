@@ -9,6 +9,10 @@ export interface SectionConfig {
   showPrice: boolean;
   /** Show league position gap after Selection (Top vs Bottom). */
   showPositionGap?: boolean;
+  /** One-line explanation under the board title. */
+  note?: string;
+  /** What the header count calls each row. Defaults to "picks". */
+  countNoun?: string;
 }
 
 export const SECTION_ORDER: RecommendationType[] = [
@@ -20,6 +24,7 @@ export const SECTION_ORDER: RecommendationType[] = [
   'OVER_15_GOALS',
   'OVER_25_GOALS',
   'DRAW',
+  'DRAW_WATCH',
   'FIRST_HALF_GOALS',
   'SECOND_HALF_GOALS',
   'VALUE_BET',
@@ -93,6 +98,14 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
     scoreLabel: 'Probability',
     scoreUnit: '%',
     showPrice: true,
+  },
+  DRAW_WATCH: {
+    title: 'Draw Watch',
+    scoreLabel: 'Probability',
+    scoreUnit: '%',
+    showPrice: true,
+    note: 'Information only: level matches where the draw price is too short to back. Not tips, and not tracked in Results.',
+    countNoun: 'matches',
   },
   FIRST_HALF_GOALS: {
     title: 'First Half Goals',
@@ -178,10 +191,20 @@ export const SECTION_CONFIG: Record<RecommendationType, SectionConfig> = {
  * Markets shown on their own board whatever the confidence filter, without a Strong/Moderate
  * badge, and kept out of Elite and the pick counts. Mirrors {@code StandaloneMarkets} in core.
  */
-export const STANDALONE_TYPES: readonly string[] = ['DRAW'];
+export const STANDALONE_TYPES: readonly string[] = ['DRAW', 'DRAW_WATCH'];
 
 export function isStandaloneType(type: string | null | undefined): boolean {
   return type != null && STANDALONE_TYPES.includes(type.toUpperCase());
+}
+
+/**
+ * Boards shown for information only: never tips, never used in Bet Gen, never settled or tracked
+ * in Results. Mirrors {@code InformationalMarkets} in core.
+ */
+export const INFORMATIONAL_TYPES: readonly string[] = ['DRAW_WATCH'];
+
+export function isInformationalType(type: string | null | undefined): boolean {
+  return type != null && INFORMATIONAL_TYPES.includes(type.toUpperCase());
 }
 
 export function sectionTitle(type: RecommendationType | string): string {

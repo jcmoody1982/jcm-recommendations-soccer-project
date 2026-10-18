@@ -46,6 +46,7 @@ public class PickSettlementGrader {
                     gradeOverUnderGoals(snapshot.getMarket(), match, true);
             case MATCH_RESULT -> gradeTeamOrDraw(snapshot, match, true);
             case DRAW -> gradeDraw(match);
+            case DRAW_WATCH -> GradeResult.unsupported("Draw Watch is information only and never settled");
             case DOUBLE_CHANCE -> gradeDoubleChance(snapshot.getMarket(), match);
             case RESULT_BTTS -> gradeResultBtts(snapshot, match);
             case CLEAN_SHEET -> gradeCleanSheet(snapshot, match);

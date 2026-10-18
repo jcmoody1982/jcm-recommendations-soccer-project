@@ -38,6 +38,7 @@ const PINNED_EMPTY_TYPES: RecommendationType[] = [
   'OVER_05_GOALS',
   'OVER_15_GOALS',
   'OVER_25_GOALS',
+  'DRAW_WATCH',
 ];
 
 const TRACK_RECORD_PERIOD: PerformancePeriod = '30d';
@@ -670,9 +671,11 @@ export default function Recommendations() {
                       recommendations={recommendations}
                       trackRecord={trackRecordByType.get(type)}
                       emptyHint={
-                        confidenceFilter === 'strong'
-                          ? 'No Strong picks in this window. These lines often grade Moderate — switch to Strong + Moderate.'
-                          : 'No picks in this window.'
+                        isStandaloneType(type)
+                          ? 'No level matches in this window.'
+                          : confidenceFilter === 'strong'
+                            ? 'No Strong picks in this window. These lines often grade Moderate — switch to Strong + Moderate.'
+                            : 'No picks in this window.'
                       }
                     />
                   );

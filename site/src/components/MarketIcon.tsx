@@ -84,6 +84,7 @@ function glyph(type: MarketIconId) {
         </g>
       );
     case 'DRAW':
+    case 'DRAW_WATCH':
       return (
         <g>
           <rect x="10" y="17.2" width="20" height="2.6" rx="1.2" className={styles.fillPrimary} />

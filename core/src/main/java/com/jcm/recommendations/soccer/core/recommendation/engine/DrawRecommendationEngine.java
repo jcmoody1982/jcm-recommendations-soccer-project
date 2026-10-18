@@ -85,70 +85,91 @@ public class DrawRecommendationEngine implements RecommendationEngine {
                 context.getHomeTeam().getName(),
                 context.getAwayTeam().getName());
 
-        // A draw at the wrong price loses money however level the match is, so no price means no pick.
-        double[] fairOutcomes = fairOutcomes(context);
-        if (fairOutcomes == null) {
-            log.debug("Draw withheld, no complete 1X2 price: fixtureId={}", context.getFixture().getId());
+        DrawAssessment assessment = assess(context);
+        if (assessment == null) {
             return Optional.empty();
         }
-        double marketDrawPct = fairOutcomes[1];
-        double drawOdds = context.getOdds().getOddsFtX();
-
-        GoalExpectation expectation = expectedGoals(context.getHomeTeamStats(), context.getAwayTeamStats());
-        if (expectation == null) {
-            log.debug("Draw withheld, venue record too thin to model: fixtureId={}",
-                    context.getFixture().getId());
+        if (!assessment.publishable()) {
+            log.debug("Draw withheld for fixtureId={}: level={}, price={}", context.getFixture().getId(),
+                    assessment.unmetLevelGates(), assessment.unmetPriceGates());
             return Optional.empty();
         }
 
-        double modelDrawPct = poissonDrawProbability(expectation.home(), expectation.away());
-        double blendedDrawPct = (modelDrawPct * WEIGHT_MODEL) + (marketDrawPct * WEIGHT_MARKET);
-        double edgeAtPrice = ((modelDrawPct / 100.0) * drawOdds) - 1.0;
-
-        List<String> unmetGates = evaluateGates(context, expectation, modelDrawPct, marketDrawPct, edgeAtPrice);
-        if (!unmetGates.isEmpty()) {
-            log.debug("Draw withheld for fixtureId={}: {}", context.getFixture().getId(), unmetGates);
-            return Optional.empty();
-        }
-
-        ConfidenceLevel confidence = determineConfidence(blendedDrawPct);
+        ConfidenceLevel confidence = determineConfidence(assessment.blendedDrawPct());
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
         }
 
-        Map<String, Object> factors = buildFactors(
-                context, expectation, modelDrawPct, marketDrawPct, blendedDrawPct, edgeAtPrice);
+        Map<String, Object> factors = buildFactors(context, assessment);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.DRAW)
                 .confidence(confidence)
-                .score(blendedDrawPct)
+                .score(assessment.blendedDrawPct())
                 .market("Draw")
-                .odds(drawOdds)
-                .description(buildDescription(context, confidence, blendedDrawPct, factors))
+                .odds(assessment.drawOdds())
+                .description(buildDescription(context, confidence, assessment.blendedDrawPct(), factors))
                 .factors(factors)
                 .build();
 
         log.info("Draw recommendation generated: fixtureId={}, model={}, market={}, published={}, edge={}",
                 context.getFixture().getId(),
-                String.format("%.1f", modelDrawPct),
-                String.format("%.1f", marketDrawPct),
-                String.format("%.1f", blendedDrawPct),
-                String.format("%.3f", edgeAtPrice));
+                String.format("%.1f", assessment.modelDrawPct()),
+                String.format("%.1f", assessment.marketDrawPct()),
+                String.format("%.1f", assessment.blendedDrawPct()),
+                String.format("%.3f", assessment.edgeAtPrice()));
 
         return Optional.of(recommendation);
     }
 
     /**
-     * Reasons this fixture should not be published, empty when it clears every gate.
-     *
-     * <p>Note the edge requirement is a band rather than a floor. Some edge is unavoidable - the
-     * price has to be beaten for the bet to pay - but a large disagreement with the market is far
-     * more likely to mean our expectations are wrong than that we have found a mispriced match, so
-     * the far tail is rejected rather than treated as the best of the board.
+     * The probabilities, price and gate results for a fixture, or null when it cannot be modelled:
+     * no complete 1X2 price to de-vig, or a venue record too thin to build an expectation from.
+     * A draw at the wrong price loses money however level the match is, so no price means no pick.
      */
-    private List<String> evaluateGates(FixtureContext context, GoalExpectation expectation,
-            double modelDrawPct, double marketDrawPct, double edgeAtPrice) {
+    DrawAssessment assess(FixtureContext context) {
+        double[] fairOutcomes = fairOutcomes(context);
+        if (fairOutcomes == null) {
+            log.debug("Draw not assessed, no complete 1X2 price: fixtureId={}", context.getFixture().getId());
+            return null;
+        }
+        GoalExpectation expectation = expectedGoals(context.getHomeTeamStats(), context.getAwayTeamStats());
+        if (expectation == null) {
+            log.debug("Draw not assessed, venue record too thin to model: fixtureId={}",
+                    context.getFixture().getId());
+            return null;
+        }
+
+        double marketDrawPct = fairOutcomes[1];
+        double drawOdds = context.getOdds().getOddsFtX();
+        double modelDrawPct = poissonDrawProbability(expectation.home(), expectation.away());
+        double blendedDrawPct = (modelDrawPct * WEIGHT_MODEL) + (marketDrawPct * WEIGHT_MARKET);
+        double edgeAtPrice = ((modelDrawPct / 100.0) * drawOdds) - 1.0;
+
+        return new DrawAssessment(expectation, modelDrawPct, marketDrawPct, blendedDrawPct, edgeAtPrice, drawOdds,
+                levelGates(context, expectation, modelDrawPct, marketDrawPct),
+                priceGates(edgeAtPrice));
+    }
+
+    /** Everything a draw decision rests on. Publishable only when both gate lists are empty. */
+    record DrawAssessment(
+            GoalExpectation expectation,
+            double modelDrawPct,
+            double marketDrawPct,
+            double blendedDrawPct,
+            double edgeAtPrice,
+            double drawOdds,
+            List<String> unmetLevelGates,
+            List<String> unmetPriceGates) {
+
+        boolean publishable() {
+            return unmetLevelGates.isEmpty() && unmetPriceGates.isEmpty();
+        }
+    }
+
+    /** Whether the match itself reads as level: both probability reads, the PPG gap and the goal count. */
+    private List<String> levelGates(FixtureContext context, GoalExpectation expectation,
+            double modelDrawPct, double marketDrawPct) {
         List<String> unmet = new ArrayList<>();
 
         if (modelDrawPct < MIN_MODEL_DRAW_PCT) {
@@ -167,6 +188,18 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         if (combined > MAX_COMBINED_EXPECTED_GOALS) {
             unmet.add(String.format("expected goals %.2f above %.2f", combined, MAX_COMBINED_EXPECTED_GOALS));
         }
+
+        return unmet;
+    }
+
+    /**
+     * Whether the price is worth taking. The edge requirement is a band rather than a floor. Some
+     * edge is unavoidable - the price has to be beaten for the bet to pay - but a large disagreement
+     * with the market is far more likely to mean our expectations are wrong than that we have found
+     * a mispriced match, so the far tail is rejected rather than treated as the best of the board.
+     */
+    private List<String> priceGates(double edgeAtPrice) {
+        List<String> unmet = new ArrayList<>();
 
         if (edgeAtPrice < MIN_EDGE_AT_PRICE) {
             unmet.add(String.format("edge %.3f below %.3f", edgeAtPrice, MIN_EDGE_AT_PRICE));
@@ -237,16 +270,17 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         return value != null ? value : 0;
     }
 
-    private Map<String, Object> buildFactors(FixtureContext context, GoalExpectation expectation,
-            double modelDrawPct, double marketDrawPct, double blendedDrawPct, double edgeAtPrice) {
+    Map<String, Object> buildFactors(FixtureContext context, DrawAssessment assessment) {
         Map<String, Object> factors = new HashMap<>();
 
         TeamSeasonStats homeStats = context.getHomeTeamStats();
         TeamSeasonStats awayStats = context.getAwayTeamStats();
+        GoalExpectation expectation = assessment.expectation();
+        double edgeAtPrice = assessment.edgeAtPrice();
 
-        factors.put("modelDrawProbability", modelDrawPct);
-        factors.put("marketDrawProbability", marketDrawPct);
-        factors.put("publishedDrawProbability", blendedDrawPct);
+        factors.put("modelDrawProbability", assessment.modelDrawPct());
+        factors.put("marketDrawProbability", assessment.marketDrawPct());
+        factors.put("publishedDrawProbability", assessment.blendedDrawPct());
         factors.put("edgeAtPrice", edgeAtPrice);
         factors.put("drawOdds", context.getOdds().getOddsFtX());
 
@@ -304,7 +338,9 @@ public class DrawRecommendationEngine implements RecommendationEngine {
         if (expectation.combined() < 2.3) {
             indicators.add(String.format("Low-scoring profile (%.2f expected goals)", expectation.combined()));
         }
-        indicators.add(String.format("Price carries %.1f%% edge over our estimate", edgeAtPrice * 100));
+        if (edgeAtPrice >= 0) {
+            indicators.add(String.format("Price carries %.1f%% edge over our estimate", edgeAtPrice * 100));
+        }
 
         if (calculateDrawPercentage(homeStats, true) >= DRAW_SPECIALIST_HIGH
                 || calculateDrawPercentage(awayStats, false) >= DRAW_SPECIALIST_HIGH) {

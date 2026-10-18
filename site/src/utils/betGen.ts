@@ -2,7 +2,13 @@ import type { Recommendation, RecommendationType } from '../types';
 import { compareByKickoff, compareByScoreDesc, matchesKickoffWindow, type KickoffWindow } from './kickoff';
 import { isFeaturedCompetition } from './featuredCompetitions';
 import { matchesConfidence, type CompetitionScope, type ConfidenceFilter } from './recommendationFilters';
-import { SECTION_CONFIG, SECTION_ORDER, includeInMarketSection, isStandaloneType } from './recommendationSections';
+import {
+  SECTION_CONFIG,
+  SECTION_ORDER,
+  includeInMarketSection,
+  isInformationalType,
+  isStandaloneType,
+} from './recommendationSections';
 import { elitePickKey } from './elitePicks';
 
 export interface BetGenFilters {
@@ -40,6 +46,7 @@ export function buildBoards(
   const boards: Boards = {};
   if (!grouped) return boards;
   for (const type of SECTION_ORDER) {
+    if (isInformationalType(type)) continue;
     const picks = (grouped[type] ?? []).filter((rec) =>
       includeInMarketSection(rec)
       && (isStandaloneType(type) || matchesConfidence(rec.confidence, filters.confidence))

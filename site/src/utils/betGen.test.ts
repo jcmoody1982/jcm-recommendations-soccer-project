@@ -37,6 +37,15 @@ function rec(overrides: Partial<Recommendation> = {}): Recommendation {
 }
 
 describe('buildBoards', () => {
+  it('never offers information-only Draw Watch matches as legs', () => {
+    const grouped = {
+      DRAW_WATCH: [rec({ fixtureId: 7, type: 'DRAW_WATCH', confidence: 'WEAK', market: 'Draw', odds: 3.1 })],
+    };
+    const boards = buildBoards(grouped, FILTERS, new Set(), NOW_MS);
+    expect(boards.DRAW_WATCH).toBeUndefined();
+    expect(topPicksAccumulator(boards).legs).toHaveLength(0);
+  });
+
   it('filters like the Recommendations page and ranks by score', () => {
     const grouped = {
       BTTS: [

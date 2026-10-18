@@ -92,6 +92,22 @@ class RecommendationSnapshotServiceTest {
     }
 
     @Test
+    void neverSnapshotsInformationalMarkets() {
+        LocalDate today = LocalDate.now(ZoneId.of("Europe/London"));
+        long todayKickoff = today.atTime(15, 0).atZone(ZoneId.of("Europe/London")).toEpochSecond();
+
+        // Confidence is set to MODERATE so the market itself, not the confidence filter, keeps it out.
+        when(recommendationService.generateAllRecommendationsIncludingShadow(anyDouble())).thenReturn(List.of(
+                rec(1L, todayKickoff, ConfidenceLevel.MODERATE, RecommendationType.DRAW_WATCH)
+        ));
+
+        RecommendationSnapshotService.SnapshotSummary summary = service.snapshotForDate(today);
+
+        assertThat(summary.considered()).isZero();
+        verify(snapshotRepository, never()).save(any());
+    }
+
+    @Test
     void doesNotOverwritePostKickoffPending() {
         LocalDate today = LocalDate.now(ZoneId.of("Europe/London"));
         long pastKickoff = today.atTime(10, 0).atZone(ZoneId.of("Europe/London")).toEpochSecond();

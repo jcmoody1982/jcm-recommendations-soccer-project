@@ -3,6 +3,7 @@ package com.jcm.recommendations.soccer.core.results;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jcm.recommendations.soccer.core.config.ResultsProperties;
+import com.jcm.recommendations.soccer.core.recommendation.InformationalMarkets;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationService;
 import com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
@@ -22,6 +23,7 @@ import java.util.List;
 
 /**
  * UC-031: freeze STRONG/MODERATE picks for fixtures kicking off today (brand timezone).
+ * {@link InformationalMarkets} are never frozen, so they are never settled or tracked.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,6 +52,7 @@ public class RecommendationSnapshotService {
         List<Recommendation> recommendations =
                 recommendationService.generateAllRecommendationsIncludingShadow(daysAhead);
         List<Recommendation> eligible = recommendations.stream()
+                .filter(r -> !InformationalMarkets.isInformational(r.getType()))
                 .filter(this::isActionableConfidence)
                 .filter(r -> isKickoffOnDate(r.getMatchDateUnix(), snapshotDate))
                 .toList();

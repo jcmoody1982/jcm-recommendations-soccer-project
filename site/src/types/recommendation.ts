@@ -19,6 +19,7 @@ export type RecommendationType =
   | 'MATCH_RESULT'
   | 'HOME_AWAY_SPECIALIST'
   | 'DRAW'
+  | 'DRAW_WATCH'
   | 'DOUBLE_CHANCE'
   | 'RESULT_BTTS'
   | 'TOP_VS_BOTTOM'
