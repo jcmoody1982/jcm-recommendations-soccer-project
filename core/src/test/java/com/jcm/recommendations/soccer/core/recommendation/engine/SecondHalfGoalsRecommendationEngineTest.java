@@ -151,15 +151,15 @@ class SecondHalfGoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze recommends Over 1.5 2H for very high expected goals")
-    void analyze_recommendsOver152H_forVeryHighExpected() {
+    @DisplayName("analyze markets Over 0.5 2H even for very high expected goals")
+    void analyze_marketsOver052H_forVeryHighExpected() {
         FixtureContext context = createVeryHighScoringContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Over 1.5 2H Goals");
-        assertThat(result.get().getFactors().get("goalsNeeded")).isEqualTo(2);
+        assertThat(result.get().getMarket()).isEqualTo("Over 0.5 2H Goals");
+        assertThat(result.get().getFactors().get("goalsNeeded")).isEqualTo(1);
     }
 
     @Test
@@ -174,26 +174,24 @@ class SecondHalfGoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("Over 1.5 2H is scored as a two-goal event, not a one-goal event")
-    void over152H_isScoredAsTwoGoalEvent() {
+    @DisplayName("Over 0.5 2H is scored as a one-goal event")
+    void over052H_isScoredAsOneGoalEvent() {
         FixtureContext context = createVeryHighScoringContext();
 
         Recommendation result = engine.analyze(context).orElseThrow();
 
         double expected2HGoals = (Double) result.getFactors().get("expected2HGoals");
         double poisson = (Double) result.getFactors().get("poissonProbability");
-        boolean over15 = "Over 1.5 2H Goals".equals(result.getMarket());
 
-        assertThat(poisson).isEqualTo(poissonAtLeast(expected2HGoals, 2), within(0.01));
+        assertThat(poisson).isEqualTo(poissonAtLeast(expected2HGoals, 1), within(0.01));
         assertThat(result.getScore()).isEqualTo(
-                SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(poisson, over15),
+                SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(poisson),
                 within(0.01));
-        assertThat(result.getScore()).isLessThan(80.0);
     }
 
     @Test
-    @DisplayName("Over 1.5 2H never approaches certainty, however extreme the fixture")
-    void over152H_neverApproachesCertainty() {
+    @DisplayName("Over 0.5 2H never approaches certainty, however extreme the fixture")
+    void over052H_neverApproachesCertainty() {
         FixtureContext context = createVeryHighScoringContext();
         context.getHomeTeamStats().setScoredAvg2hHome(3.0);
         context.getHomeTeamStats().setConcededAvg2hHome(3.0);
@@ -204,31 +202,16 @@ class SecondHalfGoalsRecommendationEngineTest {
 
         Recommendation result = engine.analyze(context).orElseThrow();
 
-        assertThat(result.getMarket()).isEqualTo("Over 1.5 2H Goals");
-        assertThat(result.getScore()).isLessThan(65.0);
-    }
-
-    @Test
-    @DisplayName("Over 1.5 2H is capped at MODERATE even above its old 54 STRONG line")
-    void over152H_neverStrong() {
-        FixtureContext context = createVeryHighScoringContext();
-        context.getHomeTeamStats().setScoredAvg2hHome(3.0);
-        context.getHomeTeamStats().setConcededAvg2hHome(3.0);
-        context.getAwayTeamStats().setScoredAvg2hAway(3.0);
-        context.getAwayTeamStats().setConcededAvg2hAway(3.0);
-
-        Recommendation result = engine.analyze(context).orElseThrow();
-
-        assertThat(result.getMarket()).isEqualTo("Over 1.5 2H Goals");
-        assertThat(result.getScore()).isGreaterThanOrEqualTo(54.0);
-        assertThat(result.getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+        assertThat(result.getMarket()).isEqualTo("Over 0.5 2H Goals");
+        assertThat(result.getScore()).isLessThan(90.0);
+        assertThat(result.getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
     }
 
     @Test
     @DisplayName("applyRealisticCeiling soft-caps the Over 0.5 2H high tail under 90")
     void applyRealisticCeiling_capsOver05Tail() {
-        assertThat(SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(80.0, false)).isEqualTo(80.0);
-        assertThat(SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(97.0, false))
+        assertThat(SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(80.0)).isEqualTo(80.0);
+        assertThat(SecondHalfGoalsRecommendationEngine.applyRealisticCeiling(97.0))
                 .isLessThan(90.0)
                 .isGreaterThan(84.0);
     }
@@ -255,9 +238,6 @@ class SecondHalfGoalsRecommendationEngineTest {
         Recommendation tameResult = engine.analyze(tame).orElseThrow();
         Recommendation livelyResult = engine.analyze(lively).orElseThrow();
 
-        // Scores only compare within a line, so the assertion is only meaningful while both sit
-        // on the same one.
-        assertThat(livelyResult.getMarket()).isEqualTo(tameResult.getMarket());
         assertThat(livelyResult.getScore()).isGreaterThan(tameResult.getScore());
     }
 

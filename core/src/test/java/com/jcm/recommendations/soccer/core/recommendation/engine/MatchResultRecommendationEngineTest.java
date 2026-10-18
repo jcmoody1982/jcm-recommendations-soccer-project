@@ -40,7 +40,15 @@ class MatchResultRecommendationEngineTest {
         assertThat(result.get().getType()).isEqualTo(RecommendationType.MATCH_RESULT);
         assertThat(result.get().getMarket()).isEqualTo("Home Team");
         assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.STRONG);
-        assertThat(result.get().getScore()).isLessThan(65.0);
+        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(65.0);
+    }
+
+    @Test
+    @DisplayName("analyze withholds homes whose market blend lands in the old 55-65 Moderate band")
+    void analyze_formerModerateBand_isWithheld() {
+        FixtureContext context = createDominantHomeTeamContextWithMidOdds();
+
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
@@ -64,35 +72,18 @@ class MatchResultRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze dampens and caps no-odds overconfident homes below 65")
-    void analyze_overconfidentHomeWithoutOdds_isDampenedUnder65() {
-        FixtureContext context = overconfidentHomeBuilder(198L).build();
+    @DisplayName("analyze withholds homes without a match-result price")
+    void analyze_overconfidentHomeWithoutOdds_isWithheld() {
+        FixtureContext context = overconfidentHomeBuilder(198L).odds(null).build();
 
-        Optional<Recommendation> result = engine.analyze(context);
-
-        assertThat(result).isPresent();
-        Double rawModel = (Double) result.get().getFactors().get("rawModelProbability");
-        assertThat(rawModel).isGreaterThan(65.0);
-        assertThat(result.get().getScore()).isLessThan(65.0);
-        assertThat(result.get().getFactors().get("noOddsDampApplied")).isEqualTo(true);
-        assertThat(result.get().getScore()).isEqualTo(
-                MatchResultRecommendationEngine.publishScore(rawModel, null));
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
-    @DisplayName("publishScore blends model with market when odds-implied % is present")
+    @DisplayName("publishScore blends model with market 40/60")
     void publishScore_withMarket_blendsFortySixty() {
         assertThat(MatchResultRecommendationEngine.publishScore(75.0, 50.0))
                 .isCloseTo(60.0, org.assertj.core.data.Offset.offset(0.001));
-    }
-
-    @Test
-    @DisplayName("publishScore dampens the high no-odds tail under 65")
-    void publishScore_withoutMarket_dampsHighTail() {
-        assertThat(MatchResultRecommendationEngine.publishScore(55.0, null)).isEqualTo(55.0);
-        // 55 + 0.5*(75-55) = 65 → capped at 64.9
-        assertThat(MatchResultRecommendationEngine.publishScore(75.0, null)).isEqualTo(64.9);
-        assertThat(MatchResultRecommendationEngine.publishScore(90.0, null)).isEqualTo(64.9);
     }
 
     @Test
@@ -143,20 +134,6 @@ class MatchResultRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isNotEqualTo("Draw");
         assertThat(result.get().getFactors().get("drawsDeferredToDrawEngine")).isEqualTo(true);
-    }
-
-    @Test
-    @DisplayName("analyze can be STRONG without odds when dampened publish score clears the strong floor")
-    void analyze_strongWithoutOdds_whenProbabilityHigh() {
-        FixtureContext context = overconfidentHomeBuilder(121L).build();
-
-        Optional<Recommendation> result = engine.analyze(context);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
-        assertThat(result.get().getOdds()).isNull();
-        assertThat(result.get().getScore()).isLessThan(65.0);
-        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(62.0);
     }
 
     @Test
@@ -333,7 +310,7 @@ class MatchResultRecommendationEngineTest {
 
         Optional<Recommendation> result = engine.analyze(context);
 
-        // 2.80 home (~36% implied) vs a 70%+ raw model → blend lands below 55
+        // 2.80 home (~36% implied) vs a 70%+ raw model → blend lands below 65
         assertThat(result).isEmpty();
     }
 
@@ -346,9 +323,9 @@ class MatchResultRecommendationEngineTest {
         FixtureContext withSquadValue = dominantHomeBuilder(131L)
                 .odds(FixtureOdds.builder()
                         .fixtureId(131L)
-                        .oddsFt1(1.45)
+                        .oddsFt1(1.40)
                         .oddsFtX(4.50)
-                        .oddsFt2(7.00)
+                        .oddsFt2(7.50)
                         .build())
                 .homeSquadProfile(TeamSquadProfile.builder()
                         .teamId(1L)
@@ -382,15 +359,22 @@ class MatchResultRecommendationEngineTest {
         return dominantHomeBuilder(101L)
                 .odds(FixtureOdds.builder()
                         .fixtureId(101L)
+                        .oddsFt1(1.40)
+                        .oddsFtX(4.50)
+                        .oddsFt2(7.50)
+                        .build())
+                .build();
+    }
+
+    private FixtureContext createDominantHomeTeamContextWithMidOdds() {
+        return dominantHomeBuilder(122L)
+                .odds(FixtureOdds.builder()
+                        .fixtureId(122L)
                         .oddsFt1(1.70)
                         .oddsFtX(3.60)
                         .oddsFt2(5.00)
                         .build())
                 .build();
-    }
-
-    private FixtureContext createDominantHomeTeamContextWithoutOdds() {
-        return dominantHomeBuilder(121L).build();
     }
 
     private FixtureContext createDominantHomeTeamContextWithLongOdds() {
@@ -471,7 +455,8 @@ class MatchResultRecommendationEngineTest {
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
                 .homeTeamForm(homeForm)
-                .awayTeamForm(awayForm);
+                .awayTeamForm(awayForm)
+                .odds(shortHomePrice(fixtureId));
     }
 
     /**
@@ -532,7 +517,8 @@ class MatchResultRecommendationEngineTest {
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
                 .homeTeamForm(homeForm)
-                .awayTeamForm(awayForm);
+                .awayTeamForm(awayForm)
+                .odds(shortHomePrice(fixtureId));
     }
 
     /** Extreme mismatch that historically inflated into the overconfident 70%+ band. */
@@ -590,7 +576,8 @@ class MatchResultRecommendationEngineTest {
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
                 .homeTeamForm(homeForm)
-                .awayTeamForm(awayForm);
+                .awayTeamForm(awayForm)
+                .odds(shortHomePrice(fixtureId));
     }
 
     private FixtureContext createThinFormSampleHotStreakContext() {
@@ -780,6 +767,7 @@ class MatchResultRecommendationEngineTest {
                 .awayTeamStats(awayStats)
                 .homeTeamForm(homeForm)
                 .awayTeamForm(awayForm)
+                .odds(shortHomePrice(106L))
                 .build();
     }
 
@@ -822,6 +810,7 @@ class MatchResultRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(shortHomePrice(108L))
                 .build();
     }
 
@@ -860,6 +849,7 @@ class MatchResultRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(shortHomePrice(109L))
                 .build();
     }
 
@@ -898,6 +888,17 @@ class MatchResultRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
+                .odds(shortHomePrice(110L))
+                .build();
+    }
+
+    /** A short home price whose market blend clears the Moderate floor for a clear favourite. */
+    private FixtureOdds shortHomePrice(long fixtureId) {
+        return FixtureOdds.builder()
+                .fixtureId(fixtureId)
+                .oddsFt1(1.30)
+                .oddsFtX(5.50)
+                .oddsFt2(9.00)
                 .build();
     }
 
@@ -932,7 +933,7 @@ class MatchResultRecommendationEngineTest {
 
         FixtureOdds odds = FixtureOdds.builder()
                 .fixtureId(111L)
-                .oddsFt1(1.80)
+                .oddsFt1(1.30)
                 .oddsFtX(3.50)
                 .oddsFt2(4.50)
                 .build();

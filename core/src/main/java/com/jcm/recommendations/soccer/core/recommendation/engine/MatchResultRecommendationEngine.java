@@ -95,21 +95,17 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     private static final double DRAW_MIN_PROBABILITY = 15.0;
     private static final double DRAW_MAX_PROBABILITY = 35.0;
 
-    // Thresholds apply to the *published* (blended / dampened) score
-    private static final double THRESHOLD_STRONG = 62.0;
-    private static final double THRESHOLD_MODERATE = 55.0;
+    /**
+     * Thresholds apply to the *published* (market-blended) score. Over 2026-10-04..10-17 the
+     * 55-62 band hit ~49% (−16% ROI) and 62-65 ~45%; 65-70 hit ~65% and 70+ ~80%. A home price
+     * is required: without one there is no blend, and no-odds picks were capped below 65.
+     */
+    private static final double THRESHOLD_STRONG = 70.0;
+    private static final double THRESHOLD_MODERATE = 65.0;
 
     /** Weight on the raw model when blending with market-implied home-win %. */
     private static final double PUBLISH_MODEL_WEIGHT = 0.40;
     private static final double PUBLISH_MARKET_WEIGHT = 0.60;
-
-    /**
-     * Without odds, pull high raw model scores toward the profitable mid band and never publish
-     * a no-odds tip at or above this cap.
-     */
-    private static final double NO_ODDS_DAMP_FLOOR = 55.0;
-    private static final double NO_ODDS_DAMP_FACTOR = 0.50;
-    private static final double NO_ODDS_PUBLISH_CAP = 64.9;
 
     /** STRONG also requires outcome odds not longer than this when odds are present. */
     private static final double STRONG_MAX_ODDS = 2.50;
@@ -184,22 +180,20 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
         final String recommendedOutcome = context.getHomeTeam().getName();
         final double rawModelProb = homeWinProb;
 
-        Double odds = null;
-        Double impliedHomePct = null;
-        boolean hasOutcomeOdds = false;
-
-        if (context.hasOdds()
-                && context.getOdds().getOddsFt1() != null
-                && context.getOdds().getOddsFt1() > 0) {
-            odds = context.getOdds().getOddsFt1();
-            impliedHomePct = (1.0 / odds) * 100;
-            hasOutcomeOdds = true;
+        if (!context.hasOdds()
+                || context.getOdds().getOddsFt1() == null
+                || context.getOdds().getOddsFt1() <= 0) {
+            log.debug("Skipping Match Result tip without a home price: fixtureId={}",
+                    context.getFixture().getId());
+            return Optional.empty();
         }
+        final double odds = context.getOdds().getOddsFt1();
+        final double impliedHomePct = (1.0 / odds) * 100;
 
         double publishedScore = publishScore(rawModelProb, impliedHomePct);
-        double valueVsOdds = impliedHomePct != null ? rawModelProb - impliedHomePct : 0.0;
+        double valueVsOdds = rawModelProb - impliedHomePct;
 
-        ConfidenceLevel confidence = determineConfidence(publishedScore, hasOutcomeOdds, odds);
+        ConfidenceLevel confidence = determineConfidence(publishedScore, odds);
 
         if (confidence == ConfidenceLevel.WEAK) {
             return Optional.empty();
@@ -209,14 +203,9 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
                 valueVsOdds, hasXgData, homeFormMomentum, awayFormMomentum);
         factors.put("rawModelProbability", rawModelProb);
         factors.put("publishedScore", publishedScore);
-        factors.put("marketBlendApplied", hasOutcomeOdds);
-        if (impliedHomePct != null) {
-            factors.put("publishModelWeight", PUBLISH_MODEL_WEIGHT);
-            factors.put("publishMarketWeight", PUBLISH_MARKET_WEIGHT);
-        } else {
-            factors.put("noOddsDampApplied", rawModelProb > NO_ODDS_DAMP_FLOOR);
-            factors.put("noOddsPublishCap", NO_ODDS_PUBLISH_CAP);
-        }
+        factors.put("marketBlendApplied", true);
+        factors.put("publishModelWeight", PUBLISH_MODEL_WEIGHT);
+        factors.put("publishMarketWeight", PUBLISH_MARKET_WEIGHT);
 
         Recommendation recommendation = RecommendationFactory.fromContext(context)
                 .type(RecommendationType.MATCH_RESULT)
@@ -225,7 +214,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
                 .market(recommendedOutcome)
                 .odds(odds)
                 .description(buildDescription(context, recommendedOutcome, publishedScore, confidence,
-                        valueVsOdds, outcomeType, homeFormMomentum, awayFormMomentum, hasOutcomeOdds))
+                        valueVsOdds, outcomeType, homeFormMomentum, awayFormMomentum))
                 .factors(factors)
                 .build();
 
@@ -238,18 +227,11 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     }
 
     /**
-     * Published probability shown on the board. With odds: lean on the market so a raw 75% model
-     * cannot outrun a ~50% price. Without odds: dampen the high tail and cap below 65.
+     * Published probability shown on the board: lean on the market so a raw 75% model cannot
+     * outrun a ~50% price.
      */
-    static double publishScore(double rawModelProb, Double impliedHomePct) {
-        if (impliedHomePct != null && impliedHomePct > 0) {
-            return (PUBLISH_MODEL_WEIGHT * rawModelProb) + (PUBLISH_MARKET_WEIGHT * impliedHomePct);
-        }
-        if (rawModelProb <= NO_ODDS_DAMP_FLOOR) {
-            return rawModelProb;
-        }
-        double dampened = NO_ODDS_DAMP_FLOOR + NO_ODDS_DAMP_FACTOR * (rawModelProb - NO_ODDS_DAMP_FLOOR);
-        return Math.min(NO_ODDS_PUBLISH_CAP, dampened);
+    static double publishScore(double rawModelProb, double impliedHomePct) {
+        return (PUBLISH_MODEL_WEIGHT * rawModelProb) + (PUBLISH_MARKET_WEIGHT * impliedHomePct);
     }
 
     private boolean hasXgData(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
@@ -556,19 +538,13 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
     }
 
     /**
-     * STRONG / MODERATE from the published score. When odds are present, STRONG also needs a
-     * short-enough price; the old "+5% value vs market" gate is dropped because positive model
-     * edge was anti-selected on graded boards once scores were already overconfident.
+     * STRONG / MODERATE from the published score. STRONG also needs a short-enough price; the
+     * old "+5% value vs market" gate is dropped because positive model edge was anti-selected on
+     * graded boards once scores were already overconfident.
      */
-    private ConfidenceLevel determineConfidence(
-            double publishedProbability, boolean hasOutcomeOdds, Double odds) {
+    private ConfidenceLevel determineConfidence(double publishedProbability, double odds) {
         if (publishedProbability >= THRESHOLD_STRONG) {
-            boolean oddsOkForStrong = !hasOutcomeOdds
-                    || (odds != null && odds <= STRONG_MAX_ODDS);
-            if (oddsOkForStrong) {
-                return ConfidenceLevel.STRONG;
-            }
-            return ConfidenceLevel.MODERATE;
+            return odds <= STRONG_MAX_ODDS ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
         }
         if (publishedProbability >= THRESHOLD_MODERATE) {
             return ConfidenceLevel.MODERATE;
@@ -722,7 +698,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
 
     private String buildDescription(FixtureContext context, String outcome, double probability,
             ConfidenceLevel confidence, double valueVsOdds, String outcomeType,
-            double homeFormMomentum, double awayFormMomentum, boolean hasOutcomeOdds) {
+            double homeFormMomentum, double awayFormMomentum) {
         StringBuilder colour = new StringBuilder();
 
         double relevantMomentum = outcomeType.equals("HOME") ? homeFormMomentum : awayFormMomentum;
@@ -751,7 +727,7 @@ public class MatchResultRecommendationEngine implements RecommendationEngine {
                 .selection(outcome)
                 .context(context)
                 .probabilityPct(probability)
-                .valuePct(hasOutcomeOdds && valueVsOdds > 0 ? valueVsOdds : null)
+                .valuePct(valueVsOdds > 0 ? valueVsOdds : null)
                 .colourNote(appendColourNote(colour.isEmpty() ? null : colour.toString(), context))
                 .build());
     }

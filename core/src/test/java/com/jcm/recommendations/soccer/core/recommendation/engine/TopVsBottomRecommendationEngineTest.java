@@ -40,13 +40,28 @@ class TopVsBottomRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze skips when position gap is below moderate floor")
+    @DisplayName("analyze skips when position gap is well below the Strong floor")
     void analyze_skipsSmallGap() {
         FixtureContext context = mismatchBuilder(2L)
                 .homeTeamStats(TeamSeasonStats.builder().teamId(1L).position(8).ppgHome(2.0)
                         .seasonGoalDifference(10).matchesPlayed(10).build())
                 .awayTeamStats(TeamSeasonStats.builder().teamId(2L).position(15).ppgAway(0.8)
                         .seasonGoalDifference(-8).matchesPlayed(10).build())
+                .build();
+
+        assertThat(engine.analyze(context)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("analyze withholds a former Moderate-band gap of 11 places")
+    void analyze_skipsModerateGap() {
+        TeamSeasonStats away = awayStatsForMismatch();
+        away.setPosition(13);
+        FixtureContext context = mismatchBuilder(21L)
+                .homeTeamStats(homeStatsForMismatch())
+                .awayTeamStats(away)
+                .homeTeamForm(homeFormForMismatch())
+                .awayTeamForm(awayFormForMismatch())
                 .build();
 
         assertThat(engine.analyze(context)).isEmpty();
@@ -61,7 +76,7 @@ class TopVsBottomRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Top Team");
-        assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.STRONG);
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
         assertThat(result.get().getFactors().get("homeIsFavorite")).isEqualTo(true);
     }
 
@@ -151,8 +166,8 @@ class TopVsBottomRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze flags upset watch and still backs the favorite to win")
-    void analyze_upsetWatchStillBacksFavoriteWin() {
+    @DisplayName("analyze withholds the pick when an upset watch fires")
+    void analyze_skipsUpsetWatch() {
         FixtureContext context = mismatchBuilder(5L)
                 .homeTeamStats(homeStatsForMismatch())
                 .awayTeamStats(TeamSeasonStats.builder()
@@ -184,13 +199,7 @@ class TopVsBottomRecommendationEngineTest {
                         .build())
                 .build();
 
-        Optional<Recommendation> result = engine.analyze(context);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Top Team");
-        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(result.get().getFactors().get("flag")).isEqualTo("Upset Watch");
-        assertThat((Integer) result.get().getFactors().get("upsetFactorCount")).isGreaterThanOrEqualTo(2);
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test

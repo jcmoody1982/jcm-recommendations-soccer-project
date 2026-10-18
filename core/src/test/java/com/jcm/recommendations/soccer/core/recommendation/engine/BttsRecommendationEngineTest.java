@@ -39,12 +39,21 @@ class BttsRecommendationEngineTest {
 
     @Test
     void analyze_withModerateBttsTeams_returnsModerateRecommendation() {
-        FixtureContext context = createContextWithBttsStats(75.0, 75.0);
+        FixtureContext context = createContextWithBttsStats(85.0, 85.0);
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
         assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.STRONG, ConfidenceLevel.MODERATE);
+        assertThat(result.get().getScore()).isGreaterThanOrEqualTo(65.0);
+    }
+
+    @Test
+    void analyze_belowSixtyFiveFloor_returnsEmpty() {
+        // 75% season BTTS each side lands in the 62-65 band that used to publish as Moderate
+        FixtureContext context = createContextWithBttsStats(75.0, 75.0);
+
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
@@ -126,7 +135,7 @@ class BttsRecommendationEngineTest {
 
     @Test
     void analyze_withLowScorers_noGoalsBoost() {
-        FixtureContext context = createContextWithGoalsData(75.0, 75.0, 10, 8);
+        FixtureContext context = createContextWithGoalsData(85.0, 85.0, 10, 8);
 
         Optional<Recommendation> result = engine.analyze(context);
 
@@ -159,8 +168,8 @@ class BttsRecommendationEngineTest {
 
     @Test
     void analyze_withFormData_producesHigherScore() {
-        FixtureContext contextWithForm = createContextWithFormData(75.0, 75.0, 85.0, 85.0);
-        FixtureContext contextWithoutForm = createContextWithBttsStats(75.0, 75.0);
+        FixtureContext contextWithForm = createContextWithFormData(85.0, 85.0, 95.0, 95.0);
+        FixtureContext contextWithoutForm = createContextWithBttsStats(85.0, 85.0);
 
         Optional<Recommendation> resultWithForm = engine.analyze(contextWithForm);
         Optional<Recommendation> resultWithoutForm = engine.analyze(contextWithoutForm);
@@ -254,7 +263,7 @@ class BttsRecommendationEngineTest {
 
     @Test
     void analyze_withSolidDefenses_noLeakyDefenseBoost() {
-        FixtureContext context = createContextWithDefensiveData(75.0, 75.0, 8, 6);
+        FixtureContext context = createContextWithDefensiveData(85.0, 85.0, 8, 6);
 
         Optional<Recommendation> result = engine.analyze(context);
 
@@ -301,7 +310,7 @@ class BttsRecommendationEngineTest {
 
     @Test
     void analyze_withLowXgTeams_noXgBoost() {
-        FixtureContext context = createContextWithXgData(75.0, 75.0, 1.0, 1.0);
+        FixtureContext context = createContextWithXgData(85.0, 85.0, 1.0, 1.0);
 
         Optional<Recommendation> result = engine.analyze(context);
 
@@ -312,7 +321,7 @@ class BttsRecommendationEngineTest {
 
     @Test
     void analyze_withoutXgData_noXgBoost() {
-        FixtureContext context = createContextWithBttsStats(75.0, 75.0);
+        FixtureContext context = createContextWithBttsStats(85.0, 85.0);
 
         Optional<Recommendation> result = engine.analyze(context);
 

@@ -160,20 +160,20 @@ class FirstHalfGoalsRecommendationEngineTest {
     }
 
     @Test
-    @DisplayName("analyze recommends Over 1.5 HT for very high expected goals")
-    void analyze_recommendsOver15HT_forVeryHighExpected() {
+    @DisplayName("analyze markets Over 0.5 HT even for very high expected goals")
+    void analyze_marketsOver05HT_forVeryHighExpected() {
         FixtureContext context = createVeryHighScoringContext();
 
         Optional<Recommendation> result = engine.analyze(context);
 
         assertThat(result).isPresent();
-        assertThat(result.get().getMarket()).isEqualTo("Over 1.5 HT Goals");
-        assertThat(result.get().getFactors().get("goalsNeeded")).isEqualTo(2);
+        assertThat(result.get().getMarket()).isEqualTo("Over 0.5 HT Goals");
+        assertThat(result.get().getFactors().get("goalsNeeded")).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("Over 1.5 HT is scored as a two-goal event, not a one-goal event")
-    void over15Ht_isScoredAsTwoGoalEvent() {
+    @DisplayName("Over 0.5 HT is scored as a one-goal event")
+    void over05Ht_isScoredAsOneGoalEvent() {
         FixtureContext context = createVeryHighScoringContext();
 
         Recommendation result = engine.analyze(context).orElseThrow();
@@ -182,23 +182,19 @@ class FirstHalfGoalsRecommendationEngineTest {
         double expected1HGoals = (Double) factors.get("expected1HGoals");
         double poisson = (Double) factors.get("poissonProbability");
 
-        // A first half of this expectation delivers two goals well under half the time. The old
-        // engine published this fixture in the high eighties.
-        assertThat(poisson).isEqualTo(poissonAtLeast(expected1HGoals, 2), within(0.01));
-        boolean over15 = "Over 1.5 HT Goals".equals(result.getMarket());
+        assertThat(poisson).isEqualTo(poissonAtLeast(expected1HGoals, 1), within(0.01));
         double potential = factors.containsKey("apiPotentialForLine")
                 ? (Double) factors.get("apiPotentialForLine") : Double.NaN;
         double expectedScore = Double.isNaN(potential)
-                ? FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(poisson, over15)
+                ? FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(poisson)
                 : FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(
-                        (poisson * 0.65) + (potential * 0.35), over15);
+                        (poisson * 0.65) + (potential * 0.35));
         assertThat(result.getScore()).isEqualTo(expectedScore, within(0.01));
-        assertThat(result.getScore()).isLessThan(65.0);
     }
 
     @Test
-    @DisplayName("Over 1.5 HT never approaches certainty, however extreme the fixture")
-    void over15Ht_neverApproachesCertainty() {
+    @DisplayName("Over 0.5 HT never approaches certainty, however extreme the fixture")
+    void over05Ht_neverApproachesCertainty() {
         FixtureContext context = createVeryHighScoringContext();
         // Absurd inputs: every signal pushed past anything a real fixture produces.
         context.getHomeTeamStats().setScoredAvgHtHome(3.0);
@@ -214,8 +210,8 @@ class FirstHalfGoalsRecommendationEngineTest {
 
         Recommendation result = engine.analyze(context).orElseThrow();
 
-        assertThat(result.getMarket()).isEqualTo("Over 1.5 HT Goals");
-        assertThat(result.getScore()).isLessThan(65.0);
+        assertThat(result.getMarket()).isEqualTo("Over 0.5 HT Goals");
+        assertThat(result.getScore()).isLessThan(88.0);
     }
 
     @Test
@@ -238,9 +234,6 @@ class FirstHalfGoalsRecommendationEngineTest {
         Recommendation tameResult = engine.analyze(tame).orElseThrow();
         Recommendation livelyResult = engine.analyze(lively).orElseThrow();
 
-        // Scores only compare within a line, so the assertion is only meaningful while both sit
-        // on the same one.
-        assertThat(livelyResult.getMarket()).isEqualTo(tameResult.getMarket());
         assertThat((Double) livelyResult.getFactors().get("expected1HGoals"))
                 .isGreaterThan((Double) tameResult.getFactors().get("expected1HGoals"));
         assertThat(livelyResult.getScore()).isGreaterThan(tameResult.getScore());
@@ -252,17 +245,6 @@ class FirstHalfGoalsRecommendationEngineTest {
         context.getAwayTeamStats().setScoredAvgHtAway(awayScored);
         context.getAwayTeamStats().setConcededAvgHtAway(homeScored);
         return context;
-    }
-
-    @Test
-    @DisplayName("Over 1.5 HT is withheld when the provider does not corroborate the line")
-    void over15Ht_withheldWithoutProviderCorroboration() {
-        FixtureContext context = createVeryHighScoringContext();
-        context.getPotentials().setO15HtPotential(35.0);
-
-        Recommendation result = engine.analyze(context).orElseThrow();
-
-        assertThat(result.getMarket()).isEqualTo("Over 0.5 HT Goals");
     }
 
     @Test
@@ -289,34 +271,28 @@ class FirstHalfGoalsRecommendationEngineTest {
         double poisson = (Double) factors.get("poissonProbability");
         double potential = (Double) factors.get("apiPotentialForLine");
         double rawPotential = (Double) factors.get("apiPotentialForLineRaw");
-        boolean over15 = "Over 1.5 HT Goals".equals(result.getMarket());
 
         assertThat(potential).isLessThan(rawPotential);
         double blended = (poisson * 0.65) + (potential * 0.35);
         assertThat(result.getScore()).isEqualTo(
-                FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(blended, over15),
+                FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(blended),
                 within(0.01));
     }
 
     @Test
     @DisplayName("shrinkApiPotential pulls a 100% HT potential toward the line prior")
     void shrinkApiPotential_pullsCertaintyTowardPrior() {
-        assertThat(FirstHalfGoalsRecommendationEngine.shrinkApiPotential(100.0, false))
+        assertThat(FirstHalfGoalsRecommendationEngine.shrinkApiPotential(100.0))
                 .isCloseTo(83.2, within(0.05));
-        assertThat(FirstHalfGoalsRecommendationEngine.shrinkApiPotential(100.0, true))
-                .isCloseTo(64.0, within(0.05));
     }
 
     @Test
     @DisplayName("applyRealisticCeiling soft-caps the Over 0.5 HT high tail under 88")
     void applyRealisticCeiling_capsOver05Tail() {
-        assertThat(FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(80.0, false)).isEqualTo(80.0);
-        assertThat(FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(95.0, false))
+        assertThat(FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(80.0)).isEqualTo(80.0);
+        assertThat(FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(95.0))
                 .isLessThan(88.0)
                 .isGreaterThan(82.0);
-        assertThat(FirstHalfGoalsRecommendationEngine.applyRealisticCeiling(90.0, true))
-                .isLessThan(65.0)
-                .isGreaterThan(58.0);
     }
 
     @Test

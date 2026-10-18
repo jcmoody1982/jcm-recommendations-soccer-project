@@ -20,12 +20,10 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 /**
  * UC-015: First Half Goals Recommendations
  *
- * Predicts likelihood of goals in the first half (Over 0.5 HT, Over 1.5 HT).
+ * Predicts likelihood of a goal in the first half (Over 0.5 HT).
  *
  * Season goals, xG (×0.45 proxy for the 1H share) and provider potentials feed a single
- * expected-first-half-goals figure, which a Poisson tail turns into the probability of the line
- * being marketed. The score published is therefore the probability of that specific line, so
- * Over 1.5 HT is scored as P(2+ HT goals) rather than sharing a scale with Over 0.5 HT.
+ * expected-first-half-goals figure, which a Poisson tail turns into the probability of the line.
  */
 @Component
 @Slf4j
@@ -35,15 +33,13 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
     private static final double FIRST_HALF_RATIO = 0.45;
 
     /**
-     * The two lines this engine can market. The published score is the probability of the line
-     * actually being recommended, so each line carries its own thresholds: a first half averages
-     * about 1.2 goals, which puts Over 0.5 in the 70-86% band and Over 1.5 in the 30-60% band.
-     * One shared threshold cannot describe both, and using the Over 0.5 band for Over 1.5 is what
-     * previously let a coin-flip market publish as a near-certainty.
+     * The line this engine markets, with thresholds on its own probability scale.
+     *
+     * <p>Over 1.5 HT is not marketed: it hit 41% on 29 picks against ~53% claimed
+     * (2026-10-04..10-17), and the half lines carry no price to judge it against.
      */
     private enum Line {
-        OVER_05(1, "Over 0.5 HT Goals", 78.0, 70.0),
-        OVER_15(2, "Over 1.5 HT Goals", 52.0, 44.0);
+        OVER_05(1, "Over 0.5 HT Goals", 78.0, 70.0);
 
         private final int goalsNeeded;
         private final String market;
@@ -70,17 +66,13 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
     private static final double API_POTENTIAL_EVIDENCE_MATCHES = 4.0;
     /** League-typical share of first halves with at least one goal. */
     private static final double PRIOR_O05_HT = 72.0;
-    /** League-typical share of first halves with at least two goals. */
-    private static final double PRIOR_O15_HT = 40.0;
 
     /**
-     * Soft-cap the published probability. Over 0.5 HT honestly sits high; Over 1.5 HT must not
-     * approach certainty. Ranking within each line is preserved.
+     * Soft-cap the published probability. Over 0.5 HT honestly sits high but must not approach
+     * certainty. Ranking is preserved.
      */
     private static final double O05_CEILING_SQUASH_START = 82.0;
     private static final double O05_MAX_REALISTIC = 88.0;
-    private static final double O15_CEILING_SQUASH_START = 58.0;
-    private static final double O15_MAX_REALISTIC = 65.0;
 
     /**
      * Bounds on the combined expected-goals adjustment. The individual signals below are all
@@ -89,10 +81,6 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
      */
     private static final double LAMBDA_ADJUST_MIN = 0.85;
     private static final double LAMBDA_ADJUST_MAX = 1.20;
-
-    // Over 1.5 HT needs a genuine volume outlier, not merely an above-average fixture
-    private static final double OVER_15_MIN_EXPECTED_GOALS = 1.5;
-    private static final double OVER_15_MIN_API_POTENTIAL = 50.0;
 
     // xG-based combined rating bands (reported as match colour)
     private static final double XG_HIGH_THRESHOLD = 3.0;
@@ -173,7 +161,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         double adjustment = calculateExpectedGoalsAdjustment(context);
         double expectedGoals1H = baseExpectedGoals1H * adjustment;
 
-        Line line = selectLine(expectedGoals1H, context);
+        Line line = Line.OVER_05;
         double score = calculateScore(expectedGoals1H, line, context);
 
         ConfidenceLevel confidence = determineConfidence(score, line);
@@ -281,29 +269,14 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         } else {
             blended = clampScore((poisson * WEIGHT_POISSON) + (safePercentage(shrunkApi) * WEIGHT_API_POTENTIAL));
         }
-        return applyRealisticCeiling(blended, line);
-    }
-
-    private Line selectLine(double expectedGoals1H, FixtureContext context) {
-        if (expectedGoals1H < OVER_15_MIN_EXPECTED_GOALS) {
-            return Line.OVER_05;
-        }
-
-        Double o15HtPotential = shrunkApiPotentialFor(Line.OVER_15, context);
-        if (o15HtPotential != null && o15HtPotential < OVER_15_MIN_API_POTENTIAL) {
-            return Line.OVER_05;
-        }
-
-        return Line.OVER_15;
+        return applyRealisticCeiling(blended);
     }
 
     private static Double apiPotentialFor(Line line, FixtureContext context) {
         if (!context.hasPotentials()) {
             return null;
         }
-        return line == Line.OVER_15
-                ? context.getPotentials().getO15HtPotential()
-                : context.getPotentials().getO05HtPotential();
+        return context.getPotentials().getO05HtPotential();
     }
 
     private static Double shrunkApiPotentialFor(Line line, FixtureContext context) {
@@ -311,40 +284,28 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         if (raw == null) {
             return null;
         }
-        return shrinkApiPotential(raw, line);
+        return shrinkApiPotential(raw);
     }
 
     /**
-     * Provider potential is one noisy read. Blend toward the line's league prior
-     * (O0.5 HT 100% → ~83%; O1.5 HT 100% → ~64%).
+     * Provider potential is one noisy read. Blend toward the league prior (100% → ~83%).
      */
-    static double shrinkApiPotential(double apiPotential, boolean over15) {
-        double prior = over15 ? PRIOR_O15_HT : PRIOR_O05_HT;
+    static double shrinkApiPotential(double apiPotential) {
         return ((apiPotential * API_POTENTIAL_EVIDENCE_MATCHES)
-                + (prior * SHRINKAGE_PSEUDO_MATCHES))
+                + (PRIOR_O05_HT * SHRINKAGE_PSEUDO_MATCHES))
                 / (API_POTENTIAL_EVIDENCE_MATCHES + SHRINKAGE_PSEUDO_MATCHES);
     }
 
-    private static double shrinkApiPotential(double apiPotential, Line line) {
-        return shrinkApiPotential(apiPotential, line == Line.OVER_15);
-    }
-
     /**
-     * Compresses the overconfident publish tail into the gap below the line's realistic max.
+     * Compresses the overconfident publish tail into the gap below the realistic max.
      */
-    static double applyRealisticCeiling(double rawScore, boolean over15) {
-        double squashStart = over15 ? O15_CEILING_SQUASH_START : O05_CEILING_SQUASH_START;
-        double maxRealistic = over15 ? O15_MAX_REALISTIC : O05_MAX_REALISTIC;
-        if (rawScore <= squashStart) {
+    static double applyRealisticCeiling(double rawScore) {
+        if (rawScore <= O05_CEILING_SQUASH_START) {
             return rawScore;
         }
-        double headroom = maxRealistic - squashStart;
-        double excess = rawScore - squashStart;
-        return squashStart + headroom * (1.0 - Math.exp(-excess / headroom));
-    }
-
-    private static double applyRealisticCeiling(double rawScore, Line line) {
-        return applyRealisticCeiling(rawScore, line == Line.OVER_15);
+        double headroom = O05_MAX_REALISTIC - O05_CEILING_SQUASH_START;
+        double excess = rawScore - O05_CEILING_SQUASH_START;
+        return O05_CEILING_SQUASH_START + headroom * (1.0 - Math.exp(-excess / headroom));
     }
 
     /**
@@ -468,11 +429,10 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
         factors.put("goalsNeeded", line.goalsNeeded);
         factors.put("poissonProbability", poissonAtLeast(expected1HGoals, line.goalsNeeded));
         Double linePotentialRaw = apiPotentialFor(line, context);
-        double squashStart = line == Line.OVER_15 ? O15_CEILING_SQUASH_START : O05_CEILING_SQUASH_START;
         double preCeiling;
         if (linePotentialRaw != null) {
             double raw = safePercentage(linePotentialRaw);
-            double shrunk = shrinkApiPotential(raw, line);
+            double shrunk = shrinkApiPotential(raw);
             factors.put("apiPotentialForLineRaw", raw);
             factors.put("apiPotentialForLine", shrunk);
             preCeiling = clampScore((poissonAtLeast(expected1HGoals, line.goalsNeeded) * WEIGHT_POISSON)
@@ -481,7 +441,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
             preCeiling = clampScore(poissonAtLeast(expected1HGoals, line.goalsNeeded));
         }
         factors.put("publishedScore", estimate.score());
-        factors.put("ceilingApplied", preCeiling > squashStart);
+        factors.put("ceilingApplied", preCeiling > O05_CEILING_SQUASH_START);
         Double providerExpected = providerExpected1HGoals(context);
         if (providerExpected != null) {
             factors.put("providerExpected1HGoals", providerExpected);

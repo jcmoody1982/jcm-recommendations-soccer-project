@@ -86,10 +86,11 @@ public class BttsRecommendationEngine implements RecommendationEngine {
 
     /**
      * STRONG sits at the band that cleared break-even on the 2026-09-04..10 board (≥75 → ~67%
-     * hit / +7% ROI). MODERATE stays at 62 for volume; long prices are cut separately.
+     * hit / +7% ROI). MODERATE starts at 65: the 60-65 band hit ~41% on 34 picks over
+     * 2026-10-04..10-17. Long prices are cut separately.
      */
     private static final double THRESHOLD_STRONG = 75.0;
-    private static final double THRESHOLD_MODERATE = 62.0;
+    private static final double THRESHOLD_MODERATE = 65.0;
 
     /**
      * BTTS Yes longer than this lost heavily (~25% hit / −53% ROI at 1.80+). Require a short

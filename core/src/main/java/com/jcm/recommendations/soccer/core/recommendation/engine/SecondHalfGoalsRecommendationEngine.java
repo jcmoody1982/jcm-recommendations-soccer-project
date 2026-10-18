@@ -19,12 +19,10 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.Recommenda
 /**
  * UC-016: Second Half Goals Recommendations
  *
- * Predicts likelihood of goals in the second half (Over 0.5 2H, Over 1.5 2H).
+ * Predicts likelihood of a goal in the second half (Over 0.5 2H).
  *
  * Season goals and xG (×0.55 proxy for the 2H share) feed a single expected-second-half-goals
- * figure, which a Poisson tail turns into the probability of the line being marketed. The score
- * published is therefore the probability of that specific line, so Over 1.5 2H is scored as
- * P(2+ second-half goals) rather than sharing a scale with Over 0.5 2H.
+ * figure, which a Poisson tail turns into the probability of the line.
  */
 @Component
 @Slf4j
@@ -34,17 +32,14 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
     private static final double SECOND_HALF_RATIO = 0.55;
 
     /**
-     * The two lines this engine can market. The published score is the probability of the line
-     * actually being recommended, so each line carries its own thresholds: a second half averages
-     * about 1.45 goals, putting Over 0.5 in the 68-86% band and Over 1.5 in the 33-60% band. There
-     * is no single scale on which both lines can be read.
+     * The line this engine markets, with thresholds on its own probability scale.
      *
-     * <p>Over 1.5 is capped at MODERATE: under its own 54 STRONG line it hit 49% on 345 picks
-     * (2026-09-13..10-11), so "Strong" was being shown on a coin flip.
+     * <p>Over 1.5 2H is not marketed: even capped at MODERATE it hit 45% on 239 picks against
+     * ~60% claimed (2026-10-04..10-17), and the provider publishes no second-half potential to
+     * corroborate it.
      */
     private enum Line {
-        OVER_05(1, "Over 0.5 2H Goals", 80.0, 72.0),
-        OVER_15(2, "Over 1.5 2H Goals", Double.POSITIVE_INFINITY, 46.0);
+        OVER_05(1, "Over 0.5 2H Goals", 80.0, 72.0);
 
         private final int goalsNeeded;
         private final String market;
@@ -67,20 +62,11 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
     private static final double ADJUST_MAX = 1.20;
 
     /**
-     * Soft-cap the published probability. Over 0.5 2H honestly sits high; Over 1.5 2H must not
-     * approach certainty.
+     * Soft-cap the published probability. Over 0.5 2H honestly sits high but must not approach
+     * certainty.
      */
     private static final double O05_CEILING_SQUASH_START = 84.0;
     private static final double O05_MAX_REALISTIC = 90.0;
-    private static final double O15_CEILING_SQUASH_START = 58.0;
-    private static final double O15_MAX_REALISTIC = 65.0;
-
-    /**
-     * Over 1.5 2H needs a clear volume outlier. The provider publishes no second-half potentials,
-     * so unlike the first-half engine there is no independent read to corroborate the line and the
-     * expectation has to carry the decision alone.
-     */
-    private static final double OVER_15_MIN_EXPECTED_GOALS = 1.8;
 
     // xG-based combined rating bands (reported as match colour)
     private static final double XG_HIGH_THRESHOLD = 3.0;
@@ -150,9 +136,9 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         double adjustment = calculateExpectedGoalsAdjustment(homeStats, awayStats);
         double expectedGoals2H = baseExpectedGoals2H * adjustment;
 
-        Line line = selectLine(expectedGoals2H);
+        Line line = Line.OVER_05;
         double poisson = poissonAtLeast(expectedGoals2H, line.goalsNeeded);
-        double score = applyRealisticCeiling(clampScore(poisson), line);
+        double score = applyRealisticCeiling(clampScore(poisson));
 
         ConfidenceLevel confidence = determineConfidence(score, line);
 
@@ -201,26 +187,16 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         return actualExpected;
     }
 
-    private Line selectLine(double expectedGoals2H) {
-        return expectedGoals2H >= OVER_15_MIN_EXPECTED_GOALS ? Line.OVER_15 : Line.OVER_05;
-    }
-
     /**
-     * Compresses the overconfident publish tail into the gap below the line's realistic max.
+     * Compresses the overconfident publish tail into the gap below the realistic max.
      */
-    static double applyRealisticCeiling(double rawScore, boolean over15) {
-        double squashStart = over15 ? O15_CEILING_SQUASH_START : O05_CEILING_SQUASH_START;
-        double maxRealistic = over15 ? O15_MAX_REALISTIC : O05_MAX_REALISTIC;
-        if (rawScore <= squashStart) {
+    static double applyRealisticCeiling(double rawScore) {
+        if (rawScore <= O05_CEILING_SQUASH_START) {
             return rawScore;
         }
-        double headroom = maxRealistic - squashStart;
-        double excess = rawScore - squashStart;
-        return squashStart + headroom * (1.0 - Math.exp(-excess / headroom));
-    }
-
-    private static double applyRealisticCeiling(double rawScore, Line line) {
-        return applyRealisticCeiling(rawScore, line == Line.OVER_15);
+        double headroom = O05_MAX_REALISTIC - O05_CEILING_SQUASH_START;
+        double excess = rawScore - O05_CEILING_SQUASH_START;
+        return O05_CEILING_SQUASH_START + headroom * (1.0 - Math.exp(-excess / headroom));
     }
 
     /**
@@ -362,10 +338,9 @@ public class SecondHalfGoalsRecommendationEngine implements RecommendationEngine
         factors.put("line", line.market);
         factors.put("goalsNeeded", line.goalsNeeded);
         double poisson = poissonAtLeast(expected2HGoals, line.goalsNeeded);
-        double squashStart = line == Line.OVER_15 ? O15_CEILING_SQUASH_START : O05_CEILING_SQUASH_START;
         factors.put("poissonProbability", poisson);
         factors.put("publishedScore", estimate.score());
-        factors.put("ceilingApplied", poisson > squashStart);
+        factors.put("ceilingApplied", poisson > O05_CEILING_SQUASH_START);
 
         // Full-time expected for reference
         factors.put("expectedFullTimeGoals", expected2HGoals / SECOND_HALF_RATIO);

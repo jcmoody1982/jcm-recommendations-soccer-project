@@ -19,35 +19,32 @@ import static com.jcm.recommendations.soccer.core.recommendation.util.SquadValue
 /**
  * UC-026: Top vs Bottom — table mismatch picks backing the home favorite to win (match result
  * only), with UC form/GD filters and upset detection.
+ *
+ * <p>Publishes STRONG only. Moderate picks (smaller gap, lower quality, or Strong capped by an
+ * upset watch) went 3 from 14 over 2026-10-04..10-17 while Strong went 3 from 4.
  */
 @Component
 @Slf4j
 public class TopVsBottomRecommendationEngine implements RecommendationEngine {
 
-    // Option A — tightened publishing floors
-    private static final int MIN_GAP_MODERATE = 10;
     private static final int MIN_GAP_STRONG = 12;
     private static final int MIN_GAP_BANKER = 14;
 
-    private static final double QUALITY_MODERATE = 50.0;
     private static final double QUALITY_STRONG = 65.0;
     private static final double QUALITY_BANKER = 70.0;
 
     // UC-026 quality filters (venue-specific)
-    private static final double FAVORITE_MIN_PPG_STRONG = 1.8;
-    private static final double FAVORITE_MIN_PPG_MODERATE = 1.5;
-    private static final double UNDERDOG_MAX_PPG_STRONG = 1.0;
-    private static final double UNDERDOG_MAX_PPG_MODERATE = 1.2;
+    private static final double FAVORITE_MIN_PPG = 1.8;
+    private static final double UNDERDOG_MAX_PPG = 1.0;
 
-    private static final int FAVORITE_MIN_GD_STRONG = 10;
-    private static final int UNDERDOG_MAX_GD_STRONG = -5;
+    private static final int FAVORITE_MIN_GD = 10;
+    private static final int UNDERDOG_MAX_GD = -5;
 
     private static final double UNDERDOG_POOR_AWAY_WIN_RATE = 20.0;
     private static final double AWAY_COMPETITIVE_WIN_RATE = 35.0;
     private static final double AWAY_IMPROVING_FORM_PPG = 1.5;
 
-    private static final int UPSET_WATCH_FACTORS = 2;
-    private static final int UPSET_SKIP_FACTORS = 3;
+    private static final int UPSET_SKIP_FACTORS = 2;
 
     private static final double UNDERDOG_SCORES_AWAY_PCT = 50.0;
     private static final int H2H_MIN_MEETINGS = 3;
@@ -82,7 +79,7 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         }
 
         int positionGap = awayPos - homePos;
-        if (positionGap < MIN_GAP_MODERATE) {
+        if (positionGap < MIN_GAP_STRONG) {
             return Optional.empty();
         }
 
@@ -94,20 +91,21 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         }
 
         double qualityScore = calculateQualityScore(context);
-        ConfidenceLevel confidence = determineConfidence(positionGap, qualityScore, upsetFactors);
-        if (confidence == ConfidenceLevel.WEAK) {
+        if (qualityScore < QUALITY_STRONG) {
             return Optional.empty();
         }
 
-        if (!passesQualityFilters(homeStats, awayStats, confidence)) {
+        if (!passesQualityFilters(homeStats, awayStats)) {
             return Optional.empty();
         }
+
+        ConfidenceLevel confidence = ConfidenceLevel.STRONG;
 
         // The selection is only ever the favourite to win: the quality score grades the table
         // mismatch, so it speaks for the match result and nothing else.
         String homeTeam = context.getHomeTeam().getName();
         Double homeOdds = context.hasOdds() ? context.getOdds().getOddsFt1() : null;
-        String flag = determineFlag(positionGap, qualityScore, upsetFactors);
+        String flag = determineFlag(positionGap, qualityScore);
 
         Map<String, Object> factors = buildFactors(context, positionGap, qualityScore, upsetFactors, flag);
 
@@ -162,28 +160,11 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         return clampScore(ppgScore + gdScore + posScore + formScore + underdogBoost + h2hBoost + squadValueBoost);
     }
 
-    private boolean passesQualityFilters(TeamSeasonStats homeStats, TeamSeasonStats awayStats,
-            ConfidenceLevel confidence) {
-        boolean strong = confidence == ConfidenceLevel.STRONG;
-        double favoriteMinPpg = strong ? FAVORITE_MIN_PPG_STRONG : FAVORITE_MIN_PPG_MODERATE;
-        double underdogMaxPpg = strong ? UNDERDOG_MAX_PPG_STRONG : UNDERDOG_MAX_PPG_MODERATE;
-
-        if (safeDouble(homeStats.getPpgHome()) < favoriteMinPpg) {
-            return false;
-        }
-        if (safeDouble(awayStats.getPpgAway()) > underdogMaxPpg) {
-            return false;
-        }
-
-        if (strong) {
-            if (safeInt(homeStats.getSeasonGoalDifference()) < FAVORITE_MIN_GD_STRONG) {
-                return false;
-            }
-            if (safeInt(awayStats.getSeasonGoalDifference()) > UNDERDOG_MAX_GD_STRONG) {
-                return false;
-            }
-        }
-        return true;
+    private boolean passesQualityFilters(TeamSeasonStats homeStats, TeamSeasonStats awayStats) {
+        return safeDouble(homeStats.getPpgHome()) >= FAVORITE_MIN_PPG
+                && safeDouble(awayStats.getPpgAway()) <= UNDERDOG_MAX_PPG
+                && safeInt(homeStats.getSeasonGoalDifference()) >= FAVORITE_MIN_GD
+                && safeInt(awayStats.getSeasonGoalDifference()) <= UNDERDOG_MAX_GD;
     }
 
     private int countUpsetFactors(FixtureContext context) {
@@ -244,39 +225,11 @@ public class TopVsBottomRecommendationEngine implements RecommendationEngine {
         return awayWins > homeWins;
     }
 
-    private ConfidenceLevel determineConfidence(int positionGap, double qualityScore, int upsetFactors) {
-        ConfidenceLevel level = ConfidenceLevel.WEAK;
-
-        if (positionGap >= MIN_GAP_BANKER && qualityScore >= QUALITY_BANKER) {
-            level = ConfidenceLevel.STRONG;
-        } else if (positionGap >= MIN_GAP_STRONG && qualityScore >= QUALITY_STRONG) {
-            level = ConfidenceLevel.STRONG;
-        } else if (positionGap >= MIN_GAP_MODERATE && qualityScore >= QUALITY_MODERATE) {
-            level = ConfidenceLevel.MODERATE;
-        }
-
-        if (level == ConfidenceLevel.WEAK) {
-            return ConfidenceLevel.WEAK;
-        }
-
-        // Option A — Strong requires home favorite (always true here); cap when upset watch fires
-        if (upsetFactors >= UPSET_WATCH_FACTORS && level == ConfidenceLevel.STRONG) {
-            return ConfidenceLevel.MODERATE;
-        }
-        return level;
-    }
-
-    private String determineFlag(int positionGap, double qualityScore, int upsetFactors) {
-        if (upsetFactors >= UPSET_WATCH_FACTORS) {
-            return "Upset Watch";
-        }
+    private String determineFlag(int positionGap, double qualityScore) {
         if (positionGap >= MIN_GAP_BANKER && qualityScore >= QUALITY_BANKER) {
             return "Banker";
         }
-        if (positionGap >= MIN_GAP_STRONG && qualityScore >= 60.0) {
-            return "Strong Favorite";
-        }
-        return "Mismatch";
+        return "Strong Favorite";
     }
 
     private Map<String, Object> buildFactors(FixtureContext context, int positionGap, double qualityScore,
