@@ -649,7 +649,7 @@ export default function Recommendations() {
         <>
           {eliteDays.length > 0 && (
             <div className={styles.lead}>
-              <ElitePicksSection days={eliteDays} trackRecord={performance?.elite} />
+              <ElitePicksSection days={eliteDays} />
             </div>
           )}
 

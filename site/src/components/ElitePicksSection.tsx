@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import type { PerformanceBucket } from '../types';
 import { MarketIcon } from './MarketIcon';
 import { RecommendationRow } from './RecommendationRow';
 import { sectionTitle } from '../utils/recommendationSections';
 import { eliteDayLabel, type EliteDay } from '../utils/elitePicks';
-import { formatTrackRecord } from '../utils/trackRecord';
 import styles from './RecommendationSection.module.css';
 
 /** Matchdays open by default; later days sit behind a button. */
@@ -12,14 +10,13 @@ const INITIAL_DAYS = 2;
 
 interface Props {
   days: EliteDay[];
-  trackRecord?: PerformanceBucket;
 }
 
 /**
  * Cross-market Elite Picks board (UC-036), ranked per matchday on the server so it matches the
  * Elite record on Results. Always shows price; score column is generic because types are mixed.
  */
-export function ElitePicksSection({ days, trackRecord }: Props) {
+export function ElitePicksSection({ days }: Props) {
   const [showAllDays, setShowAllDays] = useState(false);
 
   if (days.length === 0) {
@@ -29,7 +26,6 @@ export function ElitePicksSection({ days, trackRecord }: Props) {
   const total = days.reduce((sum, day) => sum + day.picks.length, 0);
   const visibleDays = showAllDays ? days : days.slice(0, INITIAL_DAYS);
   const hiddenDays = days.length - visibleDays.length;
-  const trackRecordLine = formatTrackRecord(trackRecord);
 
   return (
     <section className={styles.section} id="rec-section-elite-picks">
@@ -40,10 +36,8 @@ export function ElitePicksSection({ days, trackRecord }: Props) {
           {total} pick{total !== 1 ? 's' : ''}
         </span>
       </h2>
-      {trackRecordLine && <p className={styles.trackRecord}>{trackRecordLine}</p>}
       <p className={styles.eliteBlurb}>
-        Our top Strong picks for each matchday, up to 10 a day: one per fixture, at most 3 from any
-        one market family, all priced 1.20 or longer
+        Elite Picks are the premier selections from the ABG Tipster team
       </p>
       <div className={styles.tableHeader}>
         <span></span>
