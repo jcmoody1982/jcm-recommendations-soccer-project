@@ -37,19 +37,21 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
      *
      * <p>Over 1.5 HT is not marketed: it hit 41% on 29 picks against ~53% claimed
      * (2026-10-04..10-17), and the half lines carry no price to judge it against.
+     *
+     * <p>Moderate only: picks scored 78+ hit 72.9% against ~81% claimed, below the 76.3% of the
+     * 70–78 band (2026-10-07..10-27). Hit rate is flat from 70 to 85, so the score ranks but
+     * cannot single out a Strong first half.
      */
     private enum Line {
-        OVER_05(1, "Over 0.5 HT Goals", 78.0, 70.0);
+        OVER_05(1, "Over 0.5 HT Goals", 70.0);
 
         private final int goalsNeeded;
         private final String market;
-        private final double thresholdStrong;
         private final double thresholdModerate;
 
-        Line(int goalsNeeded, String market, double thresholdStrong, double thresholdModerate) {
+        Line(int goalsNeeded, String market, double thresholdModerate) {
             this.goalsNeeded = goalsNeeded;
             this.market = market;
-            this.thresholdStrong = thresholdStrong;
             this.thresholdModerate = thresholdModerate;
         }
     }
@@ -400,12 +402,7 @@ public class FirstHalfGoalsRecommendationEngine implements RecommendationEngine 
     }
 
     private ConfidenceLevel determineConfidence(double score, Line line) {
-        if (score >= line.thresholdStrong) {
-            return ConfidenceLevel.STRONG;
-        } else if (score >= line.thresholdModerate) {
-            return ConfidenceLevel.MODERATE;
-        }
-        return ConfidenceLevel.WEAK;
+        return score >= line.thresholdModerate ? ConfidenceLevel.MODERATE : ConfidenceLevel.WEAK;
     }
 
     private Map<String, Object> buildFactors(FixtureContext context, Estimate estimate,

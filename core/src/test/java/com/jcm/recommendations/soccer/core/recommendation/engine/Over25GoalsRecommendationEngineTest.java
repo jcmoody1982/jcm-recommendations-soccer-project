@@ -1,5 +1,6 @@
 package com.jcm.recommendations.soccer.core.recommendation.engine;
 
+import com.jcm.recommendations.soccer.core.recommendation.model.ConfidenceLevel;
 import com.jcm.recommendations.soccer.core.recommendation.model.FixtureContext;
 import com.jcm.recommendations.soccer.core.recommendation.model.Recommendation;
 import com.jcm.recommendations.soccer.core.recommendation.model.RecommendationType;
@@ -46,11 +47,11 @@ class Over25GoalsRecommendationEngineTest {
     void analyze_withBothPrices_blendsTowardFairMarket() {
         FixtureContext base = veryHighScoringContext();
         FixtureContext priced = withOdds(base, FixtureOdds.builder()
-                .fixtureId(1000L).oddsFtOver25(1.60).oddsFtUnder25(2.30).build());
+                .fixtureId(1000L).oddsFtOver25(1.45).oddsFtUnder25(2.75).build());
 
         Recommendation rec = engine.analyze(priced).orElseThrow();
 
-        double fair = (1 / 1.60) / ((1 / 1.60) + (1 / 2.30)) * 100.0;
+        double fair = (1 / 1.45) / ((1 / 1.45) + (1 / 2.75)) * 100.0;
         double model = (double) rec.getFactors().get("modelScore");
         assertThat(rec.getFactors()).containsEntry("marketBlendApplied", true);
         assertThat((double) rec.getFactors().get("fairMarketProbability")).isCloseTo(fair, within(1e-9));
@@ -74,6 +75,35 @@ class Over25GoalsRecommendationEngineTest {
                 .fixtureId(1000L).oddsFtOver25(3.50).oddsFtUnder25(1.30).build());
 
         assertThat(engine.analyze(longPriced)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a blend landing in the old Moderate band (58–68) no longer publishes")
+    void analyze_whenBlendFallsBelowStrong_dropsPick() {
+        double model = (double) engine.analyze(unpriced(veryHighScoringContext()))
+                .orElseThrow().getFactors().get("modelScore");
+        FixtureContext evenPriced = withOdds(veryHighScoringContext(), FixtureOdds.builder()
+                .fixtureId(1000L).oddsFtOver25(2.00).oddsFtUnder25(2.00).build());
+
+        assertThat(0.4 * model + 0.6 * 50.0).isBetween(58.0, 68.0);
+        assertThat(engine.analyze(evenPriced)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("every published Over 2.5 pick is Strong")
+    void analyze_publishesStrongOnly() {
+        assertThat(engine.analyze(veryHighScoringContext()))
+                .hasValueSatisfying(r -> assertThat(r.getConfidence()).isEqualTo(ConfidenceLevel.STRONG));
+    }
+
+    private FixtureContext unpriced(FixtureContext base) {
+        return FixtureContext.builder()
+                .fixture(base.getFixture())
+                .homeTeam(base.getHomeTeam())
+                .awayTeam(base.getAwayTeam())
+                .homeTeamStats(base.getHomeTeamStats())
+                .awayTeamStats(base.getAwayTeamStats())
+                .build();
     }
 
     private FixtureContext withOdds(FixtureContext base, FixtureOdds odds) {
@@ -102,7 +132,7 @@ class Over25GoalsRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.OVER_25_GOALS);
         assertThat(result.get().getMarket()).isEqualTo("Over 2.5 Goals");
-        assertThat(result.get().getOdds()).isEqualTo(1.60);
+        assertThat(result.get().getOdds()).isEqualTo(1.45);
         assertThat(result.get().getScore()).isLessThan(80.0);
         assertThat(result.get().getFactors()).containsKeys("expectedGoals", "over25PctHome", "over25PctAway", "apiO25Potential");
         assertThat(result.get().getFactors().get("ceilingApplied")).isEqualTo(true);
@@ -220,7 +250,7 @@ class Over25GoalsRecommendationEngineTest {
 
         FixtureOdds odds = FixtureOdds.builder()
                 .fixtureId(1000L)
-                .oddsFtOver25(1.60)
+                .oddsFtOver25(1.45)
                 .oddsFtOver35(1.90)
                 .build();
 

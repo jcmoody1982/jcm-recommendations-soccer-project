@@ -246,7 +246,7 @@ class ValueBetRecommendationEngineTest {
     @Test
     @DisplayName("match-result value caps at Moderate because source is not Strong")
     void analyze_homeWinValueCapsAtModerate() {
-        FixtureContext context = createDominantHomeContext(2.20, 3.00, 3.00);
+        FixtureContext context = createDominantHomeContext(1.55, 4.00, 6.00);
         stubNoGoalEngines();
 
         Optional<Recommendation> result = engine.analyze(context);
@@ -254,7 +254,17 @@ class ValueBetRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Home Win");
         assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
-        assertThat(result.get().getOdds()).isEqualTo(2.20);
+        assertThat(result.get().getOdds()).isEqualTo(1.55);
+    }
+
+    @Test
+    @DisplayName("an edge above the credible maximum is treated as model error and skipped")
+    void analyze_rejectsImplausiblyLargeEdge() {
+        // Our 90% home win against a 2.20 price claims an edge of about 45 points.
+        FixtureContext context = createDominantHomeContext(2.20, 3.00, 3.00);
+        stubNoGoalEngines();
+
+        assertThat(engine.analyze(context)).isEmpty();
     }
 
     @Test
@@ -262,10 +272,10 @@ class ValueBetRecommendationEngineTest {
     void analyze_squadValueBoostsHomeWinValue() {
         stubNoGoalEngines();
 
-        double baselineValue = engine.analyze(createHomeWinValueContext(8, 2.20, false))
+        double baselineValue = engine.analyze(createHomeWinValueContext(8, 1.55, false))
                 .orElseThrow()
                 .getScore();
-        Optional<Recommendation> result = engine.analyze(createHomeWinValueContext(8, 2.20, true));
+        Optional<Recommendation> result = engine.analyze(createHomeWinValueContext(8, 1.55, true));
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Home Win");

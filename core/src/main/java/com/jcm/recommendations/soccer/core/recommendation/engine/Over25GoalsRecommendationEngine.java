@@ -32,6 +32,9 @@ public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
      * Over 2.5 is a far lower base rate than Over 1.5 — around half of fixtures — so the same
      * probability score means something very different here and the thresholds sit lower. Even a
      * heavy 4.0 expected-goals fixture is only about a 76% chance to clear three goals.
+     *
+     * <p>Strong only: the Moderate band (58–68) hit 52.7% against ~63% claimed and lost 17% over
+     * 167 priced picks (2026-10-07..10-27), losing money in every score band below 68.
      */
     private static final LineSpec SPEC = new LineSpec(
             RecommendationType.OVER_25_GOALS,
@@ -40,7 +43,7 @@ public class Over25GoalsRecommendationEngine extends TotalGoalsOverRecommendatio
             "apiO25Potential",
             2.5,
             68.0,
-            58.0,
+            68.0,
             2.5
     );
 

@@ -186,18 +186,19 @@ public class DoubleChanceRecommendationEngine implements RecommendationEngine {
         boolean meets1XStrong = homeDrawProb >= THRESHOLD_STRONG_1X && marketInformed1X;
         boolean meets1XModerate = homeDrawProb >= THRESHOLD_MODERATE_1X;
         boolean meetsX2Strong = drawAwayProb >= THRESHOLD_STRONG_X2 && marketInformedX2;
-        boolean meetsX2Moderate = drawAwayProb >= THRESHOLD_MODERATE_X2;
 
+        // X2 publishes at Strong only: Moderate X2 hit 65% against ~67% claimed and lost 9–16% in
+        // every score band from 60 to 74 (238 picks, 2026-10-07..10-27), so no floor rescues it.
         if (prefer1X && meets1XModerate) {
             market = "Home/Draw (1X)";
             bestProb = homeDrawProb;
             bestValue = value1X;
             confidence = meets1XStrong ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
-        } else if (meetsX2Moderate) {
+        } else if (meetsX2Strong) {
             market = "Draw/Away (X2)";
             bestProb = drawAwayProb;
             bestValue = valueX2;
-            confidence = meetsX2Strong ? ConfidenceLevel.STRONG : ConfidenceLevel.MODERATE;
+            confidence = ConfidenceLevel.STRONG;
         } else if (meets1XModerate) {
             market = "Home/Draw (1X)";
             bestProb = homeDrawProb;

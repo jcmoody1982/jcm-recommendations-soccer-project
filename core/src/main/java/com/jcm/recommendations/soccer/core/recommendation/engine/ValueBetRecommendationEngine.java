@@ -25,6 +25,12 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
     private static final double MIN_ODDS = 1.50;
     private static final double MAX_ODDS = 2.50;
 
+    /**
+     * Largest edge over the implied probability treated as real. Above this the model is far more
+     * likely wrong than the book: edges over 30 points hit 33% and lost 32% (2026-10-07..10-27).
+     */
+    static final double MAX_CREDIBLE_VALUE = 30.0;
+
     // Kelly Criterion fraction (conservative)
     private static final double KELLY_FRACTION = 0.25;  // Quarter Kelly for safety
 
@@ -231,7 +237,9 @@ public class ValueBetRecommendationEngine implements RecommendationEngine {
         // Calculate Kelly stake
         double kellyStake = calculateKellyStake(ourProbability, odds);
 
-        if (valuePercentage >= THRESHOLD_MODERATE_VALUE && expectedValue >= THRESHOLD_MODERATE_EV) {
+        if (valuePercentage >= THRESHOLD_MODERATE_VALUE
+                && valuePercentage <= MAX_CREDIBLE_VALUE
+                && expectedValue >= THRESHOLD_MODERATE_EV) {
             return Optional.of(new ValueOpportunity(
                     market,
                     ourProbability * 100,

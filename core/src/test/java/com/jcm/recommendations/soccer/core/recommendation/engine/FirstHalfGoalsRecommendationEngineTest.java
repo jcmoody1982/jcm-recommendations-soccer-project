@@ -42,7 +42,21 @@ class FirstHalfGoalsRecommendationEngineTest {
         assertThat(result).isPresent();
         assertThat(result.get().getType()).isEqualTo(RecommendationType.FIRST_HALF_GOALS);
         assertThat(result.get().getMarket()).contains("HT Goals");
-        assertThat(result.get().getConfidence()).isIn(ConfidenceLevel.MODERATE, ConfidenceLevel.STRONG);
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
+    }
+
+    @Test
+    @DisplayName("analyze never grades a first half Strong, however high the score")
+    void analyze_withVeryHighScore_staysModerate() {
+        FixtureContext context = createVeryHighScoringContext();
+        context.getHomeTeamStats().setScoredAvgHtHome(3.0);
+        context.getAwayTeamStats().setScoredAvgHtAway(3.0);
+        context.getPotentials().setO05HtPotential(99.0);
+
+        Recommendation rec = engine.analyze(context).orElseThrow();
+
+        assertThat(rec.getScore()).isGreaterThan(80.0);
+        assertThat(rec.getConfidence()).isEqualTo(ConfidenceLevel.MODERATE);
     }
 
     @Test

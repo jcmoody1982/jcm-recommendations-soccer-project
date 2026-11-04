@@ -52,6 +52,15 @@ class DoubleChanceRecommendationEngineTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().getMarket()).isEqualTo("Draw/Away (X2)");
+        assertThat(result.get().getConfidence()).isEqualTo(ConfidenceLevel.STRONG);
+    }
+
+    @Test
+    @DisplayName("analyze no longer publishes X2 below the Strong line")
+    void analyze_dropsModerateDrawAway() {
+        Optional<Recommendation> result = engine.analyze(createRoadWarriorContext(backableX2Odds(105L)));
+
+        assertThat(result.map(Recommendation::getMarket)).isNotEqualTo(Optional.of("Draw/Away (X2)"));
     }
 
     @Test
@@ -80,7 +89,7 @@ class DoubleChanceRecommendationEngineTest {
     @Test
     @DisplayName("analyze detects road warrior")
     void analyze_detectsRoadWarrior() {
-        FixtureContext context = createRoadWarriorContext();
+        FixtureContext context = createRoadWarriorContext(shortX2Odds(105L));
 
         Optional<Recommendation> result = engine.analyze(context);
 
@@ -339,6 +348,16 @@ class DoubleChanceRecommendationEngineTest {
                 .build();
     }
 
+    /** X2 synthesises to about 1.22, with the market backing the away side strongly enough for Strong. */
+    private static FixtureOdds shortX2Odds(long fixtureId) {
+        return FixtureOdds.builder()
+                .fixtureId(fixtureId)
+                .oddsFt1(4.50)
+                .oddsFtX(3.60)
+                .oddsFt2(1.85)
+                .build();
+    }
+
     // Helper methods to create test contexts
 
     /** A clear home favourite, optionally with a market price attached. */
@@ -570,7 +589,7 @@ class DoubleChanceRecommendationEngineTest {
                 .build();
     }
 
-    private FixtureContext createRoadWarriorContext() {
+    private FixtureContext createRoadWarriorContext(FixtureOdds odds) {
         TeamSeasonStats homeStats = TeamSeasonStats.builder()
                 .teamId(1L)
                 .seasonId(1L)
@@ -611,7 +630,7 @@ class DoubleChanceRecommendationEngineTest {
                 .awayTeam(createTeam(2L, "Away Team"))
                 .homeTeamStats(homeStats)
                 .awayTeamStats(awayStats)
-                .odds(backableX2Odds(105L))
+                .odds(odds)
                 .build();
     }
 
