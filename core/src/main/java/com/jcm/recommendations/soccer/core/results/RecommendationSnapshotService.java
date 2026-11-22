@@ -42,6 +42,15 @@ public class RecommendationSnapshotService {
         return snapshotForDate(LocalDate.now(resultsProperties.zoneId()));
     }
 
+    /** True when any snapshotted picks already exist for the brand-timezone calendar day. */
+    public boolean hasSnapshotForToday() {
+        return hasSnapshotForDate(LocalDate.now(resultsProperties.zoneId()));
+    }
+
+    public boolean hasSnapshotForDate(LocalDate snapshotDate) {
+        return snapshotRepository.existsBySnapshotDate(snapshotDate);
+    }
+
     @Transactional
     public SnapshotSummary snapshotForDate(LocalDate snapshotDate) {
         Instant now = Instant.now();

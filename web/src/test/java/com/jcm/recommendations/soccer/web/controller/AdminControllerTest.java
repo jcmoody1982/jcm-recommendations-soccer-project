@@ -1,17 +1,21 @@
 package com.jcm.recommendations.soccer.web.controller;
 
 import com.jcm.recommendations.soccer.core.config.JacksonConfig;
+import com.jcm.recommendations.soccer.core.config.ResultsProperties;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationService;
 import com.jcm.recommendations.soccer.core.repository.FixtureOddsRepository;
 import com.jcm.recommendations.soccer.core.repository.FixtureRepository;
+import com.jcm.recommendations.soccer.core.repository.RecommendationSnapshotRepository;
 import com.jcm.recommendations.soccer.core.results.RecommendationSnapshotService;
 import com.jcm.recommendations.soccer.core.results.ResultsMatchIngestService;
 import com.jcm.recommendations.soccer.core.results.ResultsPerformanceService;
+import com.jcm.recommendations.soccer.core.results.ResultsQueryService;
 import com.jcm.recommendations.soccer.core.results.SettlementService;
 import com.jcm.recommendations.soccer.core.service.DataSyncService;
 import com.jcm.recommendations.soccer.core.service.FixtureService;
 import com.jcm.recommendations.soccer.domain.Fixture;
 import com.jcm.recommendations.soccer.domain.FixtureOdds;
+import com.jcm.recommendations.soccer.domain.PickOutcome;
 import com.jcm.recommendations.soccer.web.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,9 +69,20 @@ class AdminControllerTest {
     private SettlementService settlementService;
     @MockitoBean
     private ResultsPerformanceService resultsPerformanceService;
+    @MockitoBean
+    private ResultsQueryService resultsQueryService;
+    @MockitoBean
+    private RecommendationSnapshotRepository snapshotRepository;
+    @MockitoBean
+    private ResultsProperties resultsProperties;
 
     private static DataSyncService.SyncSummary syncSummary(boolean success) {
-        return new DataSyncService.SyncSummary(5, 2, 10, 4, 0, 0, 0, 0, 0, success);
+        int failed = success ? 0 : 1;
+        return new DataSyncService.SyncSummary(5, 2, 10, 4, 0, 0, 0, 0, 0, failed, 2, success);
+    }
+
+    private static DataSyncService.SyncSummary syncSummaryAllSeasonsFailed() {
+        return new DataSyncService.SyncSummary(5, 2, 0, 0, 0, 0, 0, 0, 0, 2, 2, false);
     }
 
     @Test
@@ -86,8 +101,23 @@ class AdminControllerTest {
     }
 
     @Test
-    void failedSyncSkipsSnapshot() throws Exception {
+    void partialSyncStillSnapshots() throws Exception {
         when(dataSyncService.runFullSync()).thenReturn(syncSummary(false));
+        when(recommendationSnapshotService.snapshotToday())
+                .thenReturn(new RecommendationSnapshotService.SnapshotSummary(DAY, 4, 4, 0, 0));
+
+        mockMvc.perform(post("/api/admin/sync"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sync.success").value(false))
+                .andExpect(jsonPath("$.snapshot.inserted").value(4));
+
+        verify(recommendationService).evictAllCaches();
+        verify(recommendationSnapshotService).snapshotToday();
+    }
+
+    @Test
+    void totalSyncFailureSkipsSnapshot() throws Exception {
+        when(dataSyncService.runFullSync()).thenReturn(syncSummaryAllSeasonsFailed());
 
         mockMvc.perform(post("/api/admin/sync"))
                 .andExpect(status().isOk())
@@ -96,6 +126,23 @@ class AdminControllerTest {
 
         verify(recommendationService).evictAllCaches();
         verify(recommendationSnapshotService, never()).snapshotToday();
+    }
+
+    @Test
+    void resultsDiagnosticsReportsPipelineLag() throws Exception {
+        when(resultsProperties.getTimezone()).thenReturn("Europe/London");
+        when(resultsProperties.zoneId()).thenReturn(java.time.ZoneId.of("Europe/London"));
+        when(resultsProperties.getPendingLookbackDays()).thenReturn(7);
+        when(resultsQueryService.listSnapshotDates()).thenReturn(List.of(DAY));
+        when(recommendationSnapshotService.hasSnapshotForDate(any())).thenReturn(false);
+        when(snapshotRepository.countBySnapshotDate(any())).thenReturn(0L);
+        when(snapshotRepository.countByOutcome(PickOutcome.PENDING)).thenReturn(3L);
+
+        mockMvc.perform(get("/api/admin/diagnostics/results"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latestSnapshotDate").value("2026-10-10"))
+                .andExpect(jsonPath("$.pendingCount").value(3))
+                .andExpect(jsonPath("$.timezone").value("Europe/London"));
     }
 
     @Test

@@ -3037,7 +3037,7 @@ Exact cron times remain configurable; order is fixed: **sync → snapshot**, the
 **Decisions (locked):**
 | Topic | Choice |
 |-------|--------|
-| Sync gate | Snapshot only when `SyncSummary.success` is true (`failedSeasons == 0`); otherwise skip |
+| Sync gate | Snapshot when sync is snapshot-eligible: full success **or** partial success (`failedSeasons < totalLeagues` / fixtures updated). A single failing season must not skip the day. Hard abort (league-list throw) still skips; 05:30 catch-up cron then snapshots if today's rows are missing. |
 | Same-day re-run | Upsert only rows that are still `PENDING` **and** whose kickoff is still in the future; never rewrite post-kickoff or settled rows |
 | Types snapshotted | All actionable types (including corners/cards); settlement scope is UC-033 |
 | Generation window | Generate for fixtures through end of London today (prefer `daysAhead` covering today only, not full 7-day board), then filter |

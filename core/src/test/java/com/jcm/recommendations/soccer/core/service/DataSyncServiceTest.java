@@ -98,9 +98,25 @@ class DataSyncServiceTest {
         DataSyncService.SyncSummary summary = dataSyncService.runFullSync();
 
         assertThat(summary.success()).isFalse();
+        assertThat(summary.failedSeasons()).isEqualTo(1);
+        assertThat(summary.totalLeagues()).isEqualTo(2);
+        assertThat(summary.shouldSnapshot()).isTrue();
         assertThat(summary.fixturesProcessed()).isEqualTo(3);
         verify(teamService, never()).syncTeamsForSeason(eq(1L), anyString());
         verify(teamService).syncTeamsForSeason(eq(2L), anyString());
+    }
+
+    @Test
+    void allSeasonsFailedIsNotSnapshotEligible() {
+        when(fixtureService.syncFixturesForSeason(anyLong(), anyString()))
+                .thenThrow(new RuntimeException("API down"));
+
+        DataSyncService.SyncSummary summary = dataSyncService.runFullSync();
+
+        assertThat(summary.success()).isFalse();
+        assertThat(summary.failedSeasons()).isEqualTo(2);
+        assertThat(summary.fixturesProcessed()).isZero();
+        assertThat(summary.shouldSnapshot()).isFalse();
     }
 
     @Test

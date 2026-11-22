@@ -1,16 +1,20 @@
 package com.jcm.recommendations.soccer.web.controller;
 
+import com.jcm.recommendations.soccer.core.config.ResultsProperties;
 import com.jcm.recommendations.soccer.core.recommendation.RecommendationService;
 import com.jcm.recommendations.soccer.core.repository.FixtureOddsRepository;
 import com.jcm.recommendations.soccer.core.repository.FixtureRepository;
+import com.jcm.recommendations.soccer.core.repository.RecommendationSnapshotRepository;
 import com.jcm.recommendations.soccer.core.results.RecommendationSnapshotService;
 import com.jcm.recommendations.soccer.core.results.ResultsMatchIngestService;
 import com.jcm.recommendations.soccer.core.results.ResultsPerformanceService;
+import com.jcm.recommendations.soccer.core.results.ResultsQueryService;
 import com.jcm.recommendations.soccer.core.results.SettlementService;
 import com.jcm.recommendations.soccer.core.service.DataSyncService;
 import com.jcm.recommendations.soccer.core.service.FixtureService;
 import com.jcm.recommendations.soccer.domain.Fixture;
 import com.jcm.recommendations.soccer.domain.FixtureOdds;
+import com.jcm.recommendations.soccer.domain.PickOutcome;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +43,9 @@ public class AdminController {
     private final ResultsMatchIngestService resultsMatchIngestService;
     private final SettlementService settlementService;
     private final ResultsPerformanceService resultsPerformanceService;
+    private final ResultsQueryService resultsQueryService;
+    private final RecommendationSnapshotRepository snapshotRepository;
+    private final ResultsProperties resultsProperties;
 
     @PostMapping("/sync")
     public ResponseEntity<Map<String, Object>> triggerSync(
@@ -48,16 +56,19 @@ public class AdminController {
         DataSyncService.SyncSummary summary;
         if (seasonId != null) {
             FixtureService.SyncResult result = fixtureService.syncFixturesForSeason(seasonId, "Manual");
+            int fixtures = result.newCount() + result.updatedCount();
             summary = new DataSyncService.SyncSummary(
                     0,
                     0,
-                    result.newCount() + result.updatedCount(),
+                    fixtures,
                     0,
                     0,
                     0,
                     0,
                     0,
                     0,
+                    0,
+                    1,
                     true
             );
         } else {
@@ -70,13 +81,20 @@ public class AdminController {
         Map<String, Object> body = new HashMap<>();
         body.put("sync", summary);
 
-        if (summary.success()) {
+        if (summary.shouldSnapshot()) {
+            if (!summary.success()) {
+                log.warn("Manual sync partial failure (failedSeasons={}/{}); snapshotting with available data",
+                        summary.failedSeasons(), summary.totalLeagues());
+            }
             RecommendationSnapshotService.SnapshotSummary snapshot =
                     recommendationSnapshotService.snapshotToday();
             body.put("snapshot", snapshot);
             log.info("Post-sync snapshot completed: {}", snapshot);
         } else {
-            log.warn("Skipping snapshot after manual sync because success=false");
+            log.warn("Skipping snapshot after manual sync: not snapshot-eligible "
+                            + "(success={}, failedSeasons={}/{}, fixturesProcessed={})",
+                    summary.success(), summary.failedSeasons(), summary.totalLeagues(),
+                    summary.fixturesProcessed());
             body.put("snapshot", null);
         }
 
@@ -128,6 +146,31 @@ public class AdminController {
                 "status", "success",
                 "message", "All recommendation caches evicted"
         ));
+    }
+
+    /**
+     * Pipeline health for Results: last snapshot day vs London today, pending volume, lookback.
+     * Use when the Results date list looks stuck after an international break or sync blip.
+     */
+    @GetMapping("/diagnostics/results")
+    public ResponseEntity<Map<String, Object>> diagnoseResults() {
+        LocalDate today = LocalDate.now(resultsProperties.zoneId());
+        List<LocalDate> dates = resultsQueryService.listSnapshotDates();
+        LocalDate latest = dates.isEmpty() ? null : dates.getFirst();
+        Long daysBehind = latest == null ? null : ChronoUnit.DAYS.between(latest, today);
+
+        Map<String, Object> diagnostics = new HashMap<>();
+        diagnostics.put("timezone", resultsProperties.getTimezone());
+        diagnostics.put("londonToday", today.toString());
+        diagnostics.put("latestSnapshotDate", latest != null ? latest.toString() : null);
+        diagnostics.put("daysBehind", daysBehind);
+        diagnostics.put("snapshotDateCount", dates.size());
+        diagnostics.put("todaySnapshotPresent", recommendationSnapshotService.hasSnapshotForDate(today));
+        diagnostics.put("todaySnapshotCount", snapshotRepository.countBySnapshotDate(today));
+        diagnostics.put("pendingCount", snapshotRepository.countByOutcome(PickOutcome.PENDING));
+        diagnostics.put("pendingLookbackDays", resultsProperties.getPendingLookbackDays());
+        diagnostics.put("recentDates", dates.stream().limit(14).map(LocalDate::toString).toList());
+        return ResponseEntity.ok(diagnostics);
     }
 
     @GetMapping("/diagnostics/odds")
