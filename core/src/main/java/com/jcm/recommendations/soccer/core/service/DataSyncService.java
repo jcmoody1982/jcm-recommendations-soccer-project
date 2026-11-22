@@ -148,6 +148,8 @@ public class DataSyncService {
                     formCount,
                     h2hCount,
                     squadProfileCount,
+                    failedSeasons,
+                    totalLeagues,
                     failedSeasons == 0
             );
 
@@ -167,6 +169,16 @@ public class DataSyncService {
             int formsProcessed,
             int h2hProcessed,
             int squadProfilesProcessed,
+            int failedSeasons,
+            int totalLeagues,
             boolean success
-    ) {}
+    ) {
+        /**
+         * Snapshot should run whenever sync finished (did not abort) and at least some league
+         * work completed. A single failing season must not freeze Results for the whole day.
+         */
+        public boolean shouldSnapshot() {
+            return success || (totalLeagues > 0 && failedSeasons < totalLeagues) || fixturesProcessed > 0;
+        }
+    }
 }

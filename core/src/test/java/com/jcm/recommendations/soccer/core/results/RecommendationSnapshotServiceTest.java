@@ -49,6 +49,15 @@ class RecommendationSnapshotServiceTest {
     }
 
     @Test
+    void hasSnapshotForDateDelegatesToRepository() {
+        LocalDate today = LocalDate.now(ZoneId.of("Europe/London"));
+        when(snapshotRepository.existsBySnapshotDate(today)).thenReturn(true);
+        assertThat(service.hasSnapshotForDate(today)).isTrue();
+        when(snapshotRepository.existsBySnapshotDate(today)).thenReturn(false);
+        assertThat(service.hasSnapshotForToday()).isFalse();
+    }
+
+    @Test
     void snapshotsOnlyStrongAndModerateForTodayKickoffs() {
         LocalDate today = LocalDate.now(ZoneId.of("Europe/London"));
         long todayKickoff = today.atTime(15, 0).atZone(ZoneId.of("Europe/London")).toEpochSecond();

@@ -20,6 +20,12 @@ public interface RecommendationSnapshotRepository extends JpaRepository<Recommen
 
     List<RecommendationSnapshot> findBySnapshotDateOrderByMatchDateUnixAscIdAsc(LocalDate snapshotDate);
 
+    boolean existsBySnapshotDate(LocalDate snapshotDate);
+
+    long countBySnapshotDate(LocalDate snapshotDate);
+
+    long countByOutcome(PickOutcome outcome);
+
     List<RecommendationSnapshot> findByOutcome(PickOutcome outcome);
 
     List<RecommendationSnapshot> findByOutcomeAndSnapshotDateGreaterThanEqual(

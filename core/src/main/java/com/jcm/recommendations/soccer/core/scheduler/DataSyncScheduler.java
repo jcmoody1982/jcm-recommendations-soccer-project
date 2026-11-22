@@ -31,13 +31,16 @@ public class DataSyncScheduler {
     @Value("${scheduler.results-cron:0 0 6 * * ?}")
     private String resultsCron;
 
+    @Value("${scheduler.snapshot-catchup-cron:0 30 5 * * ?}")
+    private String snapshotCatchupCron;
+
     @Value("${results.timezone:Europe/London}")
     private String scheduleZone;
 
     @PostConstruct
     void logSchedule() {
-        log.info("DataSyncScheduler active: syncCron='{}', resultsCron='{}', zone='{}'",
-                syncCron, resultsCron, scheduleZone);
+        log.info("DataSyncScheduler active: syncCron='{}', snapshotCatchupCron='{}', resultsCron='{}', zone='{}'",
+                syncCron, snapshotCatchupCron, resultsCron, scheduleZone);
     }
 
     @Scheduled(cron = "${scheduler.cron:0 0 4 * *?}", zone = "${results.timezone:Europe/London}")
@@ -45,22 +48,37 @@ public class DataSyncScheduler {
         log.info("Scheduled sync triggered (zone={})", scheduleZone);
         try {
             DataSyncService.SyncSummary summary = dataSyncService.runFullSync();
-            log.info("Scheduled sync completed: success={}, duration={}s",
-                    summary.success(), summary.durationSeconds());
+            log.info("Scheduled sync completed: success={}, failedSeasons={}/{}, duration={}s",
+                    summary.success(), summary.failedSeasons(), summary.totalLeagues(),
+                    summary.durationSeconds());
 
             recommendationService.evictAllCaches();
             log.info("Recommendation caches evicted after sync");
 
-            if (summary.success()) {
-                RecommendationSnapshotService.SnapshotSummary snapshot =
-                        recommendationSnapshotService.snapshotToday();
-                log.info("Post-sync snapshot: date={}, inserted={}, updated={}, skipped={}",
-                        snapshot.snapshotDate(), snapshot.inserted(), snapshot.updated(), snapshot.skipped());
-            } else {
-                log.warn("Skipping daily snapshot because sync reported success=false");
-            }
+            maybeSnapshotAfterSync(summary);
         } catch (Exception e) {
             log.error("Scheduled sync failed: error={}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Safety net when the 04:00 sync aborted before snapshot (API outage, etc.).
+     * No-ops when today's snapshot rows already exist.
+     */
+    @Scheduled(cron = "${scheduler.snapshot-catchup-cron:0 30 5 * *?}", zone = "${results.timezone:Europe/London}")
+    public void scheduledSnapshotCatchup() {
+        log.info("Scheduled snapshot catch-up triggered (zone={})", scheduleZone);
+        try {
+            if (recommendationSnapshotService.hasSnapshotForToday()) {
+                log.info("Snapshot catch-up skipped: today's snapshot already present");
+                return;
+            }
+            RecommendationSnapshotService.SnapshotSummary snapshot =
+                    recommendationSnapshotService.snapshotToday();
+            log.info("Snapshot catch-up: date={}, inserted={}, updated={}, skipped={}",
+                    snapshot.snapshotDate(), snapshot.inserted(), snapshot.updated(), snapshot.skipped());
+        } catch (Exception e) {
+            log.error("Scheduled snapshot catch-up failed: error={}", e.getMessage(), e);
         }
     }
 
@@ -78,5 +96,23 @@ public class DataSyncScheduler {
         } catch (Exception e) {
             log.error("Scheduled results ingest/settle failed: error={}", e.getMessage(), e);
         }
+    }
+
+    private void maybeSnapshotAfterSync(DataSyncService.SyncSummary summary) {
+        if (!summary.shouldSnapshot()) {
+            log.warn("Skipping daily snapshot: sync not snapshot-eligible "
+                            + "(success={}, failedSeasons={}/{}, fixturesProcessed={})",
+                    summary.success(), summary.failedSeasons(), summary.totalLeagues(),
+                    summary.fixturesProcessed());
+            return;
+        }
+        if (!summary.success()) {
+            log.warn("Sync partial failure (failedSeasons={}/{}); snapshotting with available data",
+                    summary.failedSeasons(), summary.totalLeagues());
+        }
+        RecommendationSnapshotService.SnapshotSummary snapshot =
+                recommendationSnapshotService.snapshotToday();
+        log.info("Post-sync snapshot: date={}, inserted={}, updated={}, skipped={}",
+                snapshot.snapshotDate(), snapshot.inserted(), snapshot.updated(), snapshot.skipped());
     }
 }
